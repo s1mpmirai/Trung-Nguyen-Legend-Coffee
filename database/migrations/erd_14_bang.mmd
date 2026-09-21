@@ -1,0 +1,170 @@
+---
+title: "LƯỢC ĐỒ QUAN HỆ THỰC THỂ (ERD) — CSDL HRM TRUNG NGUYÊN (14 BẢNG)"
+config:
+  theme: base
+  themeVariables:
+    fontFamily: "Segoe UI, Arial, sans-serif"
+    fontSize: 13px
+    primaryColor: "#FFFDF9"
+    primaryBorderColor: "#8B4513"
+    primaryTextColor: "#2B1700"
+    lineColor: "#4A5568"
+  er:
+    layoutDirection: TB
+    entityPadding: 15
+    minEntityWidth: 200
+    diagramPadding: 30
+---
+erDiagram
+
+    %% =========================================================================
+    %% BỐ TRÍ MỐI QUAN HỆ THEO TẦNG HỢP LÝ (TOP-DOWN) ĐỂ DÂY NỐI KHÔNG BỊ ĐÈ
+    %% =========================================================================
+
+    %% TẦNG 1 XUỐNG TẦNG 2 (Tổ chức sang Chi nhánh & Bậc lương)
+    chi_nhanh ||--o{ phong_ban : "truc_thuoc"
+    chuc_vu ||--o{ bac_luong : "thang_bac"
+
+    %% TẦNG 2 VÀO TÂM ĐIỂM NHÂN VIÊN
+    phong_ban ||--o{ nhan_vien : "co_nhan_su"
+    chuc_vu ||--o{ nhan_vien : "dam_nhiem"
+
+    %% QUAN HỆ VÒNG TỐI GIẢN (Trưởng phòng)
+    nhan_vien ||--o| phong_ban : "lam_truong_phong"
+
+    %% TỪ NHÂN VIÊN TỎA RA CÁC PHÂN HỆ VỆ TINH (Không giao chéo)
+    nhan_vien ||--o{ bang_cap : "trinh_do"
+    nhan_vien ||--o{ hop_dong_lao_dong : "ky_hop_dong"
+    nhan_vien ||--o{ don_tu : "nop_don"
+    nhan_vien ||--o| tai_khoan : "tai_khoan"
+    nhan_vien ||--o{ bang_luong : "bang_luong"
+
+    %% CHẤM CÔNG (Nằm ở nhánh nghiệp vụ)
+    ca_lam_viec ||--o{ bang_cham_cong : "theo_ca"
+    nhan_vien ||--o{ bang_cham_cong : "cham_cong"
+    don_tu ||--o{ bang_cham_cong : "nghi_co_don"
+
+    %% CỤM ADMIN: SẢN PHẨM & NHÀ CUNG CẤP (Liên kết gọn gàng, không vắt ngang)
+    nhan_vien ||--o{ nha_cung_cap : "phu_trach"
+    nha_cung_cap ||--o{ san_pham : "cung_cap"
+    chi_nhanh ||--o{ san_pham : "kho_san_xuat"
+
+
+    %% =========================================================================
+    %% ĐỊNH NGHĨA CÁC THUỘC TÍNH (Gọn gàng: Khóa chính PK, Khóa ngoại FK, Cột chính)
+    %% =========================================================================
+
+    chi_nhanh {
+        varchar ma_cn PK "Mã chi nhánh"
+        varchar ten_cn "Tên chi nhánh/nhà máy"
+        varchar loai_cn "TRU_SO, NHA_MAY..."
+        varchar tinh_thanh "Tỉnh thành"
+    }
+
+    phong_ban {
+        varchar ma_pb PK "Mã phòng ban"
+        varchar ten_pb "Tên phòng ban"
+        varchar ma_cn FK "Thuộc chi nhánh"
+        varchar ma_truong_pb FK "Mã trưởng phòng"
+    }
+
+    chuc_vu {
+        varchar ma_cv PK "Mã chức vụ"
+        varchar ten_cv "Tên chức vụ"
+        int cap_bac "Cấp bậc (1-5)"
+        decimal phu_cap_chuc_vu "Phụ cấp chức vụ"
+    }
+
+    bac_luong {
+        int ma_bac PK "Mã bậc lương"
+        varchar ma_cv FK "Thuộc chức vụ"
+        int bac "Bậc 1, 2, 3..."
+        decimal he_so "Hệ số lương"
+        decimal muc_luong "Lương tham chiếu"
+    }
+
+    nhan_vien {
+        varchar ma_nv PK "Mã nhân viên"
+        varchar ho_ten "Họ và tên"
+        date ngay_sinh "Ngày sinh"
+        varchar gioi_tinh "Giới tính"
+        varchar cccd UK "CCCD"
+        varchar ma_pb FK "Phòng ban"
+        varchar ma_cv FK "Chức vụ"
+        varchar ma_cn FK "Chi nhánh"
+        varchar trang_thai "DANG_LAM, DA_NGHI..."
+    }
+
+    bang_cap {
+        int ma_bc PK "Mã bằng cấp"
+        varchar ma_nv FK "Mã nhân viên"
+        varchar trinh_do "CĐ, ĐH, Thạc sĩ..."
+        varchar chuyen_nganh "Chuyên ngành"
+        varchar noi_dao_tao "Trường đào tạo"
+    }
+
+    hop_dong_lao_dong {
+        varchar ma_hd PK "Mã hợp đồng"
+        varchar ma_nv FK "Mã nhân viên"
+        varchar loai_hd "1 năm, 3 năm, VTH..."
+        date ngay_bat_dau "Ngày bắt đầu"
+        decimal luong_co_ban "Lương cơ bản"
+    }
+
+    don_tu {
+        varchar ma_don PK "Mã đơn"
+        varchar ma_nv FK "Người nộp đơn"
+        varchar loai_don "Nghỉ phép, Ốm, Việc..."
+        date ngay_bat_dau "Từ ngày"
+        date ngay_ket_thuc "Đến ngày"
+        varchar trang_thai "CHO_DUYET, DA_DUYET"
+    }
+
+    ca_lam_viec {
+        varchar ma_ca PK "Mã ca"
+        varchar ten_ca "Hành chính, Ca đêm..."
+        time gio_vao "Giờ vào"
+        time gio_ra "Giờ ra"
+        decimal he_so "Hệ số ca"
+    }
+
+    bang_cham_cong {
+        bigint ma_cc PK "Mã chấm công"
+        varchar ma_nv FK "Mã nhân viên"
+        date ngay_cong "Ngày làm việc"
+        varchar ma_ca FK "Mã ca"
+        varchar loai_cong "Đủ, Nửa, Nghỉ..."
+        varchar ma_don FK "Đơn nghỉ (nếu có)"
+    }
+
+    bang_luong {
+        bigint ma_bl PK "Mã bảng lương"
+        int thang "Tháng (1-12)"
+        int nam "Năm"
+        varchar ma_nv FK "Mã nhân viên"
+        decimal luong_gross "Lương Gross"
+        decimal luong_net "Thực lĩnh Net"
+    }
+
+    tai_khoan {
+        int ma_tk PK "Mã tài khoản"
+        varchar ten_dang_nhap UK "Username"
+        varchar ma_nv FK "Mã nhân viên"
+        varchar vai_tro "ADMIN, QUAN_LY, NV..."
+    }
+
+    nha_cung_cap {
+        varchar ma_ncc PK "Mã nhà cung cấp"
+        varchar ten_ncc "Tên NCC"
+        varchar loai_hang "Hạt cà phê, Bao bì..."
+        varchar ma_nv_phu_trach FK "NV phụ trách"
+    }
+
+    san_pham {
+        varchar ma_sp PK "Mã sản phẩm"
+        varchar ten_sp "Tên sản phẩm G7..."
+        varchar ma_ncc FK "Cung cấp bởi"
+        varchar ma_cn FK "Kho/Xưởng lưu trữ"
+        decimal gia_ban "Giá bán"
+        int ton_kho "Tồn kho"
+    }
