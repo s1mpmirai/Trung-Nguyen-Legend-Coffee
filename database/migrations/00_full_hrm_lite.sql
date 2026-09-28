@@ -1,17 +1,54 @@
--- =====================================================================
--- ĐỒ ÁN: HỆ THỐNG THÔNG TIN DOANH NGHIỆP (Mã HP: 841065) - ĐH SÀI GÒN (SGU)
--- Doanh nghiệp: CÔNG TY CỔ PHẦN TẬP ĐOÀN TRUNG NGUYÊN (Trung Nguyên Legend)
--- Phân hệ: HRM (Quản trị nguồn nhân lực) + ADMIN (Sản phẩm & NCC)
--- Phiên bản: Chuẩn 14 bảng - Đáp ứng 100% barem chấm điểm đề tài SGU
--- HQTCSDL: MySQL 8.0+ / MariaDB 10.6+ | Bảng mã: utf8mb4
--- =====================================================================
 
-SET FOREIGN_KEY_CHECKS = 0;
+-- 12. vai_tro (4 vai trò mặc định)
+INSERT INTO vai_tro (ma_vai_tro, ten_vai_tro, mo_ta, he_thong) VALUES
+('ADMIN', 'Quản trị viên', 'Toàn quyền quản trị hệ thống và phân quyền', 1),
+('QUAN_LY', 'Quản lý', 'Quản lý nhân sự và nghiệp vụ được phân công', 1),
+('TRUONG_NHOM', 'Trưởng nhóm', 'Quản lý nhóm nhân sự trực thuộc', 1),
+('NHAN_VIEN', 'Nhân viên', 'Sử dụng các chức năng cá nhân', 1);
+
+-- 13. quyen (danh mục quyền dùng cho checkbox phân quyền)
+INSERT INTO quyen (ma_quyen, ten_quyen, nhom_quyen, mo_ta) VALUES
+('EMPLOYEE_VIEW', 'Xem nhân sự', 'NHAN_SU', 'Xem danh sách và hồ sơ nhân sự'),
+('EMPLOYEE_CREATE', 'Thêm nhân sự', 'NHAN_SU', 'Tạo hồ sơ nhân sự mới'),
+('EMPLOYEE_UPDATE', 'Sửa nhân sự', 'NHAN_SU', 'Cập nhật hồ sơ nhân sự'),
+('EMPLOYEE_DELETE', 'Xóa nhân sự', 'NHAN_SU', 'Xóa hoặc ngừng sử dụng hồ sơ nhân sự'),
+('LEAVE_VIEW', 'Xem đơn từ', 'DON_TU', 'Xem đơn nghỉ phép, nghỉ việc'),
+('LEAVE_CREATE', 'Tạo đơn từ', 'DON_TU', 'Gửi đơn nghỉ phép, nghỉ việc'),
+('LEAVE_APPROVE', 'Duyệt đơn từ', 'DON_TU', 'Duyệt hoặc từ chối đơn từ'),
+('ATTENDANCE_MANAGE', 'Quản lý chấm công', 'CHAM_CONG', 'Xem và cập nhật chấm công'),
+('PAYROLL_VIEW', 'Xem bảng lương', 'LUONG', 'Xem bảng lương cá nhân hoặc nhân sự'),
+('PAYROLL_MANAGE', 'Tính và duyệt lương', 'LUONG', 'Tính, cập nhật và duyệt bảng lương'),
+('PRODUCT_VIEW', 'Xem sản phẩm', 'KHO', 'Xem, tìm kiếm và lọc sản phẩm'),
+('PRODUCT_MANAGE', 'Quản lý sản phẩm', 'KHO', 'Thêm, sửa và xóa sản phẩm'),
+('SUPPLIER_VIEW', 'Xem nhà cung cấp', 'KHO', 'Xem, tìm kiếm và lọc nhà cung cấp'),
+('SUPPLIER_MANAGE', 'Quản lý nhà cung cấp', 'KHO', 'Thêm, sửa và xóa nhà cung cấp'),
+('ACCOUNT_MANAGE', 'Quản lý tài khoản', 'PHAN_QUYEN', 'Thêm, khóa, mở khóa tài khoản'),
+('PERMISSION_ASSIGN', 'Cấp quyền tài khoản', 'PHAN_QUYEN', 'Gán hoặc thu hồi quyền cho tài khoản');
+
+-- 14. tai_khoan (10 dòng - vai trò chính của tài khoản)
+INSERT INTO tai_khoan (ten_dang_nhap, mat_khau, ma_nv, email, ma_vai_tro, trang_thai) VALUES
 SET NAMES utf8mb4;
 
 DROP DATABASE IF EXISTS trungnguyen_hrm_lite;
 CREATE DATABASE trungnguyen_hrm_lite CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE trungnguyen_hrm_lite;
+
+-- 15. vai_tro_quyen (quyền mặc định theo vai trò)
+INSERT INTO vai_tro_quyen (ma_vai_tro, ma_quyen)
+SELECT 'ADMIN', ma_quyen FROM quyen;
+
+INSERT INTO vai_tro_quyen (ma_vai_tro, ma_quyen) VALUES
+('QUAN_LY', 'EMPLOYEE_VIEW'), ('QUAN_LY', 'EMPLOYEE_CREATE'), ('QUAN_LY', 'EMPLOYEE_UPDATE'),
+('QUAN_LY', 'LEAVE_VIEW'), ('QUAN_LY', 'LEAVE_APPROVE'), ('QUAN_LY', 'ATTENDANCE_MANAGE'),
+('QUAN_LY', 'PAYROLL_VIEW'), ('QUAN_LY', 'PAYROLL_MANAGE'), ('QUAN_LY', 'PRODUCT_VIEW'),
+('QUAN_LY', 'PRODUCT_MANAGE'), ('QUAN_LY', 'SUPPLIER_VIEW'), ('QUAN_LY', 'SUPPLIER_MANAGE'),
+('TRUONG_NHOM', 'EMPLOYEE_VIEW'), ('TRUONG_NHOM', 'LEAVE_VIEW'), ('TRUONG_NHOM', 'LEAVE_APPROVE'),
+('TRUONG_NHOM', 'ATTENDANCE_MANAGE'), ('TRUONG_NHOM', 'PAYROLL_VIEW'),
+('NHAN_VIEN', 'LEAVE_VIEW'), ('NHAN_VIEN', 'LEAVE_CREATE'), ('NHAN_VIEN', 'PAYROLL_VIEW');
+
+-- 16. tai_khoan_quyen (quyền tùy chỉnh riêng cho từng tài khoản)
+INSERT INTO tai_khoan_quyen (ma_tk, ma_quyen, duoc_cap)
+SELECT ma_tk, 'PRODUCT_VIEW', 1 FROM tai_khoan WHERE ten_dang_nhap = 'nv09';
 
 -- =====================================================================
 -- NHÓM A: DANH MỤC TỔ CHỨC & BẬC LƯƠNG
@@ -232,27 +269,62 @@ CREATE TABLE bang_luong (
 -- NHÓM E: TÀI KHOẢN & PHÂN QUYỀN (Đáp ứng Mục II.2 & III.3: Admin phân quyền, cấp quyền nhân sự)
 -- =====================================================================
 
--- 12. Tài khoản người dùng hệ thống
+-- 12. Vai trò hệ thống
+CREATE TABLE vai_tro (
+    ma_vai_tro VARCHAR(30) PRIMARY KEY,
+    ten_vai_tro VARCHAR(100) NOT NULL UNIQUE,
+    mo_ta VARCHAR(255),
+    he_thong TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=Vai trò mặc định, 0=Vai trò tùy chỉnh'
+) ENGINE=InnoDB COMMENT='Danh mục vai trò RBAC';
+
+-- 13. Quyền chức năng chi tiết
+CREATE TABLE quyen (
+    ma_quyen VARCHAR(50) PRIMARY KEY,
+    ten_quyen VARCHAR(150) NOT NULL,
+    nhom_quyen VARCHAR(50) NOT NULL,
+    mo_ta VARCHAR(255)
+) ENGINE=InnoDB COMMENT='Danh mục quyền chức năng';
+
+-- 14. Tài khoản người dùng hệ thống
 CREATE TABLE tai_khoan (
     ma_tk INT AUTO_INCREMENT PRIMARY KEY,
     ten_dang_nhap VARCHAR(50) NOT NULL UNIQUE,
     mat_khau VARCHAR(255) NOT NULL COMMENT 'Băm mật khẩu',
     ma_nv VARCHAR(10) NULL UNIQUE COMMENT 'NULL = tài khoản admin hệ thống',
     email VARCHAR(100),
-    vai_tro ENUM('ADMIN', 'QUAN_LY', 'TRUONG_NHOM', 'NHAN_VIEN') NOT NULL DEFAULT 'NHAN_VIEN' 
-        COMMENT 'Ví dụ: khi lên trưởng nhóm / quản lý quyền sẽ thay đổi theo vai trò',
+    ma_vai_tro VARCHAR(30) NOT NULL DEFAULT 'NHAN_VIEN',
     trang_thai ENUM('HOAT_DONG', 'KHOA', 'CHO_KICH_HOAT') DEFAULT 'HOAT_DONG',
     lan_dn_cuoi DATETIME NULL,
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_tk_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL
-) ENGINE=InnoDB COMMENT='Tài khoản đăng nhập và phân quyền người dùng';
+    CONSTRAINT fk_tk_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT fk_tk_vaitro FOREIGN KEY (ma_vai_tro) REFERENCES vai_tro(ma_vai_tro) ON UPDATE CASCADE
+) ENGINE=InnoDB COMMENT='Tài khoản đăng nhập và vai trò chính';
+
+-- 15. Quyền mặc định theo vai trò
+CREATE TABLE vai_tro_quyen (
+    ma_vai_tro VARCHAR(30) NOT NULL,
+    ma_quyen VARCHAR(50) NOT NULL,
+    PRIMARY KEY (ma_vai_tro, ma_quyen),
+    CONSTRAINT fk_vtq_vaitro FOREIGN KEY (ma_vai_tro) REFERENCES vai_tro(ma_vai_tro) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_vtq_quyen FOREIGN KEY (ma_quyen) REFERENCES quyen(ma_quyen) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB COMMENT='Ánh xạ vai trò và quyền mặc định';
+
+-- 16. Quyền tùy chỉnh cho từng tài khoản
+CREATE TABLE tai_khoan_quyen (
+    ma_tk INT NOT NULL,
+    ma_quyen VARCHAR(50) NOT NULL,
+    duoc_cap TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=Cấp thêm, 0=Từ chối quyền kế thừa',
+    PRIMARY KEY (ma_tk, ma_quyen),
+    CONSTRAINT fk_tkq_taikhoan FOREIGN KEY (ma_tk) REFERENCES tai_khoan(ma_tk) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_tkq_quyen FOREIGN KEY (ma_quyen) REFERENCES quyen(ma_quyen) ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE=InnoDB COMMENT='Quyền cấp hoặc thu hồi riêng cho tài khoản';
 
 
 -- =====================================================================
 -- NHÓM F: SẢN PHẨM & NHÀ CUNG CẤP (Đáp ứng Mục II.2 - Giao diện ADMIN: tìm kiếm, lọc sản phẩm & NCC)
 -- =====================================================================
 
--- 13. Nhà cung cấp
+-- 17. Nhà cung cấp
 CREATE TABLE nha_cung_cap (
     ma_ncc VARCHAR(10) PRIMARY KEY,
     ten_ncc VARCHAR(180) NOT NULL,
@@ -271,7 +343,7 @@ CREATE TABLE nha_cung_cap (
 CREATE INDEX idx_ncc_ten ON nha_cung_cap(ten_ncc);
 CREATE INDEX idx_ncc_nv ON nha_cung_cap(ma_nv_phu_trach);
 
--- 14. Sản phẩm Trung Nguyên (Admin xem, tìm kiếm, lọc, sắp xếp theo giá/kho)
+-- 18. Sản phẩm Trung Nguyên (Admin xem, tìm kiếm, lọc, sắp xếp theo giá/kho)
 CREATE TABLE san_pham (
     ma_sp VARCHAR(15) PRIMARY KEY,
     ten_sp VARCHAR(180) NOT NULL,
@@ -309,7 +381,7 @@ FOREIGN KEY (ma_truong_pb) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELE
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =====================================================================
--- KẾT THÚC DDL - 14 BẢNG
+-- KẾT THÚC DDL - 18 BẢNG
 -- =====================================================================
 
 -- =================================================================================
