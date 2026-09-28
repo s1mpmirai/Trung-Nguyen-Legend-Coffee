@@ -70,7 +70,7 @@ CREATE TABLE nhan_vien (
     dia_chi VARCHAR(255),
     sdt VARCHAR(20),
     email VARCHAR(100) UNIQUE,
-    so_nguoi_pt TINYINT DEFAULT 0,
+    so_nguoi_pt TINYINT DEFAULT 0, "Số người phụ thuộc",
     ma_pb VARCHAR(10) NOT NULL,
     ma_cv VARCHAR(10) NOT NULL,
     ma_bac INT NULL COMMENT 'Bậc lương hiện tại',
