@@ -12,7 +12,7 @@ class tao_tai_khoan(BaseModel):
     ngay_tao: datetime = Field(None, description="Ngày tạo")
     ngay_cap_nhat: datetime = Field(None, description="Ngày cập nhật")
     
-class UserUpdate(BaseModel):
+class cap_nhat_tai_khoan(BaseModel):
     mat_khau: Optional[str] = Field(None, description="Mật khẩu")
     ma_vai_tro: Optional[str] = Field(None, description="Mã vai trò")
     trang_thai: Optional[str] = Field(None, description="Trạng thái tài khoản")
