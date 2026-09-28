@@ -3,8 +3,8 @@ version: '3.8'
 services:
   # ─── MySQL Database ───────────────────────────────────────────
   db:
-    image: mysql:8.0
-    container_name: htttdn_db
+    image: mariadb:10.11
+    container_name: trungnguyen_hrm_lite
     restart: always
     environment:
       MYSQL_DATABASE: ${DB_NAME}
@@ -17,7 +17,7 @@ services:
       - mysql_data:/var/lib/mysql                          # Lưu dữ liệu persistent
       - ./database/migrations:/docker-entrypoint-initdb.d  # Auto chạy SQL khi khởi tạo
     networks:
-      - htttdn_network
+      - trungnguyen_hrm_lite_network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -29,7 +29,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: htttdn_backend
+    container_name: trungnguyen_hrm_lite_backend
     restart: always
     env_file:
       - .env
@@ -41,21 +41,21 @@ services:
       db:
         condition: service_healthy
     networks:
-      - htttdn_network
+      - trungnguyen_hrm_lite_network
 
   # ─── React Frontend ───────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: htttdn_frontend
+    container_name: trungnguyen_hrm_lite_frontend
     restart: always
     ports:
       - "3000:80"
     depends_on:
       - backend
     networks:
-      - htttdn_network
+      - trungnguyen_hrm_lite_network
 
 # ─── Volumes (lưu dữ liệu MySQL) ──────────────────────────────
 volumes:
@@ -64,5 +64,5 @@ volumes:
 
 # ─── Network ──────────────────────────────────────────────────
 networks:
-  htttdn_network:
+  trungnguyen_hrm_lite_network:
     driver: bridge
