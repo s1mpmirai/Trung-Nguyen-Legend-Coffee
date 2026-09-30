@@ -1,7 +1,12 @@
 # ─── Environment & Secrets ────────────────────────────────────
 .env
+!.env.example
+*.env
 *.env.local
 *.env.production
+*.secret
+*.pem
+*.key
 
 # ─── Python / FastAPI ─────────────────────────────────────────
 __pycache__/
@@ -16,12 +21,18 @@ build/
 venv/
 env/
 *.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
 
 # ─── Node / React ─────────────────────────────────────────────
 node_modules/
 frontend/dist/
 frontend/build/
 .npm
+.vite/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -35,7 +46,8 @@ docker-compose.override.yml
 # ─── Database ─────────────────────────────────────────────────
 *.sql.gz
 *.dump
-database/backup/*.sql
+database/backup/*
+!database/backup/.gitkeep
 
 # ─── IDE / Editor ─────────────────────────────────────────────
 .vscode/
