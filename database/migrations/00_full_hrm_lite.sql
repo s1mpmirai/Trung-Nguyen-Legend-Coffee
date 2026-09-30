@@ -1,6 +1,7 @@
 -- =================================================================================
 -- HỆ THỐNG QUẢN LÝ NHÂN SỰ TRUNG NGUYÊN COFFEE (HRM LITE - CHUẨN HÓA 3NF)
 -- HQTCSDL: MySQL 8.0+ / MariaDB 10.6+
+-- ĐÃ ĐỒNG BỘ ĐẦY ĐỦ ngay_tao & ngay_cap_nhat TRÊN TẤT CẢ 18 BẢNG
 -- =================================================================================
 
 SET NAMES utf8mb4;
@@ -24,10 +25,12 @@ CREATE TABLE chi_nhanh (
     sdt VARCHAR(20),
     email VARCHAR(100),
     ngay_thanh_lap DATE,
-    trang_thai TINYINT(1) DEFAULT 1 COMMENT '1=Hoạt động, 0=Ngừng'
+    trang_thai TINYINT(1) DEFAULT 1 COMMENT '1=Hoạt động, 0=Ngừng',
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='Danh mục chi nhánh, nhà máy, cửa hàng';
 
--- 2. Phòng ban (Đồng bộ sdt)
+-- 2. Phòng ban
 CREATE TABLE phong_ban (
     ma_pb VARCHAR(10) PRIMARY KEY,
     ten_pb VARCHAR(150) NOT NULL,
@@ -36,6 +39,8 @@ CREATE TABLE phong_ban (
     sdt VARCHAR(20),
     mo_ta VARCHAR(255),
     trang_thai TINYINT(1) DEFAULT 1,
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_pb_chinhanh FOREIGN KEY (ma_cn) REFERENCES chi_nhanh(ma_cn) ON UPDATE CASCADE
 ) ENGINE=InnoDB COMMENT='Danh mục phòng ban';
 
@@ -45,7 +50,9 @@ CREATE TABLE chuc_vu (
     ten_cv VARCHAR(100) NOT NULL,
     cap_bac TINYINT DEFAULT 1 COMMENT '1=NV, 2=Tổ trưởng, 3=Phó/Trưởng phòng, 4=Phó GĐ, 5=Ban GĐ',
     phu_cap_chuc_vu DECIMAL(12,0) DEFAULT 0,
-    mo_ta VARCHAR(255)
+    mo_ta VARCHAR(255),
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='Danh mục chức vụ';
 
 -- 4. Bậc lương (Thang bảng lương)
@@ -56,11 +63,13 @@ CREATE TABLE bac_luong (
     he_so DECIMAL(4,2) NOT NULL DEFAULT 1.00,
     muc_luong DECIMAL(12,0) NOT NULL DEFAULT 0,
     mo_ta VARCHAR(255),
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE (ma_cv, bac),
     CONSTRAINT fk_bl_chucvu FOREIGN KEY (ma_cv) REFERENCES chuc_vu(ma_cv) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='Hệ số lương theo chức vụ và bậc';
 
--- 5. Hồ sơ nhân viên (Đã liên kết ma_bac tham chiếu thang lương)
+-- 5. Hồ sơ nhân viên
 CREATE TABLE nhan_vien (
     ma_nv VARCHAR(10) PRIMARY KEY,
     ho_ten VARCHAR(100) NOT NULL,
@@ -108,6 +117,8 @@ CREATE TABLE bang_cap (
     nam_tot_nghiep SMALLINT,
     xep_loai ENUM('TRUNG_BINH', 'KHA', 'GIOI', 'XUAT_SAC'),
     ghi_chu VARCHAR(255),
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_bc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='Trình độ bằng cấp nhân sự';
 
@@ -122,6 +133,8 @@ CREATE TABLE hop_dong_lao_dong (
     luong_co_ban DECIMAL(12,0) NOT NULL,
     ty_le_huong DECIMAL(5,2) DEFAULT 100.00,
     trang_thai ENUM('HIEU_LUC', 'HET_HAN', 'DA_THANH_LY', 'TAM_HOAN') DEFAULT 'HIEU_LUC',
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT ck_hd_luong CHECK (luong_co_ban > 0),
     CONSTRAINT fk_hd_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='Hợp đồng lao động';
@@ -140,6 +153,7 @@ CREATE TABLE don_tu (
     nguoi_duyet VARCHAR(10) NULL,
     ngay_duyet DATETIME NULL,
     y_kien_duyet VARCHAR(500),
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT ck_don_songay CHECK (so_ngay > 0),
     CONSTRAINT ck_don_ngay CHECK (ngay_ket_thuc >= ngay_bat_dau),
     CONSTRAINT fk_don_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -153,7 +167,9 @@ CREATE TABLE ca_lam_viec (
     gio_vao TIME NOT NULL,
     gio_ra TIME NOT NULL,
     so_gio_chuan DECIMAL(4,2) DEFAULT 8.00,
-    he_so DECIMAL(4,2) DEFAULT 1.00
+    he_so DECIMAL(4,2) DEFAULT 1.00,
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='Danh mục ca làm việc';
 
 -- 10. Chấm công
@@ -170,6 +186,8 @@ CREATE TABLE bang_cham_cong (
     so_cong DECIMAL(3,2) DEFAULT 1.00,
     ma_don VARCHAR(15) NULL,
     ghi_chu VARCHAR(255),
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE (ma_nv, ngay_cong),
     CONSTRAINT fk_cc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_cc_ca FOREIGN KEY (ma_ca) REFERENCES ca_lam_viec(ma_ca) ON UPDATE CASCADE ON DELETE SET NULL,
@@ -201,6 +219,8 @@ CREATE TABLE bang_luong (
     luong_net DECIMAL(12,0) DEFAULT 0,
     trang_thai ENUM('NHAP', 'DA_DUYET', 'DA_TRA') DEFAULT 'NHAP',
     ghi_chu VARCHAR(255),
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE (thang, nam, ma_nv),
     CONSTRAINT ck_bl_thang CHECK (thang BETWEEN 1 AND 12),
     CONSTRAINT fk_bl_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE
@@ -211,7 +231,9 @@ CREATE TABLE vai_tro (
     ma_vai_tro VARCHAR(30) PRIMARY KEY,
     ten_vai_tro VARCHAR(100) NOT NULL UNIQUE,
     mo_ta VARCHAR(255),
-    he_thong TINYINT(1) NOT NULL DEFAULT 0
+    he_thong TINYINT(1) NOT NULL DEFAULT 0,
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='Danh mục vai trò RBAC';
 
 -- 13. Quyền chức năng
@@ -219,10 +241,12 @@ CREATE TABLE quyen (
     ma_quyen VARCHAR(50) PRIMARY KEY,
     ten_quyen VARCHAR(150) NOT NULL,
     nhom_quyen VARCHAR(50) NOT NULL,
-    mo_ta VARCHAR(255)
+    mo_ta VARCHAR(255),
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='Danh mục quyền chức năng';
 
--- 14. Tài khoản (TỐI GIẢN: Dùng ma_nv làm PRIMARY KEY, bỏ ma_tk, bỏ email, bỏ username)
+-- 14. Tài khoản
 CREATE TABLE tai_khoan (
     ma_tk INT AUTO_INCREMENT PRIMARY KEY,
     ma_nv VARCHAR(10) NOT NULL UNIQUE COMMENT 'Mã nhân viên (Khóa ngoại & dùng để đăng nhập)',
@@ -231,6 +255,7 @@ CREATE TABLE tai_khoan (
     trang_thai ENUM('HOAT_DONG', 'KHOA', 'CHO_KICH_HOAT') DEFAULT 'HOAT_DONG',
     lan_dn_cuoi DATETIME NULL,
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_tk_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_tk_vaitro FOREIGN KEY (ma_vai_tro) REFERENCES vai_tro(ma_vai_tro) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
@@ -239,16 +264,20 @@ CREATE TABLE tai_khoan (
 CREATE TABLE vai_tro_quyen (
     ma_vai_tro VARCHAR(30) NOT NULL,
     ma_quyen VARCHAR(50) NOT NULL,
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (ma_vai_tro, ma_quyen),
     CONSTRAINT fk_vtq_vaitro FOREIGN KEY (ma_vai_tro) REFERENCES vai_tro(ma_vai_tro) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_vtq_quyen FOREIGN KEY (ma_quyen) REFERENCES quyen(ma_quyen) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='Ánh xạ vai trò và quyền mặc định';
 
--- 16. Quyền tùy chỉnh cho tài khoản (Dùng trực tiếp ma_nv, không cần ma_tk trung gian)
+-- 16. Quyền tùy chỉnh cho tài khoản
 CREATE TABLE tai_khoan_quyen (
     ma_tk INT NOT NULL,
     ma_quyen VARCHAR(50) NOT NULL,
     duoc_cap TINYINT(1) NOT NULL DEFAULT 1,
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (ma_tk, ma_quyen),
     CONSTRAINT fk_tkq_taikhoan FOREIGN KEY (ma_tk) REFERENCES tai_khoan(ma_tk) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_tkq_quyen FOREIGN KEY (ma_quyen) REFERENCES quyen(ma_quyen) ON UPDATE CASCADE ON DELETE CASCADE
@@ -267,6 +296,7 @@ CREATE TABLE nha_cung_cap (
     ma_nv_phu_trach VARCHAR(10) NULL,
     trang_thai TINYINT(1) NOT NULL DEFAULT 1,
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_ncc_nhanvien FOREIGN KEY (ma_nv_phu_trach) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Nhà cung cấp nguyên vật liệu';
 
@@ -286,6 +316,7 @@ CREATE TABLE san_pham (
     mo_ta VARCHAR(500),
     trang_thai TINYINT(1) NOT NULL DEFAULT 1,
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_sp_ncc FOREIGN KEY (ma_ncc) REFERENCES nha_cung_cap(ma_ncc) ON UPDATE CASCADE ON DELETE SET NULL,
     CONSTRAINT fk_sp_chinhanh FOREIGN KEY (ma_cn) REFERENCES chi_nhanh(ma_cn) ON UPDATE CASCADE ON DELETE SET NULL,
     CONSTRAINT fk_sp_nhanvien FOREIGN KEY (ma_nv_quan_ly) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL,
@@ -354,7 +385,7 @@ INSERT INTO bac_luong (ma_cv, bac, he_so, muc_luong, mo_ta) VALUES
 ('CV07', 2, 4.50, 65000000, 'Giám đốc bậc 2'),
 ('CV08', 1, 5.00, 80000000, 'Tổng Giám đốc');
 
--- 5. Nhân viên (Đã liên kết ma_bac)
+-- 5. Nhân viên
 INSERT INTO nhan_vien (ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
   so_nguoi_pt, ma_pb, ma_cv, ma_bac, ma_cn, ma_nql, ngay_vao_lam, ngay_nghi_viec, trang_thai,
   so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh) VALUES
@@ -523,7 +554,7 @@ INSERT INTO vai_tro_quyen (ma_vai_tro, ma_quyen) VALUES
 ('TRUONG_NHOM', 'ATTENDANCE_MANAGE'), ('TRUONG_NHOM', 'PAYROLL_VIEW'),
 ('NHAN_VIEN', 'LEAVE_VIEW'), ('NHAN_VIEN', 'LEAVE_CREATE'), ('NHAN_VIEN', 'PAYROLL_VIEW');
 
--- 15. Tài khoản (Tối giản: Đăng nhập trực tiếp bằng ma_nv, NV01 làm ADMIN)
+-- 15. Tài khoản
 INSERT INTO tai_khoan (ma_nv, mat_khau, ma_vai_tro, trang_thai) VALUES
 ('NV01', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ADMIN',       'HOAT_DONG'),
 ('NV02', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'QUAN_LY',     'HOAT_DONG'),
