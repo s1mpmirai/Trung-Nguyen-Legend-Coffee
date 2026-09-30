@@ -3,10 +3,10 @@ from sqlalchemy.orm import Session
 from app.repositories.employee_repository import create, get_by_cccd, get_employee_list
 from app.utils.auto_gen import generate_employee_code
 
-from app.schemas.employee_schemas import ho_so_nhan_vien_create
+from app.schemas.employee_schemas import employee_profile_create, employee_list_response
 
 
-def create_employee(db: Session, data: ho_so_nhan_vien_create) -> dict:
+def create_employee(db: Session, data: employee_profile_create) -> dict:
     if data.cccd and get_by_cccd(db, data.cccd) is not None:
         raise ValueError("CCCD đã tồn tại")
 

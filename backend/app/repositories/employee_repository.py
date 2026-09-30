@@ -46,8 +46,11 @@ def get_employee_list(
     db: Session,
     page: int = 1,
     page_size: int = 10,
-) -> list[dict]:
+) -> dict:
     offset = (page - 1) * page_size
+
+    total = db.execute(text("SELECT COUNT(*) FROM nhan_vien")).scalar() or 0
+
     query = """
         SELECT ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
                so_nguoi_pt, ma_pb, ma_cv, ma_cn, ngay_vao_lam, ngay_nghi_viec,
@@ -64,4 +67,7 @@ def get_employee_list(
         },
     ).mappings().all()
 
-    return [dict(row) for row in rows]
+    return {
+        "total": total,
+        "items": [dict(row) for row in rows]
+    }
