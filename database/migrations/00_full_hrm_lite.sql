@@ -556,15 +556,15 @@ INSERT INTO vai_tro_quyen (ma_vai_tro, ma_quyen) VALUES
 
 -- 15. Tài khoản
 INSERT INTO tai_khoan (ma_nv, mat_khau, ma_vai_tro, trang_thai) VALUES
-('NV01', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'ADMIN',       'HOAT_DONG'),
-('NV02', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'QUAN_LY',     'HOAT_DONG'),
-('NV03', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'QUAN_LY',     'HOAT_DONG'),
-('NV04', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'QUAN_LY',     'HOAT_DONG'),
-('NV05', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'QUAN_LY',     'HOAT_DONG'),
-('NV06', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'QUAN_LY',     'HOAT_DONG'),
-('NV08', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'QUAN_LY',     'HOAT_DONG'),
-('NV09', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'TRUONG_NHOM', 'HOAT_DONG'),
-('NV10', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN',   'HOAT_DONG');
+('NV01', '1', 'ADMIN',       'HOAT_DONG'),
+('NV02', '1', 'QUAN_LY',     'HOAT_DONG'),
+('NV03', '1', 'QUAN_LY',     'HOAT_DONG'),
+('NV04', '1', 'QUAN_LY',     'HOAT_DONG'),
+('NV05', '1', 'QUAN_LY',     'HOAT_DONG'),
+('NV06', '1', 'QUAN_LY',     'HOAT_DONG'),
+('NV08', '1', 'QUAN_LY',     'HOAT_DONG'),
+('NV09', '1', 'TRUONG_NHOM', 'HOAT_DONG'),
+('NV10', '1', 'NHAN_VIEN',   'HOAT_DONG');
 
 -- 16. Quyền riêng theo tài khoản
 INSERT INTO tai_khoan_quyen (ma_tk, ma_quyen, duoc_cap)
