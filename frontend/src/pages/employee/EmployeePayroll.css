@@ -339,6 +339,31 @@
   opacity: 0.6;
 }
 
+.pr-net-card__amount--pending {
+  margin: 8px 0 16px;
+}
+
+.pr-net-card__number--pending {
+  font-size: 24px;
+  font-weight: 800;
+  color: #fef08a;
+  letter-spacing: -0.3px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.pr-net-card__notice {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  backdrop-filter: blur(4px);
+}
+
 .pr-net-card__breakdown {
   display: flex;
   gap: 20px;

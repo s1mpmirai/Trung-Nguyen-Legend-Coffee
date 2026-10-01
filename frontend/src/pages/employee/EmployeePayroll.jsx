@@ -16,7 +16,6 @@ import {
   getPayrollMonth,
   getPayrollMonths,
   getPayrollYearSummary,
-  FALLBACK_PAYROLL,
 } from "../../services/payrollService";
 
 /* ── Styles ────────────────────────────────────────────────────── */
@@ -24,20 +23,20 @@ import "./EmployeePayroll.css";
 
 /**
  * EmployeePayroll – Trang Bảng Lương & Phiếu Thu Nhập (Employee Portal)
- * Đồng bộ màu sắc (#0EA5E9, #F8FAFC), Shared Header & Bottom Navigation.
+ *
+ * Logic hiển thị:
+ *   - Nếu tháng đã có bảng lương trong DB -> Hiển thị số tiền, chi tiết và trạng thái.
+ *   - Nếu tháng chưa có bảng lương -> Hiển thị "Đang cập nhật".
  */
 function EmployeePayroll({ userSession, onLogout }) {
   /* ── State ───────────────────────────────────────────────────── */
-  const [payroll, setPayroll] = useState(FALLBACK_PAYROLL);
+  const [payroll, setPayroll] = useState(null);
   const [availableMonths, setAvailableMonths] = useState([]);
   const [yearSummary, setYearSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isHidden, setIsHidden] = useState(false);      // Ẩn/hiện số tiền
   const [viewMode, setViewMode] = useState("month");     // "month" | "year"
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return { thang: now.getMonth() + 1, nam: now.getFullYear() };
-  });
+  const [selectedMonth, setSelectedMonth] = useState({ thang: 8, nam: 2026 });
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
@@ -53,13 +52,14 @@ function EmployeePayroll({ userSession, onLogout }) {
     setTimeout(() => setToastMessage(""), 3500);
   };
 
-  /* ── Load danh sách tháng khi mount ─────────────────────────── */
+  /* ── 1. Load danh sách các tháng có bảng lương khi mount ────────── */
   useEffect(() => {
     let mounted = true;
     async function loadMonths() {
       const months = await getPayrollMonths(currentMaNv);
-      if (mounted && months.length > 0) {
+      if (mounted && months && months.length > 0) {
         setAvailableMonths(months);
+        // Tự động chuyển tới kỳ lương gần nhất có dữ liệu
         setSelectedMonth({ thang: months[0].thang, nam: months[0].nam });
       }
     }
@@ -67,7 +67,7 @@ function EmployeePayroll({ userSession, onLogout }) {
     return () => { mounted = false; };
   }, [currentMaNv]);
 
-  /* ── Load bảng lương khi đổi tháng ──────────────────────────── */
+  /* ── 2. Load bảng lương khi đổi tháng ──────────────────────────── */
   const loadPayroll = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -78,7 +78,8 @@ function EmployeePayroll({ userSession, onLogout }) {
       );
       setPayroll(data);
     } catch (err) {
-      console.warn("Dùng dữ liệu dự phòng:", err.message);
+      console.warn("Không thể tải bảng lương:", err.message);
+      setPayroll(null);
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +89,7 @@ function EmployeePayroll({ userSession, onLogout }) {
     if (viewMode === "month") loadPayroll();
   }, [viewMode, loadPayroll]);
 
-  /* ── Load tổng hợp năm khi đổi sang tab "Cả Năm" ──────────── */
+  /* ── 3. Load tổng hợp năm khi đổi sang tab "Cả Năm" ──────────── */
   useEffect(() => {
     if (viewMode !== "year") return;
     let mounted = true;
@@ -98,7 +99,7 @@ function EmployeePayroll({ userSession, onLogout }) {
         const data = await getPayrollYearSummary(currentMaNv, selectedMonth.nam);
         if (mounted) setYearSummary(data);
       } catch (err) {
-        console.warn("Dùng tổng hợp năm dự phòng:", err.message);
+        console.warn("Lỗi tải tổng hợp năm:", err.message);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -107,7 +108,7 @@ function EmployeePayroll({ userSession, onLogout }) {
     return () => { mounted = false; };
   }, [viewMode, currentMaNv, selectedMonth.nam]);
 
-  /* ── Handlers ────────────────────────────────────────────────── */
+  /* ── 4. Handlers điều hướng tháng ────────────────────────────── */
   const handlePrevMonth = () => {
     setSelectedMonth((prev) => {
       if (prev.thang === 1) return { thang: 12, nam: prev.nam - 1 };
@@ -122,16 +123,38 @@ function EmployeePayroll({ userSession, onLogout }) {
     });
   };
 
+  const hasData = Boolean(payroll && payroll.hasData);
+
   const handlePrint = () => {
+    if (!hasData) {
+      showToast(`Bảng lương Tháng ${selectedMonth.thang}/${selectedMonth.nam} đang được cập nhật, chưa có phiếu để in.`);
+      return;
+    }
     window.print();
   };
 
   const handleExportExcel = () => {
+    if (!hasData) {
+      showToast(`Dữ liệu Tháng ${selectedMonth.thang}/${selectedMonth.nam} đang được cập nhật.`);
+      return;
+    }
     showToast("Chức năng xuất Excel/PDF đang được đồng bộ");
   };
 
   const handleSendEmail = () => {
+    if (!hasData) {
+      showToast(`Dữ liệu Tháng ${selectedMonth.thang}/${selectedMonth.nam} đang được cập nhật.`);
+      return;
+    }
     showToast("Bản sao bảng lương đã được gửi đến email nội bộ");
+  };
+
+  const handleViewDetail = () => {
+    if (!hasData) {
+      showToast(`Bảng lương Tháng ${selectedMonth.thang}/${selectedMonth.nam} đang được cập nhật, chưa có bảng kê chi tiết.`);
+      return;
+    }
+    setIsDetailOpen(true);
   };
 
   return (
@@ -204,14 +227,21 @@ function EmployeePayroll({ userSession, onLogout }) {
           <MonthNavigator
             month={selectedMonth.thang}
             year={selectedMonth.nam}
-            status={payroll.trang_thai}
+            status={hasData ? payroll?.trang_thai : null}
             onPrev={handlePrevMonth}
             onNext={handleNextMonth}
           />
         )}
 
         {/* Card lương thực nhận */}
-        <NetSalaryCard payroll={payroll} isHidden={isHidden} viewMode={viewMode} yearSummary={yearSummary} />
+        <NetSalaryCard
+          payroll={payroll}
+          isHidden={isHidden}
+          viewMode={viewMode}
+          yearSummary={yearSummary}
+          month={selectedMonth.thang}
+          year={selectedMonth.nam}
+        />
 
         {/* Hành động nhanh */}
         <QuickActions
@@ -224,7 +254,8 @@ function EmployeePayroll({ userSession, onLogout }) {
         <SalarySummaryBar
           payroll={payroll}
           isHidden={isHidden}
-          onViewDetail={() => setIsDetailOpen(true)}
+          hasData={hasData}
+          onViewDetail={handleViewDetail}
         />
 
         {/* Thắc mắc về bảng lương? */}
@@ -235,12 +266,14 @@ function EmployeePayroll({ userSession, onLogout }) {
       <BottomNavBar activeTab="payroll" />
 
       {/* ── Modal chi tiết bảng kê ─────────────────────────────── */}
-      <PayrollDetailModal
-        isOpen={isDetailOpen}
-        payroll={payroll}
-        isHidden={isHidden}
-        onClose={() => setIsDetailOpen(false)}
-      />
+      {hasData && (
+        <PayrollDetailModal
+          isOpen={isDetailOpen}
+          payroll={payroll}
+          isHidden={isHidden}
+          onClose={() => setIsDetailOpen(false)}
+        />
+      )}
     </div>
   );
 }

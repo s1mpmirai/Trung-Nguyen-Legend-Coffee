@@ -3,8 +3,9 @@ import { formatMoney } from "../../../services/payrollService";
 
 /**
  * SalarySummaryBar – Thanh tổng hợp Gross + Khấu trừ + link xem chi tiết.
+ * Hiển thị "Đang cập nhật" nếu tháng chưa có dữ liệu bảng lương.
  */
-function SalarySummaryBar({ payroll, isHidden, onViewDetail }) {
+function SalarySummaryBar({ payroll, isHidden, onViewDetail, hasData }) {
   const hidden = "•••••••";
 
   return (
@@ -12,11 +13,19 @@ function SalarySummaryBar({ payroll, isHidden, onViewDetail }) {
       <div className="pr-summary-bar__row">
         <span className="pr-summary-bar__item">
           Tổng Gross:{" "}
-          <strong>{isHidden ? hidden : `${formatMoney(payroll.luong_gross)} đ`}</strong>
+          <strong>
+            {hasData
+              ? (isHidden ? hidden : `${formatMoney(payroll?.luong_gross)} đ`)
+              : "Đang cập nhật"}
+          </strong>
         </span>
         <span className="pr-summary-bar__item pr-summary-bar__item--danger">
           Khấu trừ:{" "}
-          <strong>{isHidden ? hidden : `-${formatMoney(payroll.tong_khau_tru)} đ`}</strong>
+          <strong>
+            {hasData
+              ? (isHidden ? hidden : `-${formatMoney(payroll?.tong_khau_tru)} đ`)
+              : "Đang cập nhật"}
+          </strong>
         </span>
       </div>
 

@@ -9,17 +9,18 @@ import {
  * NetSalaryCard – Card hiển thị lương thực nhận (NET),
  * tổng thu nhập, khấu trừ, thanh progress bar.
  *
- * Hỗ trợ 2 chế độ: viewMode="month" (chi tiết tháng) và "year" (tổng hợp năm).
+ * Nếu tháng chưa có dữ liệu lương -> hiển thị "Đang cập nhật".
  */
-function NetSalaryCard({ payroll, isHidden, viewMode, yearSummary }) {
-  // Chọn data theo chế độ xem
+function NetSalaryCard({ payroll, isHidden, viewMode, yearSummary, month, year }) {
   const isYear = viewMode === "year";
-  const gross = isYear ? yearSummary?.tong_gross || 0 : payroll.luong_gross;
-  const net = isYear ? yearSummary?.tong_net || 0 : payroll.luong_net;
-  const deduct = isYear ? yearSummary?.tong_khau_tru || 0 : payroll.tong_khau_tru;
-  const status = isYear ? null : payroll.trang_thai;
+  const hasData = isYear ? Boolean(yearSummary) : Boolean(payroll && payroll.hasData);
 
-  const statusInfo = status ? mapPayrollStatus(status) : null;
+  const gross = isYear ? yearSummary?.tong_gross || 0 : payroll?.luong_gross || 0;
+  const net = isYear ? yearSummary?.tong_net || 0 : payroll?.luong_net || 0;
+  const deduct = isYear ? yearSummary?.tong_khau_tru || 0 : payroll?.tong_khau_tru || 0;
+  const status = isYear ? null : (hasData ? payroll?.trang_thai : null);
+
+  const statusInfo = mapPayrollStatus(status);
   const { netPct, deductPct } = calcNetRatio(gross, net);
 
   const hiddenText = "•••••••";
@@ -31,54 +32,74 @@ function NetSalaryCard({ payroll, isHidden, viewMode, yearSummary }) {
         <span className="pr-net-card__label">
           {isYear ? "TỔNG THU NHẬP RÒNG CẢ NĂM" : "LƯƠNG THỰC NHẬN (NET SALARY)"}
         </span>
-        {statusInfo && (
-          <span className={`pr-net-card__badge pr-net-card__badge--${statusInfo.color}`}>
-            {statusInfo.label}
-          </span>
-        )}
+        <span className={`pr-net-card__badge pr-net-card__badge--${statusInfo.color}`}>
+          {statusInfo.label}
+        </span>
       </div>
 
-      {/* ── Số tiền lớn ──────────────────────────────────────── */}
-      <div className="pr-net-card__amount">
-        <span className="pr-net-card__number">
-          {isHidden ? hiddenText : formatMoney(net)}
-        </span>
-        <span className="pr-net-card__currency">VNĐ</span>
-      </div>
+      {/* ── Số tiền lớn hoặc 'Đang cập nhật' ──────────────────── */}
+      {hasData ? (
+        <div className="pr-net-card__amount">
+          <span className="pr-net-card__number">
+            {isHidden ? hiddenText : formatMoney(net)}
+          </span>
+          <span className="pr-net-card__currency">VNĐ</span>
+        </div>
+      ) : (
+        <div className="pr-net-card__amount pr-net-card__amount--pending">
+          <span className="pr-net-card__number pr-net-card__number--pending">
+            Đang cập nhật
+          </span>
+        </div>
+      )}
 
       {/* ── Tổng thu nhập & Khấu trừ ─────────────────────────── */}
       <div className="pr-net-card__breakdown">
         <div className="pr-net-card__item">
           <span className="pr-net-card__item-label">Tổng thu nhập:</span>
           <span className="pr-net-card__item-value">
-            {isHidden ? hiddenText : `${formatMoney(gross)} đ`}
+            {hasData
+              ? (isHidden ? hiddenText : `${formatMoney(gross)} đ`)
+              : "Đang cập nhật"}
           </span>
         </div>
         <div className="pr-net-card__item pr-net-card__item--danger">
           <span className="pr-net-card__item-label">Khấu trừ:</span>
           <span className="pr-net-card__item-value">
-            {isHidden ? hiddenText : `-${formatMoney(deduct)} đ`}
+            {hasData
+              ? (isHidden ? hiddenText : `-${formatMoney(deduct)} đ`)
+              : "Đang cập nhật"}
           </span>
         </div>
       </div>
 
-      {/* ── Progress bar ──────────────────────────────────────── */}
-      <div className="pr-net-card__progress-wrapper">
-        <div className="pr-net-card__progress-bar">
-          <div
-            className="pr-net-card__progress-fill"
-            style={{ width: `${netPct}%` }}
-          />
+      {/* ── Progress bar hoặc thông báo chờ ───────────────────── */}
+      {hasData ? (
+        <div className="pr-net-card__progress-wrapper">
+          <div className="pr-net-card__progress-bar">
+            <div
+              className="pr-net-card__progress-fill"
+              style={{ width: `${netPct}%` }}
+            />
+          </div>
+          <div className="pr-net-card__progress-labels">
+            <span className="pr-net-card__pct pr-net-card__pct--net">
+              Thực nhận đạt {netPct}%
+            </span>
+            <span className="pr-net-card__pct pr-net-card__pct--deduct">
+              Thuế & Bảo hiểm {deductPct}%
+            </span>
+          </div>
         </div>
-        <div className="pr-net-card__progress-labels">
-          <span className="pr-net-card__pct pr-net-card__pct--net">
-            Thực nhận đạt {netPct}%
-          </span>
-          <span className="pr-net-card__pct pr-net-card__pct--deduct">
-            Thuế & Bảo hiểm {deductPct}%
-          </span>
+      ) : (
+        <div className="pr-net-card__notice">
+          <svg viewBox="0 0 16 16" fill="none" width="14" height="14" className="inline-block mr-1 opacity-80">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M8 4.5V8.5L10.5 10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          Dữ liệu bảng lương {isYear ? `năm ${year}` : `tháng ${month}/${year}`} đang được phòng Nhân sự & Kế toán cập nhật
         </div>
-      </div>
+      )}
     </section>
   );
 }
