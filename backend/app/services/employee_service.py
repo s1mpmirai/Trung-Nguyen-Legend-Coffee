@@ -1,8 +1,30 @@
 from sqlalchemy.orm import Session
 
-from app.core.security import create_access_token, verify_password
-from app.models.account_model import TaiKhoan
-from app.security import get_current_user_id
+from app.repositories.employee_repository import create, get_by_cccd, get_employee_list
+from app.utils.auto_gen import generate_employee_code
 
-def check_user_role(db: Session, ma_nv: str, allowed_roles: set[str]) -> bool:
-    
+from app.schemas.employee_schemas import employee_profile_create, employee_list_response
+
+
+def create_employee(db: Session, data: employee_profile_create) -> dict:
+    if data.cccd and get_by_cccd(db, data.cccd) is not None:
+        raise ValueError("CCCD đã tồn tại")
+
+    ma_nv = generate_employee_code(db)
+    employee_data = data.model_dump(exclude={"ma_nv", "ma_ngl"})
+    employee_data["ma_nv"] = ma_nv
+
+    try:
+        employee = create(db, employee_data)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    return employee
+
+def employee_list(
+    db: Session,
+    page: int = 1,
+) -> list[dict]:
+    return get_employee_list(db, page)

@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime, date
     
-class ho_so_nhan_vien(BaseModel):
+class employee_profile(BaseModel):
     ma_nv: str = Field(..., description="Mã nhân viên")
     ho_ten: str = Field(..., description="Họ tên nhân viên")
     ngay_sinh: date = Field(..., description="Ngày sinh")
@@ -26,7 +26,7 @@ class ho_so_nhan_vien(BaseModel):
     ngay_tao: datetime = Field(None, description="Ngày tạo")    
     ngay_cap_nhat: datetime = Field(None, description="Ngày cập nhật")
     
-class ho_so_nhan_vien_create(ho_so_nhan_vien):
+class employee_profile_create(employee_profile):
     ma_nv: str = Field(None, description="Tự động sinh")
     ho_ten: str = Field(..., description="Họ tên nhân viên")
     ngay_sinh: date = Field(..., description="Ngày sinh")
@@ -50,11 +50,11 @@ class ho_so_nhan_vien_create(ho_so_nhan_vien):
     ngay_tao: datetime = Field(None, description="Ngày tạo")
     ngay_cap_nhat: datetime = Field(None, description="Ngày cập nhật")
 
-class ho_so_nhan_vien_create_response(ho_so_nhan_vien):
+class employee_profile_create_response(employee_profile):
     class Config:
         orm_mode = True
 
-class ho_so_nhan_vien_update(ho_so_nhan_vien):
+class employee_profile_update(employee_profile):
     ho_ten: str = Field(..., description="Họ tên nhân viên")
     ngay_sinh: date = Field(..., description="Ngày sinh")
     gioi_tinh: str = Field(..., description="Giới tính")
@@ -76,14 +76,14 @@ class ho_so_nhan_vien_update(ho_so_nhan_vien):
     so_bhxh: Optional[str] = Field(None, description="Số BHXH")
     ngay_cap_nhat: datetime = Field(None, description="Ngày cập nhật")
     
-class ho_so_nhan_vien_update_response(ho_so_nhan_vien):
+class employee_profile_update_response(employee_profile):
     class Config:
         orm_mode = True
     
-class ho_so_nhan_vien_response(ho_so_nhan_vien):
+class employee_profile_response(employee_profile):
     class Config:
         orm_mode = True
         
-class danh_sach_nhan_vien_response(BaseModel):
+class employee_list_response(BaseModel):
     total: int = Field(..., description="Tổng số nhân viên")
-    items: List[ho_so_nhan_vien_response] = Field(..., description="Danh sách nhân viên")
+    items: List[employee_profile_response] = Field(..., description="Danh sách nhân viên")

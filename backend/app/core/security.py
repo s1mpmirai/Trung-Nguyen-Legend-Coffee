@@ -40,7 +40,10 @@ def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
     if payload is None:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    user_id = payload.get("sub")
-    if user_id is None:
+    if "sub" not in payload:
         raise HTTPException(status_code=401, detail="Invalid token")
-    return int(user_id)
+
+    ma_nv = payload.get("sub")
+    if ma_nv is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return int(ma_nv)
