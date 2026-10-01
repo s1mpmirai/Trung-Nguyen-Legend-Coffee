@@ -34,7 +34,7 @@ function EmployeePayroll({ userSession, onLogout }) {
   const [availableMonths, setAvailableMonths] = useState([]);
   const [yearSummary, setYearSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isHidden, setIsHidden] = useState(false);      // Ẩn/hiện số tiền
+  const [isHidden, setIsHidden] = useState(true);      // Mặc định ẩn số tiền để bảo mật
   const [viewMode, setViewMode] = useState("month");     // "month" | "year"
   const [selectedMonth, setSelectedMonth] = useState({ thang: 8, nam: 2026 });
   const [isDetailOpen, setIsDetailOpen] = useState(false);
