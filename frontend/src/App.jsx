@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from "react";
 import Login from "./pages/auth/Login";
-import AttendanceDashboard from "./pages/employee/AttendanceDashboard";
-import { EmployeeProfile, EmployeePayroll } from "./pages/employee";
+import {
+  AttendanceDashboard,
+  EmployeeProfile,
+  EmployeePayroll,
+  LeaveRequests,
+} from "./pages/employee";
 
 /**
  * App – Root component tích hợp:
@@ -104,7 +108,11 @@ function App() {
       case "payroll":
         return <EmployeePayroll userSession={userSession} onLogout={handleLogout} />;
       case "profile":
+      case "personal":
         return <EmployeeProfile userSession={userSession} onLogout={handleLogout} />;
+      case "requests":
+      case "leaves":
+        return <LeaveRequests userSession={userSession} onLogout={handleLogout} />;
       case "attendance":
       default:
         return (

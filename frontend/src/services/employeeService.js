@@ -8,7 +8,7 @@ import apiClient from "./apiClient";
 
 // Dữ liệu mẫu dự phòng khi chưa kết nối CSDL hoặc API đang offline
 export const FALLBACK_EMPLOYEE_PROFILE = {
-  id: "WP-8824",
+  id: "NV-8824",
   fullName: "Nguyễn Thị Mai Linh",
   jobTitle: "Chuyên viên Truyền thông & Thương hiệu",
   department: "Tiếp thị & Truyền thông",
@@ -17,7 +17,7 @@ export const FALLBACK_EMPLOYEE_PROFILE = {
   status: "Nhân viên chính thức",
   seniority: "3 năm 5 tháng",
   phone: "0982 739 418",
-  email: "linh.nguyen@workpulse.vn",
+  email: "linh.nguyen@trungnguyen.vn",
   contractType: "Không xác định thời hạn",
   contractStatus: "Hiệu lực",
   lastPasswordChange: "45 ngày trước",

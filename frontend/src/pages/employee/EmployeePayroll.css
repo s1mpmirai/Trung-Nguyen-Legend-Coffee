@@ -6,24 +6,24 @@
 
 /* ── CSS Custom Properties ────────────────────────────────────── */
 :root {
-  --pr-bg: #f0f2f5;
+  --pr-bg: #F8FAFC;
   --pr-surface: #ffffff;
-  --pr-primary: #1a73e8;
-  --pr-primary-light: #e8f0fe;
-  --pr-success: #0d9f6e;
-  --pr-success-light: #e6f9f0;
+  --pr-primary: #0EA5E9;
+  --pr-primary-light: #F0F9FF;
+  --pr-success: #10b981;
+  --pr-success-light: #ecfdf5;
   --pr-warning: #f59e0b;
   --pr-warning-light: #fef3c7;
-  --pr-danger: #e74c3c;
-  --pr-danger-light: #fce4e4;
-  --pr-info: #6366f1;
-  --pr-info-light: #eef2ff;
-  --pr-text: #1e293b;
+  --pr-danger: #f43f5e;
+  --pr-danger-light: #fff1f2;
+  --pr-info: #0284C7;
+  --pr-info-light: #e0f2fe;
+  --pr-text: #0f172a;
   --pr-text-secondary: #64748b;
   --pr-text-muted: #94a3b8;
   --pr-border: #e2e8f0;
-  --pr-radius: 14px;
-  --pr-radius-sm: 8px;
+  --pr-radius: 16px;
+  --pr-radius-sm: 10px;
   --pr-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   --pr-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.1);
   --pr-transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -49,8 +49,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  background: linear-gradient(135deg, #1a73e8 0%, #4f46e5 100%);
-  color: #fff;
+  background: #ffffff;
+  color: var(--pr-text);
+  border-bottom: 1px solid var(--pr-border);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -259,11 +260,11 @@
 
 /* ── Net Salary Card ──────────────────────────────────────────── */
 .pr-net-card {
-  background: linear-gradient(160deg, #1e3a5f 0%, #0f2440 60%, #0a1a30 100%);
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 60%, #075985 100%);
   border-radius: var(--pr-radius);
   padding: 22px 20px 18px;
   color: #fff;
-  box-shadow: 0 8px 32px rgba(10, 26, 48, 0.25);
+  box-shadow: 0 10px 25px -5px rgba(14, 165, 233, 0.35);
   position: relative;
   overflow: hidden;
 }
@@ -275,7 +276,7 @@
   right: -20%;
   width: 180px;
   height: 180px;
-  background: radial-gradient(circle, rgba(26, 115, 232, 0.2), transparent 70%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.18), transparent 70%);
   border-radius: 50%;
   pointer-events: none;
 }

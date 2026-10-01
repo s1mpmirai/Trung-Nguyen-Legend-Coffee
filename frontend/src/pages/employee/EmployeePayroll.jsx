@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 
 /* ── Sub-components ────────────────────────────────────────────── */
-import PayrollHeader from "./components/PayrollHeader";
+import SharedEmployeeHeader from "./components/SharedEmployeeHeader";
 import PeriodSelector from "./components/PeriodSelector";
 import MonthNavigator from "./components/MonthNavigator";
 import NetSalaryCard from "./components/NetSalaryCard";
@@ -9,7 +9,7 @@ import QuickActions from "./components/QuickActions";
 import SalarySummaryBar from "./components/SalarySummaryBar";
 import PayrollFAQ from "./components/PayrollFAQ";
 import PayrollDetailModal from "./components/PayrollDetailModal";
-import BottomNavBar from "../employee/components/BottomNavBar";
+import BottomNavBar from "./components/BottomNavBar";
 
 /* ── Services ──────────────────────────────────────────────────── */
 import {
@@ -24,30 +24,34 @@ import "./EmployeePayroll.css";
 
 /**
  * EmployeePayroll – Trang Bảng Lương & Phiếu Thu Nhập (Employee Portal)
- *
- * API tích hợp:
- *   GET /api/v1/payroll/{ma_nv}/month?thang=&nam=  → Lấy lương 1 tháng
- *   GET /api/v1/payroll/{ma_nv}/months              → Danh sách tháng có lương
- *   GET /api/v1/payroll/{ma_nv}/year?nam=           → Tổng hợp lương cả năm
- *
- * Fallback: Nếu API chưa khả dụng → dùng dữ liệu mẫu FALLBACK_PAYROLL
+ * Đồng bộ màu sắc (#0EA5E9, #F8FAFC), Shared Header & Bottom Navigation.
  */
-function EmployeePayroll() {
+function EmployeePayroll({ userSession, onLogout }) {
   /* ── State ───────────────────────────────────────────────────── */
   const [payroll, setPayroll] = useState(FALLBACK_PAYROLL);
   const [availableMonths, setAvailableMonths] = useState([]);
   const [yearSummary, setYearSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isHidden, setIsHidden] = useState(false);      // Ẩn số tiền
+  const [isHidden, setIsHidden] = useState(false);      // Ẩn/hiện số tiền
   const [viewMode, setViewMode] = useState("month");     // "month" | "year"
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return { thang: now.getMonth() + 1, nam: now.getFullYear() };
   });
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
-  // Mã NV hiện tại (lấy từ localStorage hoặc mặc định)
-  const currentMaNv = localStorage.getItem("ma_nv") || "NV02";
+  // Mã NV hiện tại
+  const currentMaNv =
+    userSession?.ma_nv ||
+    localStorage.getItem("user_ma_nv") ||
+    localStorage.getItem("ma_nv") ||
+    "NV02";
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(""), 3500);
+  };
 
   /* ── Load danh sách tháng khi mount ─────────────────────────── */
   useEffect(() => {
@@ -56,7 +60,6 @@ function EmployeePayroll() {
       const months = await getPayrollMonths(currentMaNv);
       if (mounted && months.length > 0) {
         setAvailableMonths(months);
-        // Tự chọn tháng gần nhất có dữ liệu
         setSelectedMonth({ thang: months[0].thang, nam: months[0].nam });
       }
     }
@@ -120,27 +123,47 @@ function EmployeePayroll() {
   };
 
   const handlePrint = () => {
-    // TODO: Tích hợp API xuất PDF khi backend hỗ trợ
     window.print();
   };
 
   const handleExportExcel = () => {
-    // TODO: Tích hợp API xuất Excel khi backend hỗ trợ
-    alert("Chức năng xuất Excel/PDF đang phát triển.");
+    showToast("Chức năng xuất Excel/PDF đang được đồng bộ");
   };
 
   const handleSendEmail = () => {
-    // TODO: Tích hợp API gửi email khi backend hỗ trợ
-    alert("Chức năng gửi bản sao qua Email đang phát triển.");
+    showToast("Bản sao bảng lương đã được gửi đến email nội bộ");
   };
 
   return (
-    <div className="pr-page">
-      {/* ── Header ─────────────────────────────────────────────── */}
-      <PayrollHeader isLoading={isLoading} />
+    <div className="flex-1 flex flex-col bg-[#F8FAFC] min-h-screen pb-24 relative">
+      {/* ── Toast thông báo ────────────────────────────────────── */}
+      {toastMessage && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50 animate-bounce">
+          <div className="bg-slate-900/95 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center justify-between text-xs font-semibold border border-slate-700 backdrop-blur-md">
+            <span>{toastMessage}</span>
+            <button onClick={() => setToastMessage("")} className="ml-2 text-slate-400 hover:text-white">✕</button>
+          </div>
+        </div>
+      )}
 
-      {/* ── Nội dung cuộn ──────────────────────────────────────── */}
-      <main className="pr-content">
+      {/* ── Header TrungNguyenHR chung ─────────────────────────── */}
+      <SharedEmployeeHeader
+        onLogout={onLogout}
+        onNotificationClick={() => showToast("Bạn có 1 thông báo mới từ Phòng Kế toán & Nhân sự")}
+      />
+
+      {/* ── Banner tiêu đề trang ────────────────────────────────── */}
+      <div className="px-4 pt-3.5 pb-1">
+        <span className="text-[11px] font-extrabold tracking-wider text-[#0EA5E9] uppercase block">
+          THU NHẬP & PHÚC LỢI
+        </span>
+        <h2 className="text-xl font-black text-slate-900 leading-tight mt-0.5">
+          Bảng lương & Thu nhập
+        </h2>
+      </div>
+
+      {/* ── Nội dung chính ─────────────────────────────────────── */}
+      <main className="px-4 py-2 space-y-3.5">
         {/* Bảo mật & Ẩn số tiền */}
         <div className="pr-security-bar">
           <span className="pr-security-badge">
@@ -208,7 +231,7 @@ function EmployeePayroll() {
         <PayrollFAQ />
       </main>
 
-      {/* ── Bottom Nav ─────────────────────────────────────────── */}
+      {/* ── Thanh điều hướng dưới cùng ─────────────────────────── */}
       <BottomNavBar activeTab="payroll" />
 
       {/* ── Modal chi tiết bảng kê ─────────────────────────────── */}

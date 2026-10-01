@@ -21,6 +21,8 @@ import {
 import logoImg from '../../assets/logo/Logo Trung Nguyên_black.png';
 import AttendanceHistoryDetail from './AttendanceHistoryDetail';
 import LeaveRequests from './LeaveRequests';
+import SharedEmployeeHeader from './components/SharedEmployeeHeader';
+import BottomNavBar from './components/BottomNavBar';
 import {
   getAttendanceDashboardData,
   checkInAttendance,
@@ -120,56 +122,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
     );
   }
 
-  if (activeTab === 'requests') {
-    return (
-      <div className="flex-1 flex flex-col bg-[#F8FAFC] min-h-screen relative">
-        <LeaveRequests userSession={userSession} onLogout={onLogout} />
-        {/* ───────────────── BOTTOM NAVIGATION BAR NATIVE WEB APP ───────────────── */}
-        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-100 py-2 px-4 flex items-center justify-around z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
-          <button
-            onClick={() => {
-              setActiveTab('attendance');
-              setShowHistoryDetail(false);
-            }}
-            className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
-          >
-            <Clock size={20} className="stroke-2" />
-            <span className="text-[10px] font-semibold leading-none">Chấm công</span>
-          </button>
 
-          <button
-            onClick={() => setActiveTab('requests')}
-            className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-[#0EA5E9]"
-          >
-            <FileText size={20} className="stroke-[2.5]" />
-            <span className="text-[10px] font-semibold leading-none">Đơn từ</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab('payroll');
-              showToast('Chức năng "Bảng lương" đang đồng bộ từ Database');
-            }}
-            className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
-          >
-            <DollarSign size={20} className="stroke-2" />
-            <span className="text-[10px] font-semibold leading-none">Bảng lương</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab('profile');
-              setShowProfileMenu(!showProfileMenu);
-            }}
-            className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
-          >
-            <User size={20} className="stroke-2" />
-            <span className="text-[10px] font-semibold leading-none">Cá nhân</span>
-          </button>
-        </nav>
-      </div>
-    );
-  }
 
   const { employee, location, monthlyStats, recentRecords } = data;
 
@@ -187,38 +140,10 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
       )}
 
       {/* ───────────────── HEADER NATIVE WEB APP ───────────────── */}
-      <header className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center overflow-hidden shadow-sm">
-            <img src={logoImg} alt="Trung Nguyen Legend" className="w-full h-full object-contain" />
-          </div>
-          <span className="text-lg font-black tracking-tight text-slate-900 leading-none">
-            TrungNguyen<span className="text-[#0EA5E9]">HR</span>
-          </span>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          {/* Bell icon có chấm đỏ */}
-          <button
-            onClick={() => showToast('Bạn có 1 thông báo mới từ Phòng Nhân sự')}
-            className="relative p-2 rounded-full text-slate-500 hover:bg-slate-100 transition-colors focus:outline-none"
-            aria-label="Thông báo"
-          >
-            <Bell size={20} />
-            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>
-          </button>
-
-          {/* Nút Đăng xuất tiện lợi (Không dùng Avatar) */}
-          <button
-            onClick={onLogout}
-            title="Đăng xuất"
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 transition-colors focus:outline-none text-xs font-semibold"
-          >
-            <LogOut size={15} />
-            <span>Đăng xuất</span>
-          </button>
-        </div>
-      </header>
+      <SharedEmployeeHeader
+        onLogout={onLogout}
+        onNotificationClick={() => showToast('Bạn có 1 thông báo mới từ Phòng Nhân sự')}
+      />
 
       {/* ───────────────── BODY CONTENT ───────────────── */}
       <main className="px-4 py-3.5 space-y-4">
@@ -459,54 +384,8 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
         </section>
       </main>
 
-      {/* ───────────────── BOTTOM NAVIGATION BAR NATIVE WEB APP ───────────────── */}
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-100 py-2 px-4 flex items-center justify-around z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
-        <button
-          onClick={() => setActiveTab('attendance')}
-          className={`flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'attendance' ? 'text-[#0EA5E9]' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <Clock size={20} className={activeTab === 'attendance' ? 'stroke-[2.5]' : 'stroke-2'} />
-          <span className="text-[10px] font-semibold leading-none">Chấm công</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('requests')}
-          className={`flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'requests' ? 'text-[#0EA5E9]' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <FileText size={20} className={activeTab === 'requests' ? 'stroke-[2.5]' : 'stroke-2'} />
-          <span className="text-[10px] font-semibold leading-none">Đơn từ</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('payroll');
-            window.location.hash = '#/payroll';
-          }}
-          className={`flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'payroll' ? 'text-[#0EA5E9]' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <DollarSign size={20} className={activeTab === 'payroll' ? 'stroke-[2.5]' : 'stroke-2'} />
-          <span className="text-[10px] font-semibold leading-none">Bảng lương</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('profile');
-            window.location.hash = '#/profile';
-          }}
-          className={`flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all ${
-            activeTab === 'profile' ? 'text-[#0EA5E9]' : 'text-slate-400 hover:text-slate-600'
-          }`}
-        >
-          <User size={20} className={activeTab === 'profile' ? 'stroke-[2.5]' : 'stroke-2'} />
-          <span className="text-[10px] font-semibold leading-none">Cá nhân</span>
-        </button>
-      </nav>
+      {/* ───────────────── BOTTOM NAVIGATION BAR ───────────────── */}
+      <BottomNavBar activeTab="attendance" />
     </div>
   );
 }

@@ -75,7 +75,7 @@ function EditProfileModal({ isOpen, employee, onClose, onSave }) {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="example@workpulse.vn"
+              placeholder="example@trungnguyen.vn"
               className="ep-form-input"
               required
             />
