@@ -71,3 +71,66 @@ def get_employee_list(
         "total": total,
         "items": [dict(row) for row in rows]
     }
+
+
+def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
+    query = """
+        SELECT 
+            nv.ma_nv,
+            nv.ho_ten,
+            nv.ngay_sinh,
+            nv.gioi_tinh,
+            nv.cccd,
+            nv.dia_chi,
+            nv.sdt,
+            nv.email,
+            nv.so_nguoi_pt,
+            nv.ma_pb,
+            pb.ten_pb,
+            nv.ma_cv,
+            cv.ten_cv,
+            nv.ngay_vao_lam,
+            nv.ngay_nghi_viec,
+            nv.trang_thai,
+            nv.so_tai_khoan,
+            nv.ngan_hang,
+            nv.ma_so_thue,
+            nv.so_bhxh,
+            hd.ma_hd,
+            hd.loai_hd,
+            hd.trang_thai AS trang_thai_hd,
+            tk.lan_dn_cuoi,
+            tk.ngay_cap_nhat AS ngay_cap_nhat_tk
+        FROM nhan_vien nv
+        LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
+        LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+        LEFT JOIN (
+            SELECT hd1.*
+            FROM hop_dong_lao_dong hd1
+            WHERE hd1.trang_thai = 'HIEU_LUC'
+        ) hd ON hd.ma_nv = nv.ma_nv
+        LEFT JOIN tai_khoan tk ON tk.ma_nv = nv.ma_nv
+        WHERE nv.ma_nv = :ma_nv
+        LIMIT 1
+    """
+    row = db.execute(text(query), {"ma_nv": ma_nv}).mappings().first()
+    return dict(row) if row else None
+
+
+def update_contact(db: Session, ma_nv: str, data: dict) -> dict | None:
+    # Chỉ cho phép cập nhật các trường liên hệ an toàn
+    allowed_fields = {"sdt", "email", "dia_chi", "so_tai_khoan", "ngan_hang"}
+    update_data = {k: v for k, v in data.items() if k in allowed_fields and v is not None}
+    if not update_data:
+        return get_by_ma_nv(db, ma_nv)
+
+    set_clauses = [f"{k} = :{k}" for k in update_data.keys()]
+    query = f"""
+        UPDATE nhan_vien
+        SET {', '.join(set_clauses)}
+        WHERE ma_nv = :ma_nv
+    """
+    params = {**update_data, "ma_nv": ma_nv}
+    db.execute(text(query), params)
+    db.commit()
+    return get_by_ma_nv(db, ma_nv)

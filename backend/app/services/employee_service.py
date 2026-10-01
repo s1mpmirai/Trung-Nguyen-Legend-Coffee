@@ -1,9 +1,17 @@
 from sqlalchemy.orm import Session
 
-from app.repositories.employee_repository import create, get_by_cccd, get_employee_list
+from app.repositories.employee_repository import (
+    create,
+    get_by_cccd,
+    get_employee_list,
+    get_by_ma_nv,
+    update_contact,
+)
 from app.utils.auto_gen import generate_employee_code
-
-from app.schemas.employee_schemas import employee_profile_create, employee_list_response
+from app.schemas.employee_schemas import (
+    employee_profile_create,
+    employee_contact_update,
+)
 
 
 def create_employee(db: Session, data: employee_profile_create) -> dict:
@@ -26,5 +34,20 @@ def create_employee(db: Session, data: employee_profile_create) -> dict:
 def employee_list(
     db: Session,
     page: int = 1,
-) -> list[dict]:
+) -> dict:
     return get_employee_list(db, page)
+
+def get_employee_profile(db: Session, ma_nv: str) -> dict:
+    profile = get_by_ma_nv(db, ma_nv)
+    if not profile:
+        raise ValueError(f"Không tìm thấy thông tin nhân viên {ma_nv}")
+    return profile
+
+def update_employee_contact(db: Session, ma_nv: str, data: employee_contact_update) -> dict:
+    profile = get_by_ma_nv(db, ma_nv)
+    if not profile:
+        raise ValueError(f"Không tìm thấy thông tin nhân viên {ma_nv}")
+    
+    update_dict = data.model_dump(exclude_unset=True)
+    updated = update_contact(db, ma_nv, update_dict)
+    return updated

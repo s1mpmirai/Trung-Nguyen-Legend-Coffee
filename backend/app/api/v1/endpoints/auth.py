@@ -2,7 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.auth_schemas import request_login, account_create, account_response, account_update_status
+from app.schemas.auth_schemas import (
+    request_login,
+    account_create,
+    account_response,
+    account_update_status,
+    change_password_request,
+)
 from app.services.auth_service import login_for_portal
 from fastapi import status
 import app.services.auth_service as account_service
@@ -50,6 +56,7 @@ def create_account_endpoint(
         return account_service.create_account(db, data)
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
+
 @router.put("/{ma_nv}/status", response_model=account_response)
 def update_status_endpoint(
     ma_nv: str,
@@ -60,3 +67,18 @@ def update_status_endpoint(
         return account_service.change_account_status(db, ma_nv, data.trang_thai)
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err))
+
+@router.post("/change-password")
+def change_password_endpoint(
+    data: change_password_request,
+    db: Session = Depends(get_db)
+):
+    try:
+        return account_service.change_password(
+            db,
+            ma_nv=data.ma_nv,
+            old_pass=data.mat_khau_cu,
+            new_pass=data.mat_khau_moi,
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
