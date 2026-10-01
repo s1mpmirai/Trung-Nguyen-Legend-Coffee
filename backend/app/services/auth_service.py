@@ -15,11 +15,23 @@ def authenticate_user(db: Session, ma_nv: str, mat_khau: str) -> dict[str, str] 
     if account is None:
         return None
 
-    # Hỗ trợ mật khẩu băm chuẩn bcrypt trong DB, đồng thời hỗ trợ 123456 / password để kiểm thử nhanh
-    is_valid = verify_password(mat_khau, account.mat_khau) or mat_khau in ["123456", "password"]
+    # Hỗ trợ mật khẩu băm chuẩn bcrypt trong DB  is_valid = verify_password(mat_khau, account.mat_khau)
+    is_valid = False
+    try: 
+        is_valid = verify_password(mat_khau, account.mat_khau)
+    except: 
+        is_valid = False
+        
     if not is_valid:
-        return None
-
+        # kiểm tra mật khẩu nếu chưa bâm với db nếu đúng thì cho login và bâm lại lưu vô db
+        if account.mat_khau == mat_khau:
+            account.mat_khau = hash_password(mat_khau)
+            db.commit()
+            db.refresh(account)
+            is_valid = True
+        else:
+            return None
+    
     if account.trang_thai != "HOAT_DONG":
         return None
 
