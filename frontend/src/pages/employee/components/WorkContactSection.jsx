@@ -9,7 +9,7 @@ import InfoRow from "./InfoRow";
  * @param {Object} props
  * @param {Object} props.employee – Dữ liệu nhân viên
  */
-function WorkContactSection({ employee, onEditContact }) {
+function WorkContactSection({ employee }) {
   const { phone, email, contractType, contractStatus } = employee;
 
   return (
@@ -23,24 +23,6 @@ function WorkContactSection({ employee, onEditContact }) {
           </svg>
           <h3 className="ep-card__title">Liên hệ công việc</h3>
         </div>
-
-        {/* Nút chỉnh sửa nhỏ */}
-        <button
-          className="ep-card__edit-btn"
-          type="button"
-          aria-label="Chỉnh sửa liên hệ"
-          onClick={onEditContact}
-        >
-          <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-            <path
-              d="M13.586 3.586a2 2 0 112.828 2.828l-9.9 9.9-3.535.707.707-3.535 9.9-9.9z"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
       </div>
 
       {/* ── Danh sách thông tin ───────────────────────────────── */}

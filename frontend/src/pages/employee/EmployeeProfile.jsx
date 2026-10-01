@@ -7,13 +7,11 @@ import BasicInfoSection from "./components/BasicInfoSection";
 import WorkContactSection from "./components/WorkContactSection";
 import AccountSettingsSection from "./components/AccountSettingsSection";
 import BottomNavBar from "./components/BottomNavBar";
-import EditProfileModal from "./components/EditProfileModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 
 /* ── Services ──────────────────────────────────────────────────── */
 import {
   getEmployeeProfile,
-  updateEmployeeContact,
   changePassword,
   FALLBACK_EMPLOYEE_PROFILE,
 } from "../../services/employeeService";
@@ -23,15 +21,14 @@ import "./EmployeeProfile.css";
 
 /**
  * EmployeeProfile – Trang Hồ sơ & Thông tin cá nhân của nhân viên (Employee Portal)
- * Đồng bộ màu sắc (#0EA5E9, #F8FAFC), Shared Header & Bottom Navigation.
+ * Chế độ chỉ xem thông tin (đã bỏ toàn bộ các nút sửa).
  */
 function EmployeeProfile({ userSession, onLogout }) {
   const [employee, setEmployee] = useState(FALLBACK_EMPLOYEE_PROFILE);
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Trạng thái modal
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  // Trạng thái modal đổi mật khẩu
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   // Mã nhân viên hiện tại
@@ -72,21 +69,14 @@ function EmployeeProfile({ userSession, onLogout }) {
     };
   }, [currentMaNv]);
 
-  /* ── 2. Xử lý lưu thông tin liên hệ ──────────────────────────── */
-  const handleSaveContact = async (updatedData) => {
-    const updated = await updateEmployeeContact(employee.id, updatedData);
-    setEmployee((prev) => ({ ...prev, ...updated }));
-    showToast("Cập nhật thông tin liên hệ thành công!");
-  };
-
-  /* ── 3. Xử lý đổi mật khẩu ──────────────────────────────────── */
+  /* ── 2. Xử lý đổi mật khẩu ──────────────────────────────────── */
   const handleChangePassword = async ({ ma_nv, mat_khau_cu, mat_khau_moi }) => {
     await changePassword({ ma_nv, mat_khau_cu, mat_khau_moi });
     showToast("Đổi mật khẩu thành công!");
     setEmployee((prev) => ({ ...prev, lastPasswordChange: "Vừa xong" }));
   };
 
-  /* ── 4. Xử lý đăng xuất ──────────────────────────────────────── */
+  /* ── 3. Xử lý đăng xuất ──────────────────────────────────────── */
   const handleLogout = () => {
     if (onLogout) {
       onLogout();
@@ -134,19 +124,13 @@ function EmployeeProfile({ userSession, onLogout }) {
         </h2>
       </div>
 
-      {/* ── Nội dung chính ─────────────────────────────────────── */}
+      {/* ── Nội dung chính (Chỉ xem thông tin) ─────────────────── */}
       <main className="px-4 py-2.5 space-y-4">
-        <ProfileHeader
-          employee={employee}
-          onEditProfile={() => setIsEditModalOpen(true)}
-        />
+        <ProfileHeader employee={employee} />
 
         <BasicInfoSection employee={employee} />
 
-        <WorkContactSection
-          employee={employee}
-          onEditContact={() => setIsEditModalOpen(true)}
-        />
+        <WorkContactSection employee={employee} />
 
         <AccountSettingsSection
           lastPasswordChange={employee.lastPasswordChange}
@@ -157,14 +141,6 @@ function EmployeeProfile({ userSession, onLogout }) {
 
       {/* ── Thanh điều hướng dưới cùng ─────────────────────────── */}
       <BottomNavBar activeTab="profile" />
-
-      {/* ── Modal Cập nhật thông tin ───────────────────────────── */}
-      <EditProfileModal
-        isOpen={isEditModalOpen}
-        employee={employee}
-        onClose={() => setIsEditModalOpen(false)}
-        onSave={handleSaveContact}
-      />
 
       {/* ── Modal Đổi mật khẩu ─────────────────────────────────── */}
       <ChangePasswordModal

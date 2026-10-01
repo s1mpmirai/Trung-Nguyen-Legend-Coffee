@@ -1,11 +1,11 @@
 import React from "react";
-import { Calendar, ShieldCheck, Edit3 } from "lucide-react";
+import { Calendar, ShieldCheck } from "lucide-react";
 
 /**
  * ProfileHeader – Phần đầu hồ sơ nhân viên (Không dùng avatar)
  * Đồng bộ với phong cách thẻ nhân viên trên trang Chấm công.
  */
-function ProfileHeader({ employee, onEditProfile }) {
+function ProfileHeader({ employee }) {
   const {
     fullName,
     jobTitle,
@@ -19,7 +19,7 @@ function ProfileHeader({ employee, onEditProfile }) {
 
   return (
     <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] space-y-3">
-      {/* Hàng trên: Badge phòng ban & Trạng thái & Nút chỉnh sửa */}
+      {/* Hàng trên: Badge phòng ban & Trạng thái */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
           <span className="text-[10px] font-extrabold text-[#0EA5E9] tracking-wider uppercase px-2 py-0.5 bg-sky-50 rounded-md border border-sky-100/60">
@@ -31,17 +31,6 @@ function ProfileHeader({ employee, onEditProfile }) {
             {status || "Đang làm việc"}
           </span>
         </div>
-
-        {onEditProfile && (
-          <button
-            type="button"
-            onClick={onEditProfile}
-            className="flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-[#0EA5E9] bg-sky-50 hover:bg-sky-100/80 rounded-xl transition-colors border border-sky-100"
-          >
-            <Edit3 size={13} />
-            <span>Sửa</span>
-          </button>
-        )}
       </div>
 
       {/* Thông tin tên & chức vụ */}
