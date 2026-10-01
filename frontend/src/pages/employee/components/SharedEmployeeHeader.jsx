@@ -2,7 +2,23 @@ import React from 'react';
 import { Bell, LogOut } from 'lucide-react';
 import logoImg from '../../../assets/logo/Logo Trung Nguyên_black.png';
 
+/**
+ * SharedEmployeeHeader – Header thương hiệu TrungNguyenHR chung cho toàn bộ các trang nhân viên.
+ *
+ * Tính năng:
+ *  - Click cụm Logo (Icon + Chữ TrungNguyenHR) -> Quay về trang Chấm công (#/attendance)
+ *  - Chuông thông báo
+ *  - Nút Đăng xuất tiện lợi
+ */
 export default function SharedEmployeeHeader({ onLogout, onNotificationClick }) {
+  const handleLogoClick = () => {
+    if (window.location.hash === '#/attendance') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      window.location.hash = '#/attendance';
+    }
+  };
+
   const handleNotify = () => {
     if (onNotificationClick) {
       onNotificationClick();
@@ -27,15 +43,23 @@ export default function SharedEmployeeHeader({ onLogout, onNotificationClick }) 
 
   return (
     <header className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-      <div className="flex items-center space-x-2.5">
-        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center overflow-hidden shadow-sm">
-          <img src={logoImg} alt="Trung Nguyen Legend" className="w-full h-full object-contain" />
+      {/* ── Cụm Logo: Nhấp vào quay trở lại trang Chấm công ── */}
+      <button
+        type="button"
+        onClick={handleLogoClick}
+        title="Quay lại trang Chấm công"
+        aria-label="Quay lại trang Chấm công"
+        className="flex items-center space-x-2.5 cursor-pointer group text-left focus:outline-none transition-transform active:scale-95"
+      >
+        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center overflow-hidden shadow-sm group-hover:border-[#0EA5E9] group-hover:shadow transition-all">
+          <img src={logoImg} alt="Trung Nguyen Legend" className="w-full h-full object-contain pointer-events-none" />
         </div>
-        <span className="text-lg font-black tracking-tight text-slate-900 leading-none">
+        <span className="text-lg font-black tracking-tight text-slate-900 leading-none group-hover:text-[#0EA5E9] transition-colors">
           TrungNguyen<span className="text-[#0EA5E9]">HR</span>
         </span>
-      </div>
+      </button>
 
+      {/* ── Thông báo & Đăng xuất ── */}
       <div className="flex items-center space-x-2">
         <button
           type="button"
