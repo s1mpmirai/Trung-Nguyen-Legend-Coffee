@@ -1,11 +1,10 @@
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from app.core.security import create_access_token, verify_password, hash_password
-from app.models.account_model import TaiKhoan
-from app.utils.auto_gen import define_pass
-from app.schemas.auth_schemas import account_create
 import app.repositories.auth_repository as account_repository
+from app.core.security import create_access_token, hash_password, verify_password
+from app.schemas.auth_schemas import account_create
+from app.utils.auto_gen import define_pass
 
 
 def authenticate_user(db: Session, ma_nv: str, mat_khau: str) -> dict[str, str] | None:
@@ -19,7 +18,7 @@ def authenticate_user(db: Session, ma_nv: str, mat_khau: str) -> dict[str, str] 
     is_valid = False
     try: 
         is_valid = verify_password(mat_khau, account.mat_khau)
-    except: 
+    except:  # noqa: E722
         is_valid = False
         
     if not is_valid:

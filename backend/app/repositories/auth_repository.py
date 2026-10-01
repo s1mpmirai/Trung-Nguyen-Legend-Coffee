@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+
 from app.models.account_model import TaiKhoan
+
 
 def get_by_ma_nv(db: Session, ma_nv: str) -> TaiKhoan | None:
     return db.query(TaiKhoan).filter(TaiKhoan.ma_nv == ma_nv).first()
