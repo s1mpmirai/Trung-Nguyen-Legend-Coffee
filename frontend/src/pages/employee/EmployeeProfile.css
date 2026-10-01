@@ -1,0 +1,920 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/* ═══════════════════════════════════════════════════════════════
+   EmployeeProfile.css
+   ───────────────────────────────────────────────────────────────
+   Styles cho trang Hồ sơ & Thông tin nhân viên.
+   
+   Naming convention: BEM → Block: ep (employee-profile)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── CSS Variables ─────────────────────────────────────────────── */
+:root {
+  /* Màu chính (xanh dương) */
+  --ep-primary: #1a8dd8;
+  --ep-primary-light: #e8f4fd;
+  --ep-primary-dark: #1270ad;
+
+  /* Màu nền */
+  --ep-bg: #f0f4f8;
+  --ep-bg-white: #ffffff;
+
+  /* Màu chữ */
+  --ep-text-primary: #1a2b3c;
+  --ep-text-secondary: #6b7b8d;
+  --ep-text-muted: #8d9bab;
+
+  /* Màu viền */
+  --ep-border: #e2e8f0;
+  --ep-border-light: #f0f3f7;
+
+  /* Màu trạng thái */
+  --ep-success: #22c55e;
+  --ep-success-bg: #ecfdf5;
+  --ep-success-text: #16a34a;
+  --ep-danger: #ef4444;
+  --ep-danger-bg: #fef2f2;
+
+  /* Màu highlight (mã NV) */
+  --ep-highlight: #1a8dd8;
+  --ep-highlight-bg: #e8f4fd;
+
+  /* Border radius */
+  --ep-radius-sm: 8px;
+  --ep-radius-md: 12px;
+  --ep-radius-lg: 16px;
+  --ep-radius-full: 9999px;
+
+  /* Shadow */
+  --ep-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --ep-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --ep-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+
+  /* Font */
+  --ep-font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Transition */
+  --ep-transition: 0.2s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   1. PAGE LAYOUT
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--ep-bg);
+  font-family: var(--ep-font);
+  color: var(--ep-text-primary);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   2. TOP BAR
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--ep-bg-white);
+  border-bottom: 1px solid var(--ep-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.ep-topbar__brand {
+  display: flex;
+  align-items: center;
+}
+
+.ep-topbar__logo {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ep-primary);
+  text-transform: uppercase;
+  line-height: 1;
+  border: 1.5px solid var(--ep-primary);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+.ep-topbar__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ep-text-primary);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   3. SCROLLABLE CONTENT
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px 100px;
+  /* padding-bottom đủ lớn để không bị bottom nav che */
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4. PROFILE HEADER
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 20px 24px;
+  margin-bottom: 12px;
+  background: var(--ep-bg-white);
+  border-radius: 0 0 var(--ep-radius-lg) var(--ep-radius-lg);
+  box-shadow: var(--ep-shadow-sm);
+}
+
+/* ── Avatar ────────────────────────────────────────────────────── */
+
+.ep-avatar-wrapper {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.ep-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--ep-primary-light);
+  box-shadow: 0 4px 16px rgba(26, 141, 216, 0.18);
+  transition: transform var(--ep-transition);
+}
+
+.ep-avatar:hover {
+  transform: scale(1.05);
+}
+
+/* ── Badge trạng thái ──────────────────────────────────────────── */
+
+.ep-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ep-success-text);
+  background: var(--ep-success-bg);
+  border-radius: var(--ep-radius-full);
+  margin-bottom: 14px;
+}
+
+.ep-status-badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ep-success);
+  animation: ep-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ep-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+/* ── Tên, chức danh, phòng ban ─────────────────────────────────── */
+
+.ep-profile-name {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--ep-text-primary);
+  line-height: 1.3;
+}
+
+.ep-profile-title {
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ep-text-secondary);
+  line-height: 1.4;
+}
+
+.ep-profile-dept {
+  margin: 0 0 16px;
+  font-size: 0.8rem;
+  color: var(--ep-text-muted);
+}
+
+.ep-profile-dept strong {
+  color: var(--ep-primary);
+  font-weight: 600;
+}
+
+/* ── Meta tags (ngày vào làm, thâm niên) ───────────────────────── */
+
+.ep-meta-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.ep-meta-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ep-primary);
+  background: var(--ep-primary-light);
+  border-radius: var(--ep-radius-full);
+  border: 1px solid rgba(26, 141, 216, 0.15);
+}
+
+.ep-meta-tag__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* ── Nút "Chỉnh sửa hồ sơ" ───────────────────────────────────── */
+
+.ep-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 300px;
+  padding: 12px 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: var(--ep-font);
+  color: var(--ep-bg-white);
+  background: linear-gradient(135deg, var(--ep-primary) 0%, var(--ep-primary-dark) 100%);
+  border: none;
+  border-radius: var(--ep-radius-md);
+  cursor: pointer;
+  transition: all var(--ep-transition);
+  box-shadow: 0 4px 12px rgba(26, 141, 216, 0.3);
+}
+
+.ep-edit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(26, 141, 216, 0.4);
+}
+
+.ep-edit-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(26, 141, 216, 0.3);
+}
+
+.ep-edit-btn__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. CARD (dùng chung cho các section)
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-card {
+  background: var(--ep-bg-white);
+  border-radius: var(--ep-radius-lg);
+  box-shadow: var(--ep-shadow-sm);
+  margin-bottom: 12px;
+  overflow: hidden;
+  transition: box-shadow var(--ep-transition);
+}
+
+.ep-card:hover {
+  box-shadow: var(--ep-shadow-md);
+}
+
+/* ── Card header ───────────────────────────────────────────────── */
+
+.ep-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 0;
+}
+
+.ep-card__header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ep-card__icon {
+  width: 22px;
+  height: 22px;
+  color: var(--ep-primary);
+  flex-shrink: 0;
+}
+
+.ep-card__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ep-text-primary);
+}
+
+.ep-card__edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-primary-light);
+  color: var(--ep-primary);
+  cursor: pointer;
+  transition: all var(--ep-transition);
+}
+
+.ep-card__edit-btn:hover {
+  background: var(--ep-primary);
+  color: var(--ep-bg-white);
+}
+
+/* ── Card body ─────────────────────────────────────────────────── */
+
+.ep-card__body {
+  padding: 14px 20px 18px;
+}
+
+/* ── Card footer ───────────────────────────────────────────────── */
+
+.ep-card__footer {
+  padding: 0 20px 18px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   6. INFO ROW (label–value)
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-info-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ep-border-light);
+}
+
+.ep-info-row:last-child {
+  border-bottom: none;
+}
+
+.ep-info-row__label {
+  font-size: 0.825rem;
+  color: var(--ep-text-secondary);
+  flex-shrink: 0;
+  min-width: 110px;
+}
+
+.ep-info-row__value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ep-text-primary);
+  text-align: right;
+  word-break: break-word;
+}
+
+/* ── Highlight (mã NV) ────────────────────────────────────────── */
+
+.ep-highlight {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ep-highlight);
+  background: var(--ep-highlight-bg);
+  border-radius: var(--ep-radius-sm);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   7. WORK CONTACT – Các style riêng
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-phone-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ep-phone-icon {
+  color: var(--ep-primary);
+  cursor: pointer;
+  transition: color var(--ep-transition);
+}
+
+.ep-phone-icon:hover {
+  color: var(--ep-primary-dark);
+}
+
+.ep-email-link {
+  color: var(--ep-primary);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.84rem;
+  transition: color var(--ep-transition);
+}
+
+.ep-email-link:hover {
+  color: var(--ep-primary-dark);
+  text-decoration: underline;
+}
+
+/* ── Hợp đồng ─────────────────────────────────────────────────── */
+
+.ep-contract-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  font-size: 0.84rem;
+}
+
+.ep-contract-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ep-success-text);
+  background: var(--ep-success-bg);
+  border-radius: var(--ep-radius-sm);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8. ACCOUNT SETTINGS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Nút đổi mật khẩu ─────────────────────────────────────────── */
+
+.ep-password-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--ep-font);
+  transition: background var(--ep-transition);
+  border-radius: var(--ep-radius-sm);
+}
+
+.ep-password-btn:hover {
+  background: var(--ep-bg);
+}
+
+.ep-password-btn__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ep-password-btn__icon {
+  color: var(--ep-primary);
+  flex-shrink: 0;
+}
+
+.ep-password-btn__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.ep-password-btn__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ep-text-primary);
+}
+
+.ep-password-btn__sub {
+  font-size: 0.72rem;
+  color: var(--ep-text-muted);
+}
+
+.ep-password-btn__arrow {
+  color: var(--ep-text-muted);
+  flex-shrink: 0;
+  transition: transform var(--ep-transition);
+}
+
+.ep-password-btn:hover .ep-password-btn__arrow {
+  transform: translateX(3px);
+  color: var(--ep-primary);
+}
+
+/* ── Nút đăng xuất ────────────────────────────────────────────── */
+
+.ep-logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: var(--ep-font);
+  color: var(--ep-danger);
+  background: var(--ep-danger-bg);
+  border: 1.5px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--ep-radius-md);
+  cursor: pointer;
+  transition: all var(--ep-transition);
+}
+
+.ep-logout-btn:hover {
+  background: var(--ep-danger);
+  color: var(--ep-bg-white);
+  border-color: var(--ep-danger);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.ep-logout-btn:active {
+  transform: scale(0.98);
+}
+
+.ep-logout-btn__icon {
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   9. BOTTOM NAV BAR
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-bottom-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  padding: 8px 0 12px;
+  background: var(--ep-bg-white);
+  border-top: 1px solid var(--ep-border);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  z-index: 200;
+}
+
+/* Fallback safe area cho iPhone notch */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .ep-bottom-nav {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+}
+
+.ep-bottom-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--ep-font);
+  transition: color var(--ep-transition);
+  color: var(--ep-text-muted);
+  position: relative;
+}
+
+.ep-bottom-nav__item--active {
+  color: var(--ep-primary);
+}
+
+/* Chấm tròn bên dưới tab active */
+.ep-bottom-nav__item--active::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ep-primary);
+}
+
+.ep-bottom-nav__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ep-bottom-nav__label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   10. RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Trên desktop, trang nằm giữa với viền shadow mô phỏng điện thoại */
+@media (min-width: 481px) {
+  .ep-page {
+    border-left: 1px solid var(--ep-border);
+    border-right: 1px solid var(--ep-border);
+    box-shadow: var(--ep-shadow-lg);
+  }
+}
+
+/* Màn hình rất nhỏ */
+@media (max-width: 360px) {
+  .ep-meta-tags {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .ep-info-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .ep-info-row__value {
+    text-align: left;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   11. ANIMATIONS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Fade-in khi trang load */
+.ep-profile-header,
+.ep-card {
+  animation: ep-fadeInUp 0.4s ease both;
+}
+
+.ep-card:nth-child(2) { animation-delay: 0.08s; }
+.ep-card:nth-child(3) { animation-delay: 0.16s; }
+.ep-card:nth-child(4) { animation-delay: 0.24s; }
+
+@keyframes ep-fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   12. MODALS & FORMS
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 16px;
+  animation: ep-fadeIn 0.2s ease-out;
+}
+
+.ep-modal {
+  background: var(--ep-bg-white);
+  border-radius: var(--ep-radius-lg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  animation: ep-scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ep-scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes ep-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ep-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.ep-modal__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ep-text-primary);
+}
+
+.ep-modal__close-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--ep-text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all var(--ep-transition);
+}
+
+.ep-modal__close-btn:hover {
+  background: var(--ep-border-light);
+  color: var(--ep-text-primary);
+}
+
+.ep-modal__alert {
+  padding: 10px 14px;
+  border-radius: var(--ep-radius-sm);
+  font-size: 0.825rem;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.ep-modal__alert--danger {
+  background: var(--ep-danger-bg);
+  color: var(--ep-danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.ep-modal__alert--success {
+  background: var(--ep-success-bg);
+  color: var(--ep-success-text);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.ep-form-group {
+  margin-bottom: 14px;
+}
+
+.ep-form-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ep-text-secondary);
+  margin-bottom: 6px;
+}
+
+.ep-form-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  font-family: var(--ep-font);
+  border: 1.5px solid var(--ep-border);
+  border-radius: var(--ep-radius-sm);
+  outline: none;
+  transition: border-color var(--ep-transition), box-shadow var(--ep-transition);
+  background: var(--ep-bg-white);
+  color: var(--ep-text-primary);
+}
+
+.ep-form-input:focus {
+  border-color: var(--ep-primary);
+  box-shadow: 0 0 0 3px rgba(26, 141, 216, 0.15);
+}
+
+.ep-modal__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.ep-btn {
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: var(--ep-radius-sm);
+  cursor: pointer;
+  border: none;
+  font-family: var(--ep-font);
+  transition: all var(--ep-transition);
+}
+
+.ep-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ep-btn--secondary {
+  background: var(--ep-border-light);
+  color: var(--ep-text-secondary);
+}
+
+.ep-btn--secondary:hover:not(:disabled) {
+  background: var(--ep-border);
+  color: var(--ep-text-primary);
+}
+
+.ep-btn--primary {
+  background: var(--ep-primary);
+  color: #fff;
+}
+
+.ep-btn--primary:hover:not(:disabled) {
+  background: var(--ep-primary-dark);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   13. TOAST NOTIFICATION
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: var(--ep-radius-full);
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: ep-toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ep-toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -15px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.ep-toast__icon {
+  color: #22c55e;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   14. LOADING INDICATOR
+   ═══════════════════════════════════════════════════════════════ */
+
+.ep-loading-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--ep-primary);
+  background: var(--ep-primary-light);
+  padding: 3px 8px;
+  border-radius: var(--ep-radius-full);
+  margin-left: auto;
+}
+
+.ep-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ep-primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ep-spin 0.8s linear infinite;
+}
+
+@keyframes ep-spin {
+  to { transform: rotate(360deg); }
+}
+

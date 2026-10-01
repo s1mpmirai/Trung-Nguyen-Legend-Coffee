@@ -31,6 +31,7 @@ def authenticate_user(db: Session, ma_nv: str, mat_khau: str) -> dict[str, str] 
         "ma_vai_tro": account.ma_vai_tro,
     }
 
+
 def login_for_portal(
     db: Session,
     ma_nv: str,
@@ -47,6 +48,7 @@ def login_for_portal(
 
     return result
 
+
 def create_account(db: Session, data: account_create):
     # 1. Kiểm tra xem nhân viên này có thật trong công ty không
     emp_exists = db.execute(
@@ -61,6 +63,7 @@ def create_account(db: Session, data: account_create):
     existing_account = account_repository.get_by_ma_nv(db, data.ma_nv)
     if existing_account:
         raise ValueError(f"Nhân viên {data.ma_nv} đã có tài khoản trong hệ thống.")
+    
     # 3. Hash mật khẩu bảo mật bằng bcrypt
     default_pass = define_pass()
     account_dict = {
@@ -77,9 +80,23 @@ def create_account(db: Session, data: account_create):
     except Exception:
         db.rollback()
         raise
+
+
 def change_account_status(db: Session, ma_nv: str, trang_thai: str):
     account = account_repository.update_status(db, ma_nv, trang_thai)
     if not account:
         raise ValueError(f"Không tìm thấy tài khoản của nhân viên {ma_nv}")
     db.commit()
     return account
+
+
+def change_password(db: Session, ma_nv: str, old_pass: str, new_pass: str):
+    account = account_repository.get_by_ma_nv(db, ma_nv)
+    if not account:
+        raise ValueError(f"Không tìm thấy tài khoản của nhân viên {ma_nv}")
+    if not verify_password(old_pass, account.mat_khau):
+        raise ValueError("Mật khẩu hiện tại không chính xác")
+    
+    account.mat_khau = hash_password(new_pass)
+    db.commit()
+    return {"message": "Đổi mật khẩu thành công"}

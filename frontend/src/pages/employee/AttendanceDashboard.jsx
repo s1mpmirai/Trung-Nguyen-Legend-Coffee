@@ -425,7 +425,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
         <button
           onClick={() => {
             setActiveTab('payroll');
-            showToast('Chức năng "Bảng lương" đang đồng bộ từ Database');
+            window.location.hash = '#/payroll';
           }}
           className={`flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all ${
             activeTab === 'payroll' ? 'text-[#0EA5E9]' : 'text-slate-400 hover:text-slate-600'
@@ -438,7 +438,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
         <button
           onClick={() => {
             setActiveTab('profile');
-            setShowProfileMenu(!showProfileMenu);
+            window.location.hash = '#/profile';
           }}
           className={`flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all ${
             activeTab === 'profile' ? 'text-[#0EA5E9]' : 'text-slate-400 hover:text-slate-600'
