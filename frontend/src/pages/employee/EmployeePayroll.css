@@ -567,25 +567,35 @@
   margin: 0 0 14px;
 }
 
-.pr-faq__btn {
+.pr-faq__email-wrapper {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 20px;
-  background: var(--pr-primary);
-  color: #fff;
-  border: none;
-  border-radius: 24px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--pr-transition);
+  justify-content: center;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 8px 16px;
 }
 
-.pr-faq__btn:hover {
-  background: #1557b0;
-  box-shadow: 0 4px 14px rgba(26, 115, 232, 0.3);
-  transform: translateY(-1px);
+.pr-faq__email-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pr-faq__email-link {
+  font-weight: 700;
+  color: #0284c7;
+  text-decoration: none;
+  margin-left: 4px;
+  transition: color 0.2s ease;
+}
+
+.pr-faq__email-link:hover {
+  color: #0369a1;
+  text-decoration: underline;
 }
 
 /* ═══════════════════════════════════════════════════════════════
