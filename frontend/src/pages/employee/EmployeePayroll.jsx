@@ -271,6 +271,7 @@ function EmployeePayroll({ userSession, onLogout }) {
           isOpen={isDetailOpen}
           payroll={payroll}
           isHidden={isHidden}
+          onToggleHidden={(val) => setIsHidden(val)}
           onClose={() => setIsDetailOpen(false)}
         />
       )}

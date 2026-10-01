@@ -642,6 +642,39 @@
   margin: 0;
 }
 
+.pr-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pr-modal__eye-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0284c7;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pr-modal__eye-btn:hover {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+  color: #0369a1;
+}
+
+.pr-modal__eye-text {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .pr-modal__close {
   background: none;
   border: none;

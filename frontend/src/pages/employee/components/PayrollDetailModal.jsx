@@ -1,20 +1,35 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { formatMoney } from "../../../services/payrollService";
 
 /**
  * PayrollDetailModal – Modal hiển thị chi tiết bảng kê & khấu trừ.
  *
- * Bao gồm:
- *  ▸ Thu nhập: Lương theo công, tăng ca, phụ cấp, thưởng
- *  ▸ Khấu trừ: BHXH, BHYT, BHTN, thuế TNCN, khấu trừ khác
- *  ▸ Thông tin công: Số công chuẩn, thực tế, giờ tăng ca
+ * Tích hợp icon con mắt để bật/tắt hiển thị số tiền trực tiếp trong bảng kê.
  */
-function PayrollDetailModal({ isOpen, payroll, isHidden, onClose }) {
-  if (!isOpen) return null;
+function PayrollDetailModal({
+  isOpen,
+  payroll,
+  isHidden: initialHidden = true,
+  onToggleHidden,
+  onClose,
+}) {
+  const [isAmountHidden, setIsAmountHidden] = useState(initialHidden);
+
+  useEffect(() => {
+    setIsAmountHidden(initialHidden);
+  }, [initialHidden, isOpen]);
+
+  if (!isOpen || !payroll) return null;
 
   const hidden = "•••••••";
-  const fmt = (v) => (isHidden ? hidden : `${formatMoney(v)} đ`);
-  const fmtNeg = (v) => (isHidden ? hidden : `-${formatMoney(v)} đ`);
+  const fmt = (v) => (isAmountHidden ? hidden : `${formatMoney(v)} đ`);
+  const fmtNeg = (v) => (isAmountHidden ? hidden : `-${formatMoney(v)} đ`);
+
+  const toggleHidden = () => {
+    const next = !isAmountHidden;
+    setIsAmountHidden(next);
+    if (onToggleHidden) onToggleHidden(next);
+  };
 
   // Danh sách thu nhập
   const incomeItems = [
@@ -40,16 +55,62 @@ function PayrollDetailModal({ isOpen, payroll, isHidden, onClose }) {
   return (
     <div className="pr-modal-overlay" onClick={onClose}>
       <div className="pr-modal" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+        {/* Header với icon con mắt bật/tắt số tiền */}
         <div className="pr-modal__header">
           <h3 className="pr-modal__title">
             Chi tiết bảng kê – T{payroll.thang}/{payroll.nam}
           </h3>
-          <button className="pr-modal__close" onClick={onClose} type="button">
-            <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
-              <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
+
+          <div className="pr-modal__header-actions">
+            {/* Nút con mắt bật/tắt hiển thị số tiền */}
+            <button
+              className="pr-modal__eye-btn"
+              type="button"
+              onClick={toggleHidden}
+              title={isAmountHidden ? "Nhấn để hiện số tiền" : "Nhấn để ẩn số tiền"}
+              aria-label={isAmountHidden ? "Hiện số tiền" : "Ẩn số tiền"}
+            >
+              {isAmountHidden ? (
+                <svg viewBox="0 0 20 20" fill="none" width="16" height="16">
+                  <path
+                    d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                  />
+                  <circle cx="10" cy="10" r="3" stroke="currentColor" strokeWidth="1.6" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 20 20" fill="none" width="16" height="16">
+                  <path
+                    d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6zM10 7v0a3 3 0 010 6v0a3 3 0 010-6zM3 3l14 14"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              )}
+              <span className="pr-modal__eye-text">
+                {isAmountHidden ? "Hiện tiền" : "Ẩn tiền"}
+              </span>
+            </button>
+
+            {/* Nút đóng modal */}
+            <button
+              className="pr-modal__close"
+              onClick={onClose}
+              type="button"
+              aria-label="Đóng"
+            >
+              <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+                <path
+                  d="M5 5l10 10M15 5L5 15"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -96,7 +157,13 @@ function PayrollDetailModal({ isOpen, payroll, isHidden, onClose }) {
                 className={`pr-modal__row ${item.isTotal ? "pr-modal__row--total" : ""}`}
               >
                 <span>{item.label}</span>
-                <strong className={`${item.isTotal ? "pr-modal__total-value pr-modal__total-value--danger" : "pr-modal__deduct-value"}`}>
+                <strong
+                  className={`${
+                    item.isTotal
+                      ? "pr-modal__total-value pr-modal__total-value--danger"
+                      : "pr-modal__deduct-value"
+                  }`}
+                >
                   {fmtNeg(item.value)}
                 </strong>
               </div>
