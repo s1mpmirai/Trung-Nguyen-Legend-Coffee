@@ -43,29 +43,6 @@ def get_payroll_months(db: Session, ma_nv: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def get_payroll_year_summary(db: Session, ma_nv: str, nam: int) -> dict | None:
-    """Tổng hợp lương cả năm của nhân viên."""
-    query = """
-        SELECT
-            COUNT(*)            AS so_thang,
-            SUM(luong_gross)    AS tong_gross,
-            SUM(tong_khau_tru)  AS tong_khau_tru,
-            SUM(luong_net)      AS tong_net,
-            SUM(tien_thuong)    AS tong_thuong,
-            SUM(tong_phu_cap)   AS tong_phu_cap,
-            SUM(bhxh)           AS tong_bhxh,
-            SUM(bhyt)           AS tong_bhyt,
-            SUM(bhtn)           AS tong_bhtn,
-            SUM(thue_tncn)      AS tong_thue_tncn
-        FROM bang_luong
-        WHERE ma_nv = :ma_nv AND nam = :nam
-    """
-    row = db.execute(text(query), {"ma_nv": ma_nv, "nam": nam}).mappings().first()
-    if not row or row["so_thang"] == 0:
-        return None
-    return dict(row)
-
-
 def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
     """Lấy danh sách bảng lương tháng của toàn bộ nhân viên cho quản lý."""
     query = """

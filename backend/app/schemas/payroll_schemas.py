@@ -50,18 +50,6 @@ class payroll_months_response(BaseModel):
     items: List[payroll_month_item] = Field(default_factory=list)
 
 
-class payroll_year_summary_response(BaseModel):
-    """Tổng hợp lương cả năm."""
-    so_thang: int = 0
-    tong_gross: float = 0
-    tong_khau_tru: float = 0
-    tong_net: float = 0
-    tong_thuong: float = 0
-    tong_phu_cap: float = 0
-    tong_bhxh: float = 0
-    tong_bhyt: float = 0
-    tong_bhtn: float = 0
-    tong_thue_tncn: float = 0
 
 
 class payroll_calculate_request(BaseModel):

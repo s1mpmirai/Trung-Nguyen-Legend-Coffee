@@ -1,17 +1,20 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from typing import List
 
 from app.db.session import get_db
 from app.schemas.employee_schemas import (
-    employee_profile_create,
-    employee_list_response,
-    employee_profile_response,
-    employee_detail_response,
     employee_contact_update,
+    employee_detail_response,
+    employee_list_response,
+    employee_profile_create,
+    employee_profile_response,
 )
 from app.services.employee_service import (
     create_employee as create_employee_service,
+)
+from app.services.employee_service import (
     employee_list,
     get_employee_profile,
     update_employee_contact,
@@ -55,4 +58,4 @@ def update_profile(
     try:
         return update_employee_contact(db, ma_nv, data)
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error

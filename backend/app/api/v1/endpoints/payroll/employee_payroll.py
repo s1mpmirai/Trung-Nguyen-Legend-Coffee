@@ -7,12 +7,10 @@ from app.db.session import get_db
 from app.schemas.payroll_schemas import (
     payroll_month_response,
     payroll_months_response,
-    payroll_year_summary_response,
 )
 from app.services.payroll_service import (
     get_employee_payroll_history,
     get_employee_payroll_month,
-    get_employee_payroll_year,
 )
 
 router = APIRouter()
@@ -43,17 +41,3 @@ def get_payroll_months_list(
     """Lấy danh sách các tháng/năm đã có bảng lương của nhân viên."""
     return get_employee_payroll_history(db, ma_nv)
 
-
-@router.get("/{ma_nv}/year", response_model=payroll_year_summary_response, summary="[Nhân viên] Tổng hợp lương cả năm (In bảng lương năm)")
-def get_payroll_year(
-    ma_nv: str,
-    nam: int = Query(..., ge=2000, description="Năm"),
-    db: DbSession = None,
-):
-    """Tổng hợp thu nhập, bảo hiểm, thuế cả năm của nhân viên để in bảng lương năm."""
-    try:
-        return get_employee_payroll_year(db, ma_nv, nam)
-    except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(err)
-        ) from err
