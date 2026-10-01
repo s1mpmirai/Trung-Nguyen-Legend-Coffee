@@ -59,11 +59,29 @@ function EmployeePayroll({ userSession, onLogout }) {
   useEffect(() => {
     let mounted = true;
     async function loadMonths() {
-      const months = await getPayrollMonths(currentMaNv);
-      if (mounted && months && months.length > 0) {
-        setAvailableMonths(months);
-        // Tự động chuyển tới kỳ lương gần nhất có dữ liệu
-        setSelectedMonth({ thang: months[0].thang, nam: months[0].nam });
+      try {
+        const months = await getPayrollMonths(currentMaNv);
+        if (mounted && months && months.length > 0) {
+          setAvailableMonths(months);
+          // Mặc định chọn tháng đã chốt lương gần nhất từ Database (DA_DUYET hoặc DA_TRA)
+          const latestClosed = months.find(
+            (m) => m.trang_thai === "DA_DUYET" || m.trang_thai === "DA_TRA"
+          ) || months[0];
+
+          if (latestClosed) {
+            setSelectedMonth({ thang: latestClosed.thang, nam: latestClosed.nam });
+          }
+        } else if (mounted) {
+          // Nếu DB chưa có bản ghi, tính theo tháng chốt gần nhất của thời gian thực (tháng hiện tại - 1)
+          const now = new Date();
+          const curM = now.getMonth() + 1;
+          const curY = now.getFullYear();
+          const prevM = curM === 1 ? 12 : curM - 1;
+          const prevY = curM === 1 ? curY - 1 : curY;
+          setSelectedMonth({ thang: prevM, nam: prevY });
+        }
+      } catch (err) {
+        console.warn("Lỗi load danh sách tháng:", err);
       }
     }
     loadMonths();
@@ -111,18 +129,11 @@ function EmployeePayroll({ userSession, onLogout }) {
     return () => { mounted = false; };
   }, [viewMode, currentMaNv, selectedMonth.nam]);
 
-  /* ── 4. Handlers điều hướng tháng ────────────────────────────── */
-  const handlePrevMonth = () => {
-    setSelectedMonth((prev) => {
-      if (prev.thang === 1) return { thang: 12, nam: prev.nam - 1 };
-      return { thang: prev.thang - 1, nam: prev.nam };
-    });
-  };
-
-  const handleNextMonth = () => {
-    setSelectedMonth((prev) => {
-      if (prev.thang === 12) return { thang: 1, nam: prev.nam + 1 };
-      return { thang: prev.thang + 1, nam: prev.nam };
+  /* ── 4. Handler chọn tháng/năm trực tiếp ───────────────────────── */
+  const handleSelectMonth = (thang, nam) => {
+    setSelectedMonth({
+      thang: Number(thang),
+      nam: Number(nam || selectedMonth.nam),
     });
   };
 
@@ -238,13 +249,13 @@ function EmployeePayroll({ userSession, onLogout }) {
 
       {/* ── Nội dung chính ─────────────────────────────────────── */}
       <main className="px-4 py-2 space-y-3.5">
-        {/* Điều hướng tháng */}
+        {/* Bộ chọn tháng/năm trực tiếp (gọn gàng, canh giữa) */}
         <MonthNavigator
           month={selectedMonth.thang}
           year={selectedMonth.nam}
-          status={hasData ? payroll?.trang_thai : null}
-          onPrev={handlePrevMonth}
-          onNext={handleNextMonth}
+          availableMonths={availableMonths}
+          onSelectMonth={handleSelectMonth}
+          startYear={employeeStartYear}
         />
 
         {/* Card lương thực nhận */}

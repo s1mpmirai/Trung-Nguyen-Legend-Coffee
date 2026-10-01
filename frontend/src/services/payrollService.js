@@ -64,7 +64,7 @@ export function formatMoney(value) {
 export function mapPayrollStatus(status) {
   const map = {
     NHAP: { label: "Đang xử lý", color: "warning" },
-    DA_DUYET: { label: "Đã chốt", color: "info" },
+    DA_DUYET: { label: "Đã xác nhận", color: "success" },
     DA_TRA: { label: "Đã chi trả", color: "success" },
     DANG_CAP_NHAT: { label: "Đang cập nhật", color: "warning" },
   };
