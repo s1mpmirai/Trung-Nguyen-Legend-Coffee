@@ -20,6 +20,7 @@ import {
 
 import logoImg from '../../assets/logo/Logo Trung Nguyên_black.png';
 import AttendanceHistoryDetail from './AttendanceHistoryDetail';
+import LeaveRequests from './LeaveRequests';
 import {
   getAttendanceDashboardData,
   checkInAttendance,
@@ -63,7 +64,8 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
       gio_vao: timeStr,
       gio_ra: '--:--',
       ca_lam_viec: 'Ca hành chính',
-      dia_diem_cham: 'Landmark 81 (GPS)',
+      dia_diem_cham: data.location?.ten_dia_diem || 'Trụ sở chính Trung Nguyên',
+      dia_diem_chi_nhanh: data.location?.ten_dia_diem || 'Trụ sở chính Trung Nguyên',
       hinh_thuc: 'GPS',
       trang_thai: 'Đúng giờ',
     };
@@ -110,7 +112,62 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
       <AttendanceHistoryDetail
         userSession={userSession}
         onBack={() => setShowHistoryDetail(false)}
+        onTabChange={(tab) => {
+          setShowHistoryDetail(false);
+          setActiveTab(tab);
+        }}
       />
+    );
+  }
+
+  if (activeTab === 'requests') {
+    return (
+      <div className="flex-1 flex flex-col bg-[#F8FAFC] min-h-screen relative">
+        <LeaveRequests userSession={userSession} onLogout={onLogout} />
+        {/* ───────────────── BOTTOM NAVIGATION BAR NATIVE WEB APP ───────────────── */}
+        <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-100 py-2 px-4 flex items-center justify-around z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
+          <button
+            onClick={() => {
+              setActiveTab('attendance');
+              setShowHistoryDetail(false);
+            }}
+            className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
+          >
+            <Clock size={20} className="stroke-2" />
+            <span className="text-[10px] font-semibold leading-none">Chấm công</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('requests')}
+            className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-[#0EA5E9]"
+          >
+            <FileText size={20} className="stroke-[2.5]" />
+            <span className="text-[10px] font-semibold leading-none">Đơn từ</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('payroll');
+              showToast('Chức năng "Bảng lương" đang đồng bộ từ Database');
+            }}
+            className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
+          >
+            <DollarSign size={20} className="stroke-2" />
+            <span className="text-[10px] font-semibold leading-none">Bảng lương</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('profile');
+              setShowProfileMenu(!showProfileMenu);
+            }}
+            className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
+          >
+            <User size={20} className="stroke-2" />
+            <span className="text-[10px] font-semibold leading-none">Cá nhân</span>
+          </button>
+        </nav>
+      </div>
     );
   }
 
@@ -135,14 +192,9 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
           <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center overflow-hidden shadow-sm">
             <img src={logoImg} alt="Trung Nguyen Legend" className="w-full h-full object-contain" />
           </div>
-          <div>
-            <div className="text-[10px] font-black tracking-wider text-[#0EA5E9] uppercase leading-none">
-              TrungNguyenHR
-            </div>
-            <h1 className="text-base font-bold text-slate-900 leading-tight">
-              Chấm Công
-            </h1>
-          </div>
+          <span className="text-lg font-black tracking-tight text-slate-900 leading-none">
+            TrungNguyen<span className="text-[#0EA5E9]">HR</span>
+          </span>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -171,6 +223,16 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
       {/* ───────────────── BODY CONTENT ───────────────── */}
       <main className="px-4 py-3.5 space-y-4">
         
+        {/* TIÊU ĐỀ TRANG CHẤM CÔNG (ĐƯỢC ĐƯA XUỐNG DƯỚI ĐỂ ĐỒNG BỘ VỚI TRANG ĐƠN TỪ) */}
+        <div>
+          <span className="text-[11px] font-extrabold tracking-wider text-[#0EA5E9] uppercase block">
+            THEO DÕI VÀO / RA
+          </span>
+          <h2 className="text-xl font-black text-slate-900 leading-tight mt-0.5">
+            Chấm công
+          </h2>
+        </div>
+
         {/* 1. THẺ THÔNG TIN NHÂN VIÊN (BỎ HOÀN TOÀN AVATAR) */}
         <section className="bg-white rounded-2xl p-4 border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.03)] flex items-center justify-between">
           <div className="min-w-0 flex-1 pr-2">
@@ -410,10 +472,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
         </button>
 
         <button
-          onClick={() => {
-            setActiveTab('requests');
-            showToast('Chức năng "Đơn từ" (Nghỉ phép, công tác) đang đồng bộ');
-          }}
+          onClick={() => setActiveTab('requests')}
           className={`flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all ${
             activeTab === 'requests' ? 'text-[#0EA5E9]' : 'text-slate-400 hover:text-slate-600'
           }`}

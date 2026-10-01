@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { getAttendanceHistory } from '../../services/attendanceService';
 
-export default function AttendanceHistoryDetail({ userSession, onBack }) {
+export default function AttendanceHistoryDetail({ userSession, onBack, onTabChange }) {
   // Mặc định tháng 9 / 2026 (hoặc tháng hiện tại có dữ liệu trong DB)
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(9); // Database mẫu đang có dữ liệu tháng 9
@@ -234,7 +234,7 @@ export default function AttendanceHistoryDetail({ userSession, onBack }) {
         </button>
 
         <button
-          onClick={() => showToast('Chức năng "Đơn từ" đang đồng bộ')}
+          onClick={() => (onTabChange ? onTabChange('requests') : showToast('Chuyển sang Đơn từ'))}
           className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
         >
           <FileText size={20} className="stroke-2" />

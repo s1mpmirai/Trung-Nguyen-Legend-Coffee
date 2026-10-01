@@ -19,75 +19,32 @@ export const INITIAL_DATABASE_DATA = {
 
   // Bảng dia_diem (Work Locations)
   location: {
-    ten_dia_diem: 'Văn phòng Tòa nhà Landmark 81, TP. HCM',
-    vi_do: 10.7951,
-    kinh_do: 106.7218,
-    ban_kinh_cho_phep: 50,
-    khoang_cach_hien_tai: 15, // 15m
+    ten_dia_diem: 'Trụ sở chính Trung Nguyên',
+    vi_do: 10.7769,
+    kinh_do: 106.7009,
+    ban_kinh_cho_phep: 100,
+    khoang_cach_hien_tai: 18,
     hop_le: true,
   },
 
-  // Bảng thong_ke_thang (MonthlyStatistics) - Tháng 10/2023
+  // Bảng thong_ke_thang (MonthlyStatistics)
   monthlyStats: {
-    thang: 10,
-    nam: 2023,
-    so_ngay_cong_thuc_te: 21.5,
+    thang: new Date().getMonth() + 1,
+    nam: new Date().getFullYear(),
+    so_ngay_cong_thuc_te: 0,
     so_ngay_cong_chuan: 22.0,
-    so_lan_di_muon: 1,
-    chi_tiet_muon: 'Muộn 5 phút (12/10)',
-    so_gio_ot: 4.5,
+    so_lan_di_muon: 0,
+    chi_tiet_muon: 'Không có dữ liệu',
+    so_gio_ot: 0,
     he_so_ot: 'x1.5',
-    phep_nam_con_lai: 9.5,
+    phep_nam_con_lai: 12.0,
     tong_phep_nam: 12.0,
     han_dung_phep: '31/12',
-    cap_nhat_luc: '5 phút trước',
+    cap_nhat_luc: 'Vừa cập nhật',
   },
 
   // Bảng bang_cham_cong (AttendanceRecords / TimeLogs)
-  recentRecords: [
-    {
-      ma_cc: 101,
-      thu: 'T2',
-      ngay: '23',
-      ngay_day_du: '2023-10-23',
-      gio_vao: '08:24',
-      gio_ra: '17:35',
-      ca_lam_viec: 'Ca hành chính',
-      dia_diem_cham: 'Landmark 81 (GPS)',
-      hinh_thuc: 'GPS',
-      trang_thai: 'Đúng giờ',
-      ghi_chu: '',
-      loai_cong: 'CONG_DU',
-    },
-    {
-      ma_cc: 100,
-      thu: 'T6',
-      ngay: '20',
-      ngay_day_du: '2023-10-20',
-      gio_vao: '08:29',
-      gio_ra: '19:00',
-      ca_lam_viec: 'Ca hành chính',
-      dia_diem_cham: 'QR Lễ tân (OT 1.5h)',
-      hinh_thuc: 'QR_CODE',
-      trang_thai: 'Đúng giờ',
-      ghi_chu: 'OT 1.5h',
-      loai_cong: 'CONG_DU',
-    },
-    {
-      ma_cc: 99,
-      thu: 'T5',
-      ngay: '19',
-      ngay_day_du: '2023-10-19',
-      gio_vao: '08:15',
-      gio_ra: '17:32',
-      ca_lam_viec: 'Ca hành chính',
-      dia_diem_cham: 'Máy chấm công cửa',
-      hinh_thuc: 'FINGERPRINT',
-      trang_thai: 'Đúng giờ',
-      ghi_chu: '',
-      loai_cong: 'CONG_DU',
-    },
-  ],
+  recentRecords: [],
 };
 
 /**
