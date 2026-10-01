@@ -14,6 +14,7 @@ router = APIRouter()
 DbSession = Annotated[Session, Depends(get_db)]
 
 @router.post("/login/admin-login")
+@router.post("/admin-login")
 def admin_login(
     request: request_login,
     db: DbSession,
@@ -29,6 +30,7 @@ def admin_login(
     return result
 
 @router.post("/login/management-login")
+@router.post("/management-login")
 def management_login(
     request: request_login,
     db: DbSession,
@@ -45,6 +47,7 @@ def management_login(
 
 
 @router.post("/login/employee-login")
+@router.post("/employee-login")
 def employee_login(
     request: request_login,
     db: DbSession,

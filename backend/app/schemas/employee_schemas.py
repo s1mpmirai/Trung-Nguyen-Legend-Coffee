@@ -112,6 +112,7 @@ class employee_detail_response(BaseModel):
     ma_hd: Optional[str] = None
     loai_hd: Optional[str] = None
     trang_thai_hd: Optional[str] = None
+    hinh_thuc_lam_viec: Optional[str] = "PART_TIME"
     lan_dn_cuoi: Optional[datetime] = None
     ngay_cap_nhat_tk: Optional[datetime] = None
 
@@ -119,6 +120,8 @@ class employee_detail_response(BaseModel):
         from_attributes = True
 
 class employee_contact_update(BaseModel):
+    ngay_sinh: Optional[date] = Field(None, description="Ngày sinh")
+    gioi_tinh: Optional[str] = Field(None, description="Giới tính (Nam, Nu, Khac)")
     sdt: Optional[str] = Field(None, description="Số điện thoại")
     email: Optional[EmailStr] = Field(None, description="Email")
     dia_chi: Optional[str] = Field(None, description="Địa chỉ")

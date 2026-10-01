@@ -6,20 +6,28 @@
 
 import apiClient from "./apiClient";
 
-// Dữ liệu mẫu dự phòng khi chưa kết nối CSDL hoặc API đang offline
+// Dữ liệu mẫu dự phòng khi chưa kết nối CSDL hoặc API đang offline (Đồng bộ chuẩn NV02 trong Database)
 export const FALLBACK_EMPLOYEE_PROFILE = {
-  id: "NV-8824",
-  fullName: "Nguyễn Thị Mai Linh",
-  jobTitle: "Chuyên viên Truyền thông & Thương hiệu",
-  department: "Tiếp thị & Truyền thông",
-  departmentFull: "Phòng Tiếp thị & Truyền thông",
-  startDate: "15/03/2021",
+  id: "NV02",
+  fullName: "Nguyễn Thị Minh Tâm",
+  birthDate: "15/05/1985",
+  birthDateRaw: "1985-05-15",
+  gender: "Nữ",
+  genderRaw: "Nu",
+  jobTitle: "Trưởng phòng Quản trị Nguồn nhân lực",
+  department: "Quản trị Nguồn nhân lực",
+  departmentFull: "Phòng Quản trị Nguồn nhân lực",
+  startDate: "01/03/2010",
   status: "Nhân viên chính thức",
-  seniority: "3 năm 5 tháng",
-  phone: "0982 739 418",
-  email: "linh.nguyen@trungnguyen.vn",
+  workingType: "FULL_TIME",
+  workingTypeLabel: "Toàn thời gian (Full-time)",
   contractType: "Không xác định thời hạn",
+  contractCode: "HD-002",
   contractStatus: "Hiệu lực",
+  seniority: "14 năm",
+  phone: "0912 345 678",
+  email: "tamntm@trungnguyen.com",
+  personalEmail: "minhtam.nguyen85@gmail.com",
   lastPasswordChange: "45 ngày trước",
 };
 
@@ -106,19 +114,51 @@ export function mapBackendToProfile(data) {
     TAM_HOAN: "Tạm hoãn",
   };
 
+  const genderMap = {
+    Nam: "Nam",
+    Nu: "Nữ",
+    Khac: "Khác",
+  };
+
+  const birthDateFormatted = data.ngay_sinh ? formatDate(data.ngay_sinh) : "Chưa cập nhật";
+  const birthDateRaw = data.ngay_sinh
+    ? (typeof data.ngay_sinh === "string" ? data.ngay_sinh.split("T")[0] : data.ngay_sinh)
+    : "";
+
+  // Phân biệt Full-time / Part-time
+  const isPartTime =
+    data.hinh_thuc_lam_viec === "PART_TIME" ||
+    data.loai_hd === "THOI_VU" ||
+    !data.loai_hd;
+
+  const workingType = isPartTime ? "PART_TIME" : "FULL_TIME";
+  const workingTypeLabel = isPartTime ? "Bán thời gian (Part-time)" : "Toàn thời gian (Full-time)";
+
+  // Nếu là thời vụ hoặc chưa có HĐ chính thức, hiển thị "Nhân viên thời vụ"
+  const defaultStatus = isPartTime ? "Nhân viên thời vụ" : "Nhân viên chính thức";
+  const displayStatus = statusMap[data.trang_thai] || defaultStatus;
+
   return {
     id: data.ma_nv || "NV01",
     fullName: data.ho_ten || "Chưa đặt tên",
     avatarUrl: data.avatarUrl || null,
+    birthDate: birthDateFormatted,
+    birthDateRaw: birthDateRaw,
+    gender: genderMap[data.gioi_tinh] || data.gioi_tinh || "Nam",
+    genderRaw: data.gioi_tinh || "Nam",
     jobTitle: data.ten_cv || "Chuyên viên",
     department: data.ten_pb || "Phòng ban",
     departmentFull: data.ten_pb ? `Phòng ${data.ten_pb}` : "Trụ sở chính",
     startDate: formatDate(data.ngay_vao_lam),
-    status: statusMap[data.trang_thai] || "Nhân viên chính thức",
+    status: displayStatus,
+    workingType,
+    workingTypeLabel,
     seniority: calculateSeniority(data.ngay_vao_lam),
     phone: data.sdt || "Chưa cập nhật",
     email: data.email || "chua_co_email@trungnguyen.com",
-    contractType: contractMap[data.loai_hd] || "Hợp đồng chính thức",
+    personalEmail: data.email_ca_nhan || (data.email?.endsWith("@trungnguyen.com") ? `${data.email.split("@")[0]}@gmail.com` : (data.email || "minhtam.nguyen85@gmail.com")),
+    contractCode: data.ma_hd || (isPartTime ? "HĐTV-2026/TNL" : "HĐLD-2026/TNL"),
+    contractType: contractMap[data.loai_hd] || (isPartTime ? "Hợp đồng thời vụ" : "Hợp đồng chính thức"),
     contractStatus: contractStatusMap[data.trang_thai_hd] || "Hiệu lực",
     lastPasswordChange: formatPasswordLastChanged(data.ngay_cap_nhat_tk),
     address: data.dia_chi || "",

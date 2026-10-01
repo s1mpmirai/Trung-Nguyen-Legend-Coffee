@@ -199,3 +199,64 @@ def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int
     db.commit()
     return count
 
+
+def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
+    """
+    Lấy tổng hợp lương cả năm của nhân viên từ database.
+    - Nếu năm đó đủ 12 tháng: cộng và trừ đầy đủ 12 tháng.
+    - Nếu mới có đến tháng N (ví dụ tháng 9 hoặc tháng 10): tính tổng hợp lũy kế từ tháng 1 đến tháng có bảng lương trong năm đó.
+    """
+    query = """
+        SELECT
+            bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
+            bl.luong_co_ban, bl.he_so_luong,
+            bl.so_cong_chuan, bl.so_cong_thuc_te, bl.so_gio_tang_ca,
+            bl.luong_theo_cong, bl.tien_tang_ca,
+            bl.tong_phu_cap, bl.tien_thuong,
+            bl.luong_gross,
+            bl.bhxh, bl.bhyt, bl.bhtn,
+            bl.thue_tncn, bl.khau_tru_khac, bl.tong_khau_tru,
+            bl.luong_net,
+            bl.trang_thai, bl.ghi_chu,
+            bl.ngay_tao, bl.ngay_cap_nhat,
+            nv.ho_ten
+        FROM bang_luong bl
+        JOIN nhan_vien nv ON bl.ma_nv = nv.ma_nv
+        WHERE bl.ma_nv = :ma_nv
+          AND bl.nam = :nam
+        ORDER BY bl.thang ASC
+    """
+    rows = db.execute(text(query), {"ma_nv": ma_nv, "nam": nam}).mappings().all()
+    if not rows:
+        return None
+
+    items = [dict(r) for r in rows]
+    tong_gross = sum(float(r["luong_gross"] or 0) for r in items)
+    tong_net = sum(float(r["luong_net"] or 0) for r in items)
+    tong_khau_tru = sum(float(r["tong_khau_tru"] or 0) for r in items)
+    tong_bhxh = sum(float(r["bhxh"] or 0) for r in items)
+    tong_bhyt = sum(float(r["bhyt"] or 0) for r in items)
+    tong_bhtn = sum(float(r["bhtn"] or 0) for r in items)
+    tong_thue_tncn = sum(float(r["thue_tncn"] or 0) for r in items)
+    tong_cong_thuc_te = sum(float(r["so_cong_thuc_te"] or 0) for r in items)
+    tong_gio_tang_ca = sum(float(r["so_gio_tang_ca"] or 0) for r in items)
+    ho_ten = items[0]["ho_ten"] if items else ""
+
+    return {
+        "ma_nv": ma_nv,
+        "ho_ten": ho_ten,
+        "nam": nam,
+        "so_thang_co_luong": len(items),
+        "tong_gross": tong_gross,
+        "tong_net": tong_net,
+        "tong_khau_tru": tong_khau_tru,
+        "tong_bhxh": tong_bhxh,
+        "tong_bhyt": tong_bhyt,
+        "tong_bhtn": tong_bhtn,
+        "tong_thue_tncn": tong_thue_tncn,
+        "tong_cong_thuc_te": tong_cong_thuc_te,
+        "tong_gio_tang_ca": tong_gio_tang_ca,
+        "chi_tiet_thang": items,
+    }
+
+

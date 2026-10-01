@@ -6,11 +6,11 @@
 export const INITIAL_DATABASE_DATA = {
   // Bảng nhan_vien (Employees)
   employee: {
-    ma_nv: 'NV-8824',
-    ho_ten: 'Nguyễn Thị Mai Linh',
-    phong_ban: 'PHÒNG MARKETING',
-    ma_pb: 'PB04',
-    chuc_vu: 'Chuyên viên Marketing',
+    ma_nv: 'NV02',
+    ho_ten: 'Nguyễn Thị Minh Tâm',
+    phong_ban: 'PHÒNG QUẢN TRỊ NGUỒN NHÂN LỰC',
+    ma_pb: 'PB02',
+    chuc_vu: 'Trưởng phòng Quản trị Nguồn nhân lực',
     loai_hop_dong: 'Chính thức',
     trang_thai: 'DANG_LAM',
     avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop',

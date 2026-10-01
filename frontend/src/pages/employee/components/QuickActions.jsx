@@ -4,11 +4,11 @@ import React from "react";
  * QuickActions – 3 nút hành động nhanh: In phiếu tháng, In bảng năm, Gửi email.
  * TODO: Backend chưa hỗ trợ API xuất PDF/Excel/Email → hiện tại chỉ hiển thị UI.
  */
-function QuickActions({ onPrint, onExportExcel, onSendEmail }) {
+function QuickActions({ onPrint, onSendEmail }) {
   const actions = [
     {
       key: "print",
-      label: "In phiếu tháng (PDF)",
+      label: "In phiếu lương (PDF)",
       icon: (
         <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
           <rect x="6" y="2" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.6"/>
@@ -17,17 +17,6 @@ function QuickActions({ onPrint, onExportExcel, onSendEmail }) {
         </svg>
       ),
       onClick: onPrint,
-    },
-    {
-      key: "excel",
-      label: "In bảng năm (Excel/PDF)",
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
-          <rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="1.6"/>
-          <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-        </svg>
-      ),
-      onClick: onExportExcel,
     },
     {
       key: "email",
