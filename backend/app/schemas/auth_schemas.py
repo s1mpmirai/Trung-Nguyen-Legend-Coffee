@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field
 from datetime import datetime
+
+from pydantic import BaseModel, Field
+
 
 class request_login(BaseModel):
     ma_nv: str = Field(..., description="Mã nhân viên")
@@ -26,4 +28,14 @@ class account_response(BaseModel):
 class change_password_request(BaseModel):
     ma_nv: str = Field(..., description="Mã nhân viên")
     mat_khau_cu: str = Field(..., description="Mật khẩu hiện tại")
-    mat_khau_moi: str = Field(..., min_length=6, description="Mật khẩu mới (tối thiểu 6 ký tự)")
+    mat_khau_moi: str = Field(..., min_length=6, description="Mật khẩu mới (tối thiểu 6 ký tự)")
+
+class employee_without_account_response(BaseModel):
+    ma_nv: str = Field(..., description="Mã nhân viên")
+    ho_ten: str = Field(..., description="Họ tên")
+    email: str = Field(..., description="Email")
+    ten_pb: str | None = None
+    ten_cv: str | None = None
+
+    class Config:
+        from_attributes = True

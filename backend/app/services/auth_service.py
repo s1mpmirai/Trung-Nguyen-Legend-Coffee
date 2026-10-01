@@ -1,8 +1,8 @@
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 import app.repositories.auth_repository as account_repository
 from app.core.security import create_access_token, hash_password, verify_password
+from app.repositories.employee_repository import get_by_ma_nv as employee_get_by_ma_nv
 from app.schemas.auth_schemas import account_create
 from app.utils.auto_gen import define_pass
 
@@ -62,10 +62,7 @@ def login_for_portal(
 
 def create_account(db: Session, data: account_create):
     # 1. Kiểm tra xem nhân viên này có thật trong công ty không
-    emp_exists = db.execute(
-        text("SELECT ma_nv FROM nhan_vien WHERE ma_nv = :ma_nv"),
-        {"ma_nv": data.ma_nv}
-    ).scalar_one_or_none()
+    emp_exists = employee_get_by_ma_nv(db, data.ma_nv)
     
     if not emp_exists:
         raise ValueError(f"Không tìm thấy nhân viên {data.ma_nv} trong hồ sơ. Hãy tạo nhân viên trước!")
@@ -111,3 +108,6 @@ def change_password(db: Session, ma_nv: str, old_pass: str, new_pass: str):
     account.mat_khau = hash_password(new_pass)
     db.commit()
     return {"message": "Đổi mật khẩu thành công"}
+
+def get_without_account(db: Session) -> list[dict]:
+    return account_repository.get_employees_without_account(db)

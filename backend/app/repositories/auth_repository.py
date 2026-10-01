@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.account_model import TaiKhoan
@@ -18,3 +19,17 @@ def update_status(db: Session, ma_nv: str, trang_thai: str) -> TaiKhoan | None:
         account.trang_thai = trang_thai
         db.flush()
     return account
+
+def get_employees_without_account(db: Session) -> list[TaiKhoan]:
+    query = """
+        SELECT nv.ma_nv, nv.ho_ten, nv.email, pb.ten_pb, cv.ten_cv
+        FROM nhan_vien nv
+        LEFT JOIN tai_khoan tk ON nv.ma_nv = tk.ma_nv
+        LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
+        LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+        WHERE tk.ma_nv IS NULL
+          AND nv.trang_thai = 'DANG_LAM'
+        ORDER BY nv.ma_nv ASC
+    """
+    rows = db.execute(text(query)).mappings().all()
+    return [dict(row) for row in rows]

@@ -10,6 +10,7 @@ from app.schemas.auth_schemas import (
     account_response,
     account_update_status,
     change_password_request,
+    employee_without_account_response,
 )
 
 router = APIRouter()
@@ -55,3 +56,10 @@ def change_password_endpoint(
         )
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
+
+@router.get("/without_account", response_model=list[employee_without_account_response])
+def get_without_account_endpoint(db: DbSession):
+    try:
+        return account_service.get_without_account(db)
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err))
