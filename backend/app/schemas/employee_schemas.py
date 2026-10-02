@@ -93,3 +93,42 @@ class employee_contact_update(BaseModel):
     so_tai_khoan: Optional[str] = Field(None, description="Số tài khoản ngân hàng")
     ngan_hang: Optional[str] = Field(None, description="Tên ngân hàng")
     hinh_thuc_lam_viec: Optional[str] = Field(None, description="Hình thức: FULL_TIME hoặc PART_TIME")
+    ma_so_thue: Optional[str] = Field(None, description="Mã số thuế cá nhân")
+    so_bhxh: Optional[str] = Field(None, description="Số sổ bảo hiểm xã hội (BHXH)")
+
+
+
+class profile_update_request_create(BaseModel):
+    """Schema gửi yêu cầu cập nhật hồ sơ cá nhân của nhân viên."""
+    thong_tin_moi: dict = Field(..., description="Các thông tin muốn cập nhật")
+    ly_do: Optional[str] = Field(None, description="Lý do cập nhật thông tin")
+
+
+class profile_update_review_request(BaseModel):
+    """Schema cho Quản lý phê duyệt/từ chối yêu cầu cập nhật hồ sơ."""
+    trang_thai: str = Field(..., description="Trạng thái phê duyệt: DA_DUYET hoặc TU_CHOI")
+    nguoi_duyet: Optional[str] = Field(None, description="Mã nhân viên người duyệt")
+    y_kien_duyet: Optional[str] = Field(None, description="Ý kiến hoặc lý do duyệt / từ chối")
+
+
+class profile_update_request_response(BaseModel):
+    """Schema trả về thông tin yêu cầu cập nhật hồ sơ cá nhân."""
+    ma_yc: int
+    ma_nv: str
+    ho_ten: Optional[str] = None
+    ten_pb: Optional[str] = None
+    ten_cv: Optional[str] = None
+    thong_tin_cu: Optional[dict] = None
+    thong_tin_moi: dict
+    ly_do: Optional[str] = None
+    trang_thai: str
+    nguoi_duyet: Optional[str] = None
+    ten_nguoi_duyet: Optional[str] = None
+    ngay_duyet: Optional[datetime] = None
+    y_kien_duyet: Optional[str] = None
+    ngay_tao: Optional[datetime] = None
+    ngay_cap_nhat: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+

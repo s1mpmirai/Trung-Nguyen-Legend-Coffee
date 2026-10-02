@@ -111,5 +111,5 @@ def change_password(db: Session, ma_nv: str, old_pass: str, new_pass: str):
     db.commit()
     return {"message": "Đổi mật khẩu thành công"}
 
-def get_without_account(db: Session) -> list[dict]:
-    return account_repository.get_employees_without_account(db)
+def get_without_account(db: Session) -> list[str]:
+    return account_repository.get_employees_without_account(db)

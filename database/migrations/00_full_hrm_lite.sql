@@ -212,6 +212,24 @@ CREATE TABLE IF NOT EXISTS lich_su_dieu_chinh_cong (
     CONSTRAINT fk_ls_nv FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON DELETE CASCADE
 ) ENGINE=InnoDB COMMENT='Lịch sử quản lý sửa chấm công nhân viên';
 
+-- 10.2. Yêu cầu cập nhật hồ sơ cá nhân nhân viên (Chờ Quản lý phê duyệt mới lưu DB)
+CREATE TABLE IF NOT EXISTS yeu_cau_cap_nhat_ho_so (
+    ma_yc BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ma_nv VARCHAR(10) NOT NULL,
+    thong_tin_cu JSON NULL COMMENT 'Snapshot thông tin cũ trước khi sửa',
+    thong_tin_moi JSON NOT NULL COMMENT 'Thông tin nhân viên yêu cầu thay đổi',
+    ly_do VARCHAR(500) NULL COMMENT 'Lý do xin thay đổi thông tin',
+    trang_thai ENUM('CHO_DUYET', 'DA_DUYET', 'TU_CHOI', 'DA_HUY') DEFAULT 'CHO_DUYET',
+    nguoi_duyet VARCHAR(10) NULL,
+    ngay_duyet DATETIME NULL,
+    y_kien_duyet VARCHAR(500) NULL,
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_yc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON DELETE CASCADE,
+    CONSTRAINT fk_yc_nguoiduyet FOREIGN KEY (nguoi_duyet) REFERENCES nhan_vien(ma_nv) ON DELETE SET NULL
+) ENGINE=InnoDB COMMENT='Yêu cầu cập nhật hồ sơ cá nhân nhân viên';
+
+
 
 -- 11. Bảng lương tháng
 CREATE TABLE bang_luong (
