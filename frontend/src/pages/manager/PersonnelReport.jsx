@@ -210,20 +210,10 @@ export default function PersonnelReport() {
     <div className="flex flex-col gap-6 w-full animate-in fade-in duration-300">
       {/* ──────────────── HEADER BAR ──────────────── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 font-semibold text-[11px] uppercase tracking-wider border border-sky-200/50">
-              Phân hệ Báo cáo Chuyên sâu
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-            <span className="text-xs text-slate-500">Cập nhật lúc 08:30 hôm nay</span>
-          </div>
-          <h1 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight mt-1">
-            Báo cáo Thông tin Nhân sự
+        <div>
+          <h1 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight uppercase">
+            BÁO CÁO THÔNG TIN NHÂN SỰ
           </h1>
-          <p className="text-xs text-slate-500 max-w-2xl">
-            Phân tích 3 chiều cốt lõi: Trình độ học vấn & Chuyên môn, Thâm niên công tác và Mặt bằng đãi ngộ tiền lương trên toàn bộ 1,280 nhân sự.
-          </p>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -261,8 +251,8 @@ export default function PersonnelReport() {
               <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
                 Khối Trí Thức & Chuyên Môn
               </span>
-              <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg mt-0.5">
-                Trình độ Học vấn
+              <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg mt-0.5 uppercase">
+                TRÌNH ĐỘ HỌC VẤN
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600">
@@ -305,8 +295,8 @@ export default function PersonnelReport() {
               <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
                 Độ Gắn Kết Tổ Chức
               </span>
-              <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg mt-0.5">
-                Thâm niên Công tác
+              <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg mt-0.5 uppercase">
+                THÂM NIÊN CÔNG TÁC
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
@@ -349,8 +339,8 @@ export default function PersonnelReport() {
               <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
                 Mặt Bằng Đãi Ngộ
               </span>
-              <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg mt-0.5">
-                Mức lương Hiện tại
+              <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg mt-0.5 uppercase">
+                MỨC LƯƠNG HIỆN TẠI
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">

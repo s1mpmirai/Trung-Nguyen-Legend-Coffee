@@ -39,11 +39,11 @@ def create(db: Session, employee: dict) -> dict:
             INSERT INTO nhan_vien (
                 ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
                 so_nguoi_pt, ma_pb, ma_cv, ma_cn, ngay_vao_lam, ngay_nghi_viec,
-                trang_thai, hinh_thuc_lam_viec, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
+                trang_thai, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
             ) VALUES (
                 :ma_nv, :ho_ten, :ngay_sinh, :gioi_tinh, :cccd, :dia_chi, :sdt, :email,
                 :so_nguoi_pt, :ma_pb, :ma_cv, :ma_cn, :ngay_vao_lam, :ngay_nghi_viec,
-                :trang_thai, :hinh_thuc_lam_viec, :so_tai_khoan, :ngan_hang, :ma_so_thue, :so_bhxh
+                :trang_thai, :so_tai_khoan, :ngan_hang, :ma_so_thue, :so_bhxh
             )
             """
         ),
@@ -54,18 +54,20 @@ def create(db: Session, employee: dict) -> dict:
 def get_employee_list(
     db: Session,
     page: int = 1,
-    page_size: int = 10,
+    page_size: int = 50,
 ) -> dict:
     offset = (page - 1) * page_size
 
     total = db.execute(text("SELECT COUNT(*) FROM nhan_vien")).scalar() or 0
 
     query = """
-        SELECT ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
-               so_nguoi_pt, ma_pb, ma_cv, ma_cn, ngay_vao_lam, ngay_nghi_viec,
-               trang_thai, hinh_thuc_lam_viec, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
-        FROM nhan_vien
-        ORDER BY ma_nv ASC
+        SELECT nv.ma_nv, nv.ho_ten, nv.ngay_sinh, nv.gioi_tinh, nv.cccd, nv.dia_chi, nv.sdt, nv.email,
+               nv.so_nguoi_pt, nv.ma_pb, pb.ten_pb, nv.ma_cv, cv.ten_cv, nv.ma_cn, nv.ngay_vao_lam, nv.ngay_nghi_viec,
+               nv.trang_thai, 'FULL_TIME' AS hinh_thuc_lam_viec, nv.so_tai_khoan, nv.ngan_hang, nv.ma_so_thue, nv.so_bhxh
+        FROM nhan_vien nv
+        LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
+        LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+        ORDER BY nv.ma_nv ASC
         LIMIT :limit OFFSET :offset
     """
     rows = db.execute(
@@ -101,7 +103,7 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
             nv.ngay_vao_lam,
             nv.ngay_nghi_viec,
             nv.trang_thai,
-            nv.hinh_thuc_lam_viec,
+            'FULL_TIME' AS hinh_thuc_lam_viec,
             nv.so_tai_khoan,
             nv.ngan_hang,
             nv.ma_so_thue,
@@ -109,7 +111,6 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
             hd.ma_hd,
             hd.loai_hd,
             hd.trang_thai AS trang_thai_hd,
-            COALESCE(nv.hinh_thuc_lam_viec, 'FULL_TIME') AS hinh_thuc_lam_viec,
             tk.lan_dn_cuoi,
             tk.ngay_cap_nhat AS ngay_cap_nhat_tk
         FROM nhan_vien nv
