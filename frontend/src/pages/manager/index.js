@@ -13,4 +13,3 @@ export { default as EducationChartCard } from "./components/EducationChartCard";
 export { default as TenureStatsCard } from "./components/TenureStatsCard";
 export { default as PayrollDepartmentCard } from "./components/PayrollDepartmentCard";
 export { default as RecentPersonnelTable } from "./components/RecentPersonnelTable";
-export { default as SystemSettings } from "./SystemSettings";
