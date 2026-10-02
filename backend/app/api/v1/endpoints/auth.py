@@ -13,7 +13,6 @@ router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
 
-@router.post("/login/admin-login")
 @router.post("/admin-login")
 def admin_login(
     request: request_login,
@@ -29,12 +28,7 @@ def admin_login(
         raise HTTPException(status_code=401, detail="Thông tin đăng nhập không hợp lệ")
     return result
 
-<<<<<<< HEAD
-@router.post("/login/manager-login")
-=======
-@router.post("/login/management-login")
-@router.post("/management-login")
->>>>>>> b796772c64ad4dd902d1eaa721b4a2e6847ed96f
+@router.post("/manager-login")
 def management_login(
     request: request_login,
     db: DbSession,
@@ -50,7 +44,6 @@ def management_login(
     return result
 
 
-@router.post("/login/employee-login")
 @router.post("/employee-login")
 def employee_login(
     request: request_login,
