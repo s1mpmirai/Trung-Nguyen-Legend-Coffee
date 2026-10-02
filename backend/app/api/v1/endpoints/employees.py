@@ -1,4 +1,4 @@
-from typing import List
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -22,10 +22,12 @@ from app.services.employee_service import (
 
 router = APIRouter()
 
+DbSession = Annotated[Session, Depends(get_db)]
+
 @router.post("/create_employee", response_model=employee_profile_response)
 def create_employee(
     data: employee_profile_create,
-    db: Session = Depends(get_db),
+        db: DbSession,
 ):
     try:
         return create_employee_service(db, data)
@@ -34,7 +36,7 @@ def create_employee(
 
 @router.get("/get_employee_list", response_model=employee_list_response)
 def get_employee_list(
-    db: Session = Depends(get_db),
+    db: DbSession,
     page: int = Query(1, ge=1, description="Số trang (bắt đầu từ 1)"),
 ):
     return employee_list(db, page)
@@ -42,7 +44,7 @@ def get_employee_list(
 @router.get("/profile/{ma_nv}", response_model=employee_detail_response)
 def get_profile(
     ma_nv: str,
-    db: Session = Depends(get_db),
+    db: DbSession,
 ):
     try:
         return get_employee_profile(db, ma_nv)
@@ -53,7 +55,7 @@ def get_profile(
 def update_profile(
     ma_nv: str,
     data: employee_contact_update,
-    db: Session = Depends(get_db),
+    db: DbSession,
 ):
     try:
         return update_employee_contact(db, ma_nv, data)

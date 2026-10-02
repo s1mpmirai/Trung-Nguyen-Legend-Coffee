@@ -28,7 +28,7 @@ def admin_login(
         raise HTTPException(status_code=401, detail="Thông tin đăng nhập không hợp lệ")
     return result
 
-@router.post("/login/management-login")
+@router.post("/login/manager-login")
 def management_login(
     request: request_login,
     db: DbSession,
