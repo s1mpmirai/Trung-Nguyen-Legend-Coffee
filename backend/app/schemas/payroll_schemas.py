@@ -88,3 +88,25 @@ class payroll_company_summary_response(BaseModel):
     tong_tien_net: float = 0
     items: List[payroll_summary_item] = Field(default_factory=list)
 
+
+class payroll_year_summary_response(BaseModel):
+    """Tổng hợp bảng lương cả năm của nhân viên."""
+    ma_nv: str
+    ho_ten: Optional[str] = None
+    nam: int
+    so_thang_co_luong: int = 0
+    tong_gross: float = 0
+    tong_net: float = 0
+    tong_khau_tru: float = 0
+    tong_bhxh: float = 0
+    tong_bhyt: float = 0
+    tong_bhtn: float = 0
+    tong_thue_tncn: float = 0
+    tong_cong_thuc_te: float = 0
+    tong_gio_tang_ca: float = 0
+    chi_tiet_thang: List[payroll_month_response] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+

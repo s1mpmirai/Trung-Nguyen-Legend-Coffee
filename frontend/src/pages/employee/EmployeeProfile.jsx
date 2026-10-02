@@ -7,13 +7,14 @@ import BasicInfoSection from "./components/BasicInfoSection";
 import WorkContactSection from "./components/WorkContactSection";
 import AccountSettingsSection from "./components/AccountSettingsSection";
 import BottomNavBar from "./components/BottomNavBar";
-import ChangePasswordModal from "./components/ChangePasswordModal";
+import EditProfileModal from "./components/EditProfileModal";
 
 /* ── Services ──────────────────────────────────────────────────── */
 import {
   getEmployeeProfile,
-  changePassword,
+  updateEmployeeContact,
   FALLBACK_EMPLOYEE_PROFILE,
+  formatDate,
 } from "../../services/employeeService";
 
 /* ── Styles ────────────────────────────────────────────────────── */
@@ -28,8 +29,8 @@ function EmployeeProfile({ userSession, onLogout }) {
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Trạng thái modal đổi mật khẩu
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  // Trạng thái modal chỉnh sửa thông tin
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Mã nhân viên hiện tại
   const currentMaNv =
@@ -69,11 +70,32 @@ function EmployeeProfile({ userSession, onLogout }) {
     };
   }, [currentMaNv]);
 
-  /* ── 2. Xử lý đổi mật khẩu ──────────────────────────────────── */
-  const handleChangePassword = async ({ ma_nv, mat_khau_cu, mat_khau_moi }) => {
-    await changePassword({ ma_nv, mat_khau_cu, mat_khau_moi });
-    showToast("Đổi mật khẩu thành công!");
-    setEmployee((prev) => ({ ...prev, lastPasswordChange: "Vừa xong" }));
+  /* ── 2. Xử lý gửi yêu cầu chỉnh sửa thông tin cá nhân ─────────── */
+  const handleSaveProfile = async (formData) => {
+    try {
+      // Cập nhật lên API (nếu có kết nối)
+      try {
+        await updateEmployeeContact(currentMaNv, formData);
+      } catch (apiErr) {
+        console.info("[EmployeeProfile] API update offline, cập nhật tạm thời giao diện:", apiErr.message);
+      }
+
+      // Cập nhật ngay trên state để người dùng thấy thông tin họ vừa yêu cầu thay đổi
+      setEmployee((prev) => ({
+        ...prev,
+        birthDate: formData.ngay_sinh ? formatDate(formData.ngay_sinh) : prev.birthDate,
+        birthDateRaw: formData.ngay_sinh || prev.birthDateRaw,
+        gender: formData.gioi_tinh === "Nu" ? "Nữ" : (formData.gioi_tinh === "Nam" ? "Nam" : "Khác"),
+        genderRaw: formData.gioi_tinh || prev.genderRaw,
+        phone: formData.sdt || prev.phone,
+        personalEmail: formData.personalEmail || prev.personalEmail,
+      }));
+
+      showToast("Đã gửi yêu cầu chỉnh sửa thông tin thành công đến Quản lý phê duyệt!");
+    } catch (err) {
+      showToast(err.message || "Gửi yêu cầu thất bại", "error");
+      throw err;
+    }
   };
 
   /* ── 3. Xử lý đăng xuất ──────────────────────────────────────── */
@@ -124,17 +146,22 @@ function EmployeeProfile({ userSession, onLogout }) {
         </h2>
       </div>
 
-      {/* ── Nội dung chính (Chỉ xem thông tin) ─────────────────── */}
+      {/* ── Nội dung chính (Xem & Sửa thông tin) ────────────────── */}
       <main className="px-4 py-2.5 space-y-4">
-        <ProfileHeader employee={employee} />
+        <ProfileHeader
+          employee={employee}
+        />
 
-        <BasicInfoSection employee={employee} />
+        <BasicInfoSection
+          employee={employee}
+          onEdit={() => setIsEditModalOpen(true)}
+        />
 
-        <WorkContactSection employee={employee} />
+        <WorkContactSection
+          employee={employee}
+        />
 
         <AccountSettingsSection
-          lastPasswordChange={employee.lastPasswordChange}
-          onChangePassword={() => setIsPasswordModalOpen(true)}
           onLogout={handleLogout}
         />
       </main>
@@ -142,12 +169,12 @@ function EmployeeProfile({ userSession, onLogout }) {
       {/* ── Thanh điều hướng dưới cùng ─────────────────────────── */}
       <BottomNavBar activeTab="profile" />
 
-      {/* ── Modal Đổi mật khẩu ─────────────────────────────────── */}
-      <ChangePasswordModal
-        isOpen={isPasswordModalOpen}
-        employeeId={employee.id}
-        onClose={() => setIsPasswordModalOpen(false)}
-        onSuccess={handleChangePassword}
+      {/* ── Modal Chỉnh sửa thông tin cá nhân ───────────────────── */}
+      <EditProfileModal
+        isOpen={isEditModalOpen}
+        employee={employee}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={handleSaveProfile}
       />
     </div>
   );

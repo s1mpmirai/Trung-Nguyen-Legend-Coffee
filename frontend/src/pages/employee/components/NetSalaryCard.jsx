@@ -11,7 +11,7 @@ import {
  *
  * Nếu tháng chưa có dữ liệu lương -> hiển thị "Đang cập nhật".
  */
-function NetSalaryCard({ payroll, isHidden, viewMode, yearSummary, month, year }) {
+function NetSalaryCard({ payroll, isHidden, onToggleHide, viewMode, yearSummary, month, year }) {
   const isYear = viewMode === "year";
   const hasData = isYear ? Boolean(yearSummary) : Boolean(payroll && payroll.hasData);
 
@@ -44,6 +44,35 @@ function NetSalaryCard({ payroll, isHidden, viewMode, yearSummary, month, year }
             {isHidden ? hiddenText : formatMoney(net)}
           </span>
           <span className="pr-net-card__currency">VNĐ</span>
+          {onToggleHide && (
+            <button
+              className="pr-net-card__eye-btn"
+              onClick={onToggleHide}
+              type="button"
+              title={isHidden ? "Hiện số tiền" : "Ẩn số tiền"}
+              aria-label={isHidden ? "Hiện số tiền" : "Ẩn số tiền"}
+            >
+              {isHidden ? (
+                <svg viewBox="0 0 20 20" fill="none" width="17" height="17">
+                  <path
+                    d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6zM10 7v0a3 3 0 010 6v0a3 3 0 010-6zM3 3l14 14"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 20 20" fill="none" width="17" height="17">
+                  <path
+                    d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                  />
+                  <circle cx="10" cy="10" r="3" stroke="currentColor" strokeWidth="1.6" />
+                </svg>
+              )}
+            </button>
+          )}
         </div>
       ) : (
         <div className="pr-net-card__amount pr-net-card__amount--pending">

@@ -9,7 +9,7 @@ import InfoRow from "./InfoRow";
  * @param {Object} props
  * @param {Object} props.employee – Dữ liệu nhân viên
  */
-function WorkContactSection({ employee }) {
+function WorkContactSection({ employee, onEdit }) {
   const { phone, email, contractType, contractStatus } = employee;
 
   return (
@@ -23,6 +23,20 @@ function WorkContactSection({ employee }) {
           </svg>
           <h3 className="ep-card__title">Liên hệ công việc</h3>
         </div>
+        {onEdit && (
+          <button
+            className="ep-card__edit-btn"
+            onClick={onEdit}
+            title="Chỉnh sửa liên hệ"
+            aria-label="Chỉnh sửa liên hệ"
+            type="button"
+          >
+            <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
+              <path d="M11 4H4a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M15.5 2.5a2.121 2.121 0 013 3L10 14l-4 1 1-4 8.5-8.5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* ── Danh sách thông tin ───────────────────────────────── */}
@@ -51,8 +65,23 @@ function WorkContactSection({ employee }) {
 
         <InfoRow label="Hợp đồng lao động">
           <div className="ep-contract-info">
-            <span>{contractType}</span>
-            <span className="ep-contract-badge">{contractStatus}</span>
+            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+              <span className="font-semibold text-slate-800 text-xs">
+                {contractType || "Hợp đồng lao động"}
+              </span>
+              {employee.workingType === "PART_TIME" ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  Part-time
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-[#0EA5E9] border border-sky-200">
+                  Full-time
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-[11px] text-slate-500">
+              <span className="ep-contract-badge">{contractStatus || "Hiệu lực"}</span>
+            </div>
           </div>
         </InfoRow>
       </div>

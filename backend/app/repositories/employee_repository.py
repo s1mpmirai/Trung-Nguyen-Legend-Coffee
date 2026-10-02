@@ -99,6 +99,11 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
             hd.ma_hd,
             hd.loai_hd,
             hd.trang_thai AS trang_thai_hd,
+            CASE 
+                WHEN hd.loai_hd = 'THOI_VU' THEN 'PART_TIME'
+                WHEN hd.loai_hd IS NOT NULL THEN 'FULL_TIME'
+                ELSE 'PART_TIME'
+            END AS hinh_thuc_lam_viec,
             tk.lan_dn_cuoi,
             tk.ngay_cap_nhat AS ngay_cap_nhat_tk
         FROM nhan_vien nv
@@ -118,9 +123,20 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
 
 
 def update_contact(db: Session, ma_nv: str, data: dict) -> dict | None:
-    # Chỉ cho phép cập nhật các trường liên hệ an toàn
-    allowed_fields = {"sdt", "email", "dia_chi", "so_tai_khoan", "ngan_hang"}
+    # Cho phép nhân viên cập nhật thông tin cá nhân & liên hệ
+    allowed_fields = {"sdt", "email", "dia_chi", "so_tai_khoan", "ngan_hang", "ngay_sinh", "gioi_tinh"}
     update_data = {k: v for k, v in data.items() if k in allowed_fields and v is not None}
+    
+    # Chuẩn hóa giới tính theo enum ENUM('Nam', 'Nu', 'Khac')
+    if "gioi_tinh" in update_data:
+        gt_raw = str(update_data["gioi_tinh"]).strip()
+        if gt_raw in ["Nữ", "Nu", "nu", "FEMALE", "Female"]:
+            update_data["gioi_tinh"] = "Nu"
+        elif gt_raw in ["Khác", "Khac", "khac", "OTHER", "Other"]:
+            update_data["gioi_tinh"] = "Khac"
+        else:
+            update_data["gioi_tinh"] = "Nam"
+
     if not update_data:
         return get_by_ma_nv(db, ma_nv)
 

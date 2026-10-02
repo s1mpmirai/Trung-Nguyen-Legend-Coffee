@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories.payroll_repository import (
     get_payroll_by_month,
+    get_payroll_by_year,
     get_payroll_months,
 )
 
@@ -14,6 +15,14 @@ def get_employee_payroll_month(db: Session, ma_nv: str, thang: int, nam: int) ->
             f"Không tìm thấy bảng lương tháng {thang}/{nam} của nhân viên {ma_nv}"
         )
     return payroll
+
+
+def get_employee_payroll_year(db: Session, ma_nv: str, nam: int) -> dict:
+    """Lấy bảng tổng hợp lương cả năm của nhân viên."""
+    summary = get_payroll_by_year(db, ma_nv, nam)
+    if not summary:
+        raise ValueError(f"Chưa có dữ liệu bảng lương năm {nam} của nhân viên {ma_nv}")
+    return summary
 
 
 def get_employee_payroll_history(db: Session, ma_nv: str) -> dict:
