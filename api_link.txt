@@ -1,0 +1,48 @@
+# ==============================================================================
+# TRUNG NGUYEN LEGEND COFFEE - DANH MỤC API BACKEND (API LINKS)
+# Tự động cập nhật mỗi khi có API mới hoặc thay đổi endpoint
+# Cập nhật lần cuối: 2026-10-02 12:20:00 (UTC+7)
+# ==============================================================================
+
+[AUTH - XÁC THỰC & ĐĂNG NHẬP]
+- POST /api/v1/auth/admin-login             | Đăng nhập tài khoản Quản trị viên (Admin)
+- POST /api/v1/auth/manager-login           | Đăng nhập tài khoản Quản lý (Manager)
+- POST /api/v1/auth/employee-login          | Đăng nhập tài khoản Nhân viên (Employee)
+
+[ACCOUNTS - QUẢN LÝ TÀI KHOẢN NGƯỜI DÙNG]
+- POST /api/v1/accounts/create_account      | Tạo tài khoản người dùng mới
+- PUT  /api/v1/accounts/{ma_nv}/status      | Cập nhật trạng thái tài khoản (Kích hoạt / Khóa)
+- POST /api/v1/accounts/change-password     | Đổi mật khẩu tài khoản
+- GET  /api/v1/accounts/without_account     | Danh sách nhân viên chưa được cấp tài khoản
+
+[EMPLOYEES - HỒ SƠ NHÂN SỰ]
+- POST /api/v1/employees/create_employee    | Thêm mới hồ sơ nhân sự
+- GET  /api/v1/employees/get_employee_list  | Lấy danh sách nhân sự (lọc, tìm kiếm, phân trang)
+- GET  /api/v1/employees/profile/{ma_nv}    | Lấy chi tiết hồ sơ cá nhân nhân viên
+- PUT  /api/v1/employees/profile/{ma_nv}    | Cập nhật thông tin hồ sơ nhân viên
+
+[ATTENDANCE - CHẤM CÔNG & CA LÀM VIỆC]
+- GET  /api/v1/attendance/dashboard/{ma_nv} | [Nhân viên] Dashboard chấm công, GPS, thống kê tháng, lịch sử gần đây
+- POST /api/v1/attendance/check-in          | [Nhân viên] Vào ca (1 lần/ngày, chuẩn 8h-17h, grace 15p, sau 8h15 báo QL sửa <= 3 lần, quá 3 lần trừ 1h lương)
+- POST /api/v1/attendance/check-out         | [Nhân viên] Ra ca (kết thúc ca làm việc)
+- GET  /api/v1/attendance/history/{ma_nv}   | [Nhân viên] Nhật ký chấm công chi tiết theo tháng/năm
+- GET  /api/v1/attendance/daily             | [Quản lý] Bảng chấm công theo ngày của toàn công ty/phòng ban
+- GET  /api/v1/attendance/summary           | [Quản lý] Bảng tổng hợp công tháng của tất cả nhân viên
+- PUT  /api/v1/attendance/{ma_cc}/adjust    | [Quản lý] Điều chỉnh thông tin chấm công (Sửa giờ check-in tối đa 3 lần/tháng)
+- PUT  /api/v1/attendance/manager/{ma_cc}/adjust | [Quản lý] Alias điều chỉnh thông tin chấm công
+
+[LEAVES - NGHỈ PHÉP & ĐƠN TỪ]
+- POST /api/v1/leaves/request               | [Nhân viên] Gửi đơn xin nghỉ phép/nghỉ việc
+- GET  /api/v1/leaves/my-history/{ma_nv}    | [Nhân viên] Lịch sử đơn từ của cá nhân
+- PUT  /api/v1/leaves/cancel/{ma_don}       | [Nhân viên] Hủy đơn nghỉ phép đang chờ duyệt
+- GET  /api/v1/leaves/pending               | [Quản lý] Danh sách đơn từ đang chờ duyệt
+- GET  /api/v1/leaves/all                   | [Quản lý] Danh sách tất cả đơn từ nhân viên
+- PUT  /api/v1/leaves/{ma_don}/review       | [Quản lý] Phê duyệt hoặc từ chối đơn từ
+
+[PAYROLL - TIỀN LƯƠNG & PHỤ CẤP]
+- GET  /api/v1/payroll/{ma_nv}/month        | [Nhân viên] Chi tiết bảng lương 1 tháng (In phiếu lương)
+- GET  /api/v1/payroll/{ma_nv}/year         | [Nhân viên] Tổng hợp bảng lương cả năm
+- GET  /api/v1/payroll/{ma_nv}/months       | [Nhân viên] Danh sách các tháng đã có lương
+- POST /api/v1/payroll/calculate            | [Quản lý] Tự động tính bảng lương tháng toàn công ty
+- GET  /api/v1/payroll/summary              | [Quản lý] Xem bảng lương tổng hợp toàn bộ nhân viên theo tháng
+- PUT  /api/v1/payroll/{ma_bl}/adjust       | [Quản lý] Điều chỉnh các khoản lương thưởng/phụ cấp/khấu trừ

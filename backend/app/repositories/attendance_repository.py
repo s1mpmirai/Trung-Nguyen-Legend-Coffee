@@ -83,66 +83,148 @@ def get_monthly_stats(
     return {"tong_cong": 0, "tong_ot": 0, "so_muon": 0, "so_phep": 0}
 
 
-def record_check_in(
-    db: Session, ma_nv: str, today: date, gio_vao: str
-) -> dict[str, Any]:
-    """Thực hiện lưu hoặc cập nhật lượt check-in hôm nay."""
+def get_today_attendance(
+    db: Session, ma_nv: str, today: date
+) -> Optional[dict[str, Any]]:
+    """Lấy bản ghi chấm công của nhân viên trong ngày hôm nay."""
     check_sql = text("""
-        SELECT ma_cc FROM bang_cham_cong 
+        SELECT ma_cc, ma_nv, ngay_cong, ma_ca, gio_vao, gio_ra, 
+               so_gio_lam, so_gio_tang_ca, loai_cong, so_cong, ghi_chu
+        FROM bang_cham_cong 
         WHERE ma_nv = :ma_nv AND ngay_cong = :ngay_cong
         LIMIT 1
     """)
-    existing = db.execute(check_sql, {"ma_nv": ma_nv, "ngay_cong": today}).fetchone()
+    row = db.execute(check_sql, {"ma_nv": ma_nv, "ngay_cong": today}).fetchone()
+    return dict(row._mapping) if row else None
+
+
+def count_late_checkins_in_month(
+    db: Session, ma_nv: str, month: int, year: int, exclude_date: Optional[date] = None
+) -> int:
+    """
+    Đếm số lần nhân viên check-in muộn (sau 08:15 hoặc loai_cong = 'DI_TRE') trong tháng.
+    """
+    where_parts = [
+        "ma_nv = :ma_nv",
+        "MONTH(ngay_cong) = :month",
+        "YEAR(ngay_cong) = :year",
+        "(loai_cong = 'DI_TRE' OR gio_vao > '08:15:00')",
+    ]
+    params: dict[str, Any] = {"ma_nv": ma_nv, "month": month, "year": year}
+    if exclude_date:
+        where_parts.append("ngay_cong != :exclude_date")
+        params["exclude_date"] = exclude_date
+
+    query = text(f"""
+        SELECT COUNT(*) AS total
+        FROM bang_cham_cong
+        WHERE {' AND '.join(where_parts)}
+    """)
+    row = db.execute(query, params).fetchone()
+    return int(row[0]) if row else 0
+
+
+def record_check_in(
+    db: Session,
+    ma_nv: str,
+    today: date,
+    gio_vao: str,
+    loai_cong: str = "CONG_DU",
+    so_cong: float = 1.0,
+    so_gio_lam: float = 8.0,
+    ghi_chu: str = "",
+) -> dict[str, Any]:
+    """
+    Thực hiện lưu lượt check-in hôm nay.
+    Quy định: Mỗi ngày nhân viên chỉ được check-in 1 lần. Những lần sau không tính.
+    Nếu đã check-in trước đó thì không ghi đè, trả về thông tin kèm cờ is_duplicate=True.
+    """
+    existing = get_today_attendance(db, ma_nv, today)
+
+    if existing and existing.get("gio_vao"):
+        return {
+            "ma_cc": existing["ma_cc"],
+            "gio_vao": str(existing["gio_vao"]),
+            "loai_cong": existing.get("loai_cong") or "CONG_DU",
+            "is_duplicate": True,
+        }
 
     if existing:
         update_sql = text("""
             UPDATE bang_cham_cong 
-            SET gio_vao = :gio_vao, loai_cong = 'CONG_DU'
+            SET gio_vao = :gio_vao, loai_cong = :loai_cong, 
+                so_cong = :so_cong, so_gio_lam = :so_gio_lam, ghi_chu = :ghi_chu
             WHERE ma_cc = :ma_cc
         """)
-        db.execute(update_sql, {"gio_vao": gio_vao, "ma_cc": existing[0]})
-        ma_cc = existing[0]
+        db.execute(update_sql, {
+            "gio_vao": gio_vao,
+            "loai_cong": loai_cong,
+            "so_cong": so_cong,
+            "so_gio_lam": so_gio_lam,
+            "ghi_chu": ghi_chu,
+            "ma_cc": existing["ma_cc"],
+        })
+        ma_cc = existing["ma_cc"]
     else:
         insert_sql = text("""
-            INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_vao, loai_cong, so_cong)
-            VALUES (:ma_nv, :ngay_cong, 'CA01', :gio_vao, 'CONG_DU', 1.0)
+            INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_vao, loai_cong, so_cong, so_gio_lam, ghi_chu)
+            VALUES (:ma_nv, :ngay_cong, 'CA01', :gio_vao, :loai_cong, :so_cong, :so_gio_lam, :ghi_chu)
         """)
-        res = db.execute(insert_sql, {"ma_nv": ma_nv, "ngay_cong": today, "gio_vao": gio_vao})
+        res = db.execute(insert_sql, {
+            "ma_nv": ma_nv,
+            "ngay_cong": today,
+            "gio_vao": gio_vao,
+            "loai_cong": loai_cong,
+            "so_cong": so_cong,
+            "so_gio_lam": so_gio_lam,
+            "ghi_chu": ghi_chu,
+        })
         ma_cc = res.lastrowid
 
     db.commit()
-    return {"ma_cc": ma_cc, "gio_vao": gio_vao}
+    return {
+        "ma_cc": ma_cc,
+        "gio_vao": gio_vao,
+        "loai_cong": loai_cong,
+        "so_cong": so_cong,
+        "so_gio_lam": so_gio_lam,
+        "is_duplicate": False,
+    }
 
 
 def record_check_out(
-    db: Session, ma_nv: str, today: date, gio_ra: str, so_gio_lam: float = 8.0
+    db: Session, ma_nv: str, today: date, gio_ra: str, so_gio_lam: Optional[float] = None
 ) -> dict[str, Any]:
     """Thực hiện lưu hoặc cập nhật lượt check-out hôm nay."""
-    check_sql = text("""
-        SELECT ma_cc, gio_vao FROM bang_cham_cong 
-        WHERE ma_nv = :ma_nv AND ngay_cong = :ngay_cong
-        LIMIT 1
-    """)
-    existing = db.execute(check_sql, {"ma_nv": ma_nv, "ngay_cong": today}).fetchone()
+    existing = get_today_attendance(db, ma_nv, today)
 
     if existing:
+        current_gio_lam = float(existing.get("so_gio_lam") or 8.0)
+        target_gio_lam = so_gio_lam if so_gio_lam is not None else current_gio_lam
+        if current_gio_lam == 7.0 and target_gio_lam > 7.0:
+            target_gio_lam = 7.0
+
         update_sql = text("""
             UPDATE bang_cham_cong 
             SET gio_ra = :gio_ra, so_gio_lam = :so_gio_lam
             WHERE ma_cc = :ma_cc
         """)
-        db.execute(update_sql, {"gio_ra": gio_ra, "so_gio_lam": so_gio_lam, "ma_cc": existing[0]})
-        ma_cc = existing[0]
+        db.execute(update_sql, {"gio_ra": gio_ra, "so_gio_lam": target_gio_lam, "ma_cc": existing["ma_cc"]})
+        ma_cc = existing["ma_cc"]
     else:
+        target_gio_lam = so_gio_lam if so_gio_lam is not None else 8.0
         insert_sql = text("""
             INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_ra, loai_cong, so_cong, so_gio_lam)
             VALUES (:ma_nv, :ngay_cong, 'CA01', :gio_ra, 'CONG_DU', 1.0, :so_gio_lam)
         """)
         res = db.execute(
             insert_sql,
-            {"ma_nv": ma_nv, "ngay_cong": today, "gio_ra": gio_ra, "so_gio_lam": so_gio_lam}
+            {"ma_nv": ma_nv, "ngay_cong": today, "gio_ra": gio_ra, "so_gio_lam": target_gio_lam}
         )
         ma_cc = res.lastrowid
+
+    db.commit()
+    return {"ma_cc": ma_cc, "gio_ra": gio_ra}
 
     db.commit()
     return {"ma_cc": ma_cc, "gio_ra": gio_ra}
@@ -271,3 +353,61 @@ def adjust_attendance_record(
     """)
     row = db.execute(select_sql, {"ma_cc": ma_cc}).fetchone()
     return dict(row._mapping) if row else None
+
+
+def get_attendance_by_id(db: Session, ma_cc: int) -> Optional[dict[str, Any]]:
+    """Lấy thông tin chi tiết một bản ghi chấm công theo ID."""
+    query = text("""
+        SELECT * FROM bang_cham_cong WHERE ma_cc = :ma_cc
+    """)
+    row = db.execute(query, {"ma_cc": ma_cc}).fetchone()
+    return dict(row._mapping) if row else None
+
+
+def count_checkin_adjustments_in_month(
+    db: Session, ma_nv: str, thang: int, nam: int
+) -> int:
+    """Đếm số lần Quản lý đã sửa giờ check-in của nhân viên trong tháng."""
+    query = text("""
+        SELECT COUNT(*) AS total
+        FROM lich_su_dieu_chinh_cong
+        WHERE ma_nv = :ma_nv 
+          AND thang = :thang 
+          AND nam = :nam 
+          AND gio_vao_moi IS NOT NULL
+    """)
+    row = db.execute(query, {"ma_nv": ma_nv, "thang": thang, "nam": nam}).fetchone()
+    return int(row[0]) if row else 0
+
+
+def log_attendance_adjustment(
+    db: Session,
+    ma_cc: int,
+    ma_nv: str,
+    thang: int,
+    nam: int,
+    gio_vao_cu: Optional[str] = None,
+    gio_vao_moi: Optional[str] = None,
+    gio_ra_cu: Optional[str] = None,
+    gio_ra_moi: Optional[str] = None,
+    ly_do: Optional[str] = None,
+) -> None:
+    """Ghi log lịch sử sửa đổi chấm công của Quản lý."""
+    insert_sql = text("""
+        INSERT INTO lich_su_dieu_chinh_cong (
+            ma_cc, ma_nv, thang, nam, gio_vao_cu, gio_vao_moi, gio_ra_cu, gio_ra_moi, ly_do
+        ) VALUES (
+            :ma_cc, :ma_nv, :thang, :nam, :gio_vao_cu, :gio_vao_moi, :gio_ra_cu, :gio_ra_moi, :ly_do
+        )
+    """)
+    db.execute(insert_sql, {
+        "ma_cc": ma_cc,
+        "ma_nv": ma_nv,
+        "thang": thang,
+        "nam": nam,
+        "gio_vao_cu": gio_vao_cu,
+        "gio_vao_moi": gio_vao_moi,
+        "gio_ra_cu": gio_ra_cu,
+        "gio_ra_moi": gio_ra_moi,
+        "ly_do": ly_do,
+    })

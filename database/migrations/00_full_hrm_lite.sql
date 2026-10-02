@@ -195,6 +195,24 @@ CREATE TABLE bang_cham_cong (
     CONSTRAINT fk_cc_don FOREIGN KEY (ma_don) REFERENCES don_tu(ma_don) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Bảng chấm công hàng ngày';
 
+-- 10.1. Lịch sử quản lý sửa chấm công nhân viên (Tối đa 3 lần/tháng cho sửa giờ check-in)
+CREATE TABLE IF NOT EXISTS lich_su_dieu_chinh_cong (
+    ma_ls BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ma_cc BIGINT NOT NULL,
+    ma_nv VARCHAR(10) NOT NULL,
+    thang TINYINT NOT NULL,
+    nam SMALLINT NOT NULL,
+    gio_vao_cu TIME NULL,
+    gio_vao_moi TIME NULL,
+    gio_ra_cu TIME NULL,
+    gio_ra_moi TIME NULL,
+    ly_do VARCHAR(255) NULL,
+    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_ls_cc FOREIGN KEY (ma_cc) REFERENCES bang_cham_cong(ma_cc) ON DELETE CASCADE,
+    CONSTRAINT fk_ls_nv FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON DELETE CASCADE
+) ENGINE=InnoDB COMMENT='Lịch sử quản lý sửa chấm công nhân viên';
+
+
 -- 11. Bảng lương tháng
 CREATE TABLE bang_luong (
     ma_bl BIGINT AUTO_INCREMENT PRIMARY KEY,

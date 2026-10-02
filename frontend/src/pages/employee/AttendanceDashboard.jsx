@@ -52,50 +52,55 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
     setTimeout(() => setToastMessage(''), 3500);
   };
 
-  // Thao tác VÀO CA (IN)
+  // Kiểm tra trạng thái chấm công của ngày hôm nay
+  const todayRecord = (data?.recentRecords || []).find((r) => r.is_today);
+  const hasCheckedInToday = Boolean(todayRecord && todayRecord.gio_vao && todayRecord.gio_vao !== '--:--');
+  const hasCheckedOutToday = Boolean(todayRecord && todayRecord.gio_ra && todayRecord.gio_ra !== '--:--');
+
+  // Thao tác VÀO CA (IN) - Mỗi ngày chỉ check-in 1 lần
   const handleCheckIn = async () => {
     if (!data) return;
+
+    if (hasCheckedInToday) {
+      showToast(
+        `Hôm nay bạn đã vào ca lúc ${todayRecord.gio_vao}. Mỗi ngày chỉ check-in 1 lần, những lần sau không tính!`
+      );
+      return;
+    }
+
     const res = await checkInAttendance(data.employee.ma_nv, data.location);
-    const now = new Date();
-    const timeStr = res.gio_vao || `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    if (!res.success) {
+      showToast(res.message || 'Chấm công không thành công');
+      const freshData = await getAttendanceDashboardData(data.employee.ma_nv);
+      setData(freshData);
+      return;
+    }
 
-    const newRecord = {
-      ma_cc: Date.now(),
-      thu: 'Hôm nay',
-      ngay: now.getDate().toString(),
-      gio_vao: timeStr,
-      gio_ra: '--:--',
-      ca_lam_viec: 'Ca hành chính',
-      dia_diem_cham: data.location?.ten_dia_diem || 'Trụ sở chính Trung Nguyên',
-      dia_diem_chi_nhanh: data.location?.ten_dia_diem || 'Trụ sở chính Trung Nguyên',
-      hinh_thuc: 'GPS',
-      trang_thai: 'Đúng giờ',
-    };
-
-    setData((prev) => ({
-      ...prev,
-      recentRecords: [newRecord, ...prev.recentRecords.slice(0, 2)],
-    }));
-
-    showToast(`✓ Đã chấm VÀO CA thành công (${timeStr})`);
+    // Tải lại dữ liệu chuẩn từ database để đồng bộ hoàn toàn với backend
+    const freshData = await getAttendanceDashboardData(data.employee.ma_nv);
+    setData(freshData);
+    showToast(res.message || `✓ Đã chấm VÀO CA thành công (${res.gio_vao})`);
   };
 
   // Thao tác RA CA (OUT)
   const handleCheckOut = async () => {
     if (!data) return;
+
+    if (!hasCheckedInToday) {
+      showToast('Bạn chưa chấm công vào ca hôm nay!');
+      return;
+    }
+
     const res = await checkOutAttendance(data.employee.ma_nv, data.location);
-    const now = new Date();
-    const timeStr = res.gio_ra || `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    if (!res.success) {
+      showToast(res.message || 'Chấm công ra ca không thành công');
+      return;
+    }
 
-    setData((prev) => {
-      const updated = [...prev.recentRecords];
-      if (updated.length > 0) {
-        updated[0] = { ...updated[0], gio_ra: timeStr };
-      }
-      return { ...prev, recentRecords: updated };
-    });
-
-    showToast(`✓ Đã chấm RA CA thành công (${timeStr})`);
+    // Tải lại dữ liệu chuẩn từ database
+    const freshData = await getAttendanceDashboardData(data.employee.ma_nv);
+    setData(freshData);
+    showToast(res.message || `✓ Đã chấm RA CA thành công (${res.gio_ra})`);
   };
 
   if (isLoading || !data) {
@@ -208,18 +213,28 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={handleCheckIn}
-              className="py-3.5 px-3 bg-[#0EA5E9] hover:bg-[#0284C7] active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-md shadow-sky-500/25 transition-all flex items-center justify-center space-x-1.5 focus:outline-none"
+              className={`py-3.5 px-3 font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center space-x-1.5 focus:outline-none ${
+                hasCheckedInToday
+                  ? 'bg-slate-100 text-slate-500 border border-slate-200 shadow-none hover:bg-slate-200/70'
+                  : 'bg-[#0EA5E9] hover:bg-[#0284C7] active:scale-[0.98] text-white shadow-sky-500/25'
+              }`}
             >
               <LogIn size={16} />
-              <span>VÀO CA (IN)</span>
+              <span>{hasCheckedInToday ? `ĐÃ VÀO (${todayRecord?.gio_vao})` : 'VÀO CA (IN)'}</span>
             </button>
 
             <button
               onClick={handleCheckOut}
-              className="py-3.5 px-3 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center justify-center space-x-1.5 focus:outline-none"
+              className={`py-3.5 px-3 font-bold text-xs rounded-xl border transition-all flex items-center justify-center space-x-1.5 focus:outline-none ${
+                !hasCheckedInToday
+                  ? 'bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed'
+                  : hasCheckedOutToday
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/60 active:scale-[0.98]'
+                  : 'bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-800 border-slate-300 shadow-sm'
+              }`}
             >
-              <LogOut size={16} className="text-slate-500" />
-              <span>RA CA (OUT)</span>
+              <LogOut size={16} className={hasCheckedOutToday ? 'text-emerald-600' : 'text-slate-500'} />
+              <span>{hasCheckedOutToday ? `ĐÃ RA (${todayRecord?.gio_ra})` : 'RA CA (OUT)'}</span>
             </button>
           </div>
         </section>
@@ -335,46 +350,89 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
               (item) => item.gio_vao && item.gio_vao !== '--:--' && item.loai_cong !== 'NGHI_PHEP' && item.trang_thai !== 'Nghỉ phép'
             );
             return validRecords.length > 0 ? (
-              <div className="bg-white rounded-2xl p-2 border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] divide-y divide-slate-100">
-                {validRecords.map((item) => (
-                  <div
-                    key={item.ma_cc}
-                    className="py-3 px-2 flex items-center justify-between hover:bg-slate-50/60 rounded-xl transition-colors"
-                  >
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-11 h-11 bg-slate-100/80 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-slate-700">
-                        <span className="text-[10px] font-bold uppercase leading-none text-slate-500">{item.thu || '—'}</span>
-                      <span className="text-sm font-black leading-tight mt-0.5">{item.ngay || '—'}</span>
-                    </div>
+              <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] space-y-2">
+                {validRecords.map((item, idx) => {
+                  const isToday = item.is_today || item.thu === 'Hôm nay';
+                  const weekdayLabel = isToday
+                    ? `Hôm nay (${item.thu_day_du || item.thu || 'Thứ Sáu'})`
+                    : (item.thu_day_du || item.thu || 'Thứ');
+                  const dayDisplay = item.ngay ? String(item.ngay).padStart(2, '0') : '01';
+                  const monthDisplay = item.thang_label || (item.thang ? `Th.${parseInt(item.thang, 10)}` : 'Th.10');
 
-                    <div className="min-w-0">
-                      <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
-                        <span className="flex items-center text-emerald-600">
-                          <ArrowDown size={14} className="stroke-[2.5]" />
-                          <span className="ml-0.5">{item.gio_vao || '--:--'}</span>
-                        </span>
-                        <span className="text-slate-300 font-normal">—</span>
-                        <span className="flex items-center text-[#0EA5E9]">
-                          <ArrowUp size={14} className="stroke-[2.5]" />
-                          <span className="ml-0.5">{item.gio_ra || '--:--'}</span>
-                        </span>
+                  // Kiểm tra xem record hiện tại có cùng ngày với record trước đó không
+                  const prevItem = idx > 0 ? validRecords[idx - 1] : null;
+                  const itemDateKey = item.ngay_day_du || `${item.ngay}-${item.thang || ''}-${item.thu || ''}`;
+                  const prevDateKey = prevItem ? (prevItem.ngay_day_du || `${prevItem.ngay}-${prevItem.thang || ''}-${prevItem.thu || ''}`) : null;
+                  const isFirstOfDate = idx === 0 || itemDateKey !== prevDateKey;
+
+                  return (
+                    <div key={item.ma_cc || idx} className="space-y-1">
+                      {/* Chỉ hiển thị đường border Thứ khi bắt đầu một ngày/thứ mới */}
+                      {isFirstOfDate && (
+                        <div className={`relative flex items-center ${idx === 0 ? 'pt-1' : 'pt-2.5'} pb-0.5`}>
+                          <div className="flex-grow border-t border-slate-200"></div>
+                          <span className={`flex-shrink mx-2 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-full border flex items-center gap-1.5 shadow-2xs ${
+                            isToday
+                              ? 'bg-sky-50 text-[#0EA5E9] border-sky-200'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}>
+                            {isToday && <span className="w-1.5 h-1.5 rounded-full bg-[#0EA5E9] animate-pulse"></span>}
+                            {weekdayLabel}
+                          </span>
+                          <div className="flex-grow border-t border-slate-200"></div>
+                        </div>
+                      )}
+
+                      {/* Chi tiết lượt chấm công (nếu cùng ngày thì nằm liền kề bên dưới) */}
+                      <div className={`py-2 px-2 flex items-center justify-between hover:bg-slate-50/80 rounded-xl transition-colors ${
+                        !isFirstOfDate ? 'border-t border-dashed border-slate-200/70 pt-2.5' : ''
+                      }`}>
+                        <div className="flex items-center space-x-3 min-w-0">
+                          {/* Ô xem chỉ hiển thị ngày và tháng */}
+                          <div className="w-11 h-11 bg-slate-100/90 border border-slate-200/80 rounded-xl flex flex-col items-center justify-center flex-shrink-0 text-slate-800 shadow-2xs">
+                            <span className="text-sm font-black leading-tight text-slate-800">{dayDisplay}</span>
+                            <span className="text-[9px] font-bold text-slate-500 uppercase leading-none mt-0.5">{monthDisplay}</span>
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                              <span className="flex items-center text-emerald-600">
+                                <ArrowDown size={14} className="stroke-[2.5]" />
+                                <span className="ml-0.5">{item.gio_vao || '--:--'}</span>
+                              </span>
+                              <span className="text-slate-300 font-normal">—</span>
+                              <span className="flex items-center text-[#0EA5E9]">
+                                <ArrowUp size={14} className="stroke-[2.5]" />
+                                <span className="ml-0.5">{item.gio_ra || '--:--'}</span>
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-slate-500 font-normal mt-0.5 truncate">
+                              {item.ca_lam_viec || 'Hành chính'} • {item.dia_diem_chi_nhanh || item.dia_diem_cham || 'Trụ sở chính Trung Nguyên'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex-shrink-0 pl-2 text-right">
+                          <span className={`inline-block px-2.5 py-0.5 text-[11px] font-bold rounded-full border ${
+                            item.trang_thai === 'Đi muộn' || item.loai_cong === 'DI_TRE'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200/80'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-100/80'
+                          }`}>
+                            {item.trang_thai || 'Đúng giờ'}
+                          </span>
+                          {(item.is_penalized || item.so_gio_lam === 7.0 || (item.ghi_chu && item.ghi_chu.includes('trừ 1 tiếng'))) && (
+                            <span className="block mt-0.5 text-[10px] font-bold text-rose-600">
+                              -1h lương
+                            </span>
+                          )}
+                        </div>
                       </div>
-
-                      <p className="text-[11px] text-slate-500 font-normal mt-0.5 truncate">
-                        {item.ca_lam_viec || 'Hành chính'} • {item.dia_diem_chi_nhanh || item.dia_diem_cham || 'Trụ sở chính Trung Nguyên'}
-                      </p>
                     </div>
-                  </div>
-
-                  <div className="flex-shrink-0 pl-2">
-                    <span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-600 text-xs font-semibold rounded-full border border-emerald-100/80">
-                      {item.trang_thai || 'Đúng giờ'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
+                  );
+                })}
+              </div>
+            ) : (
             <div className="bg-white rounded-2xl p-8 border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] text-center text-slate-400">
               <Calendar size={32} className="mx-auto text-slate-300 mb-2 stroke-1" />
               <p className="text-xs font-medium text-slate-500">Không có dữ liệu</p>

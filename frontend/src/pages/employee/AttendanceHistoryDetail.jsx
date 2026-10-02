@@ -15,10 +15,10 @@ import {
 import { getAttendanceHistory } from '../../services/attendanceService';
 
 export default function AttendanceHistoryDetail({ userSession, onBack, onTabChange }) {
-  // Mặc định tháng 9 / 2026 (hoặc tháng hiện tại có dữ liệu trong DB)
+  // Mặc định tháng/năm hiện tại
   const now = new Date();
-  const [currentMonth, setCurrentMonth] = useState(9); // Database mẫu đang có dữ liệu tháng 9
-  const [currentYear, setCurrentYear] = useState(2026);
+  const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1);
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
   const [historyData, setHistoryData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
@@ -208,6 +208,18 @@ export default function AttendanceHistoryDetail({ userSession, onBack, onTabChan
                       </div>
                     </div>
                   </div>
+
+                  {/* Hàng 3: Ghi chú / Trừ lương nếu có */}
+                  {item.ghi_chu && (
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 font-medium truncate">{item.ghi_chu}</span>
+                      {(item.so_gio_lam === 7.0 || item.ghi_chu.includes('trừ 1 tiếng')) && (
+                        <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 font-bold rounded text-[10px] border border-rose-200/60 ml-2 flex-shrink-0">
+                          -1h lương
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

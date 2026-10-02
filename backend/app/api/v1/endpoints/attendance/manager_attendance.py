@@ -43,6 +43,10 @@ def get_monthly_attendance_summary_endpoint(
     "/{ma_cc}/adjust",
     summary="[Quản lý] Điều chỉnh/chốt thông tin chấm công thủ công",
 )
+@router.put(
+    "/manager/{ma_cc}/adjust",
+    summary="[Quản lý] Điều chỉnh/chốt thông tin chấm công thủ công",
+)
 def adjust_attendance_endpoint(
     ma_cc: int,
     data: AttendanceAdjustRequest,
