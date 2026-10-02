@@ -18,15 +18,15 @@ import {
 } from "../../services/employeeService";
 
 /* ── Styles ────────────────────────────────────────────────────── */
-import "./EmployeeProfile.css";
+import "./styles/EmployeeProfile.css";
 
 /**
  * EmployeeProfile – Trang Hồ sơ & Thông tin cá nhân của nhân viên (Employee Portal)
  * Chế độ chỉ xem thông tin (đã bỏ toàn bộ các nút sửa).
  */
 function EmployeeProfile({ userSession, onLogout }) {
-  const [employee, setEmployee] = useState(FALLBACK_EMPLOYEE_PROFILE);
-  const [isLoading, setIsLoading] = useState(false);
+  const [employee, setEmployee] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
   // Trạng thái modal chỉnh sửa thông tin
@@ -148,22 +148,31 @@ function EmployeeProfile({ userSession, onLogout }) {
 
       {/* ── Nội dung chính (Xem & Sửa thông tin) ────────────────── */}
       <main className="px-4 py-2.5 space-y-4">
-        <ProfileHeader
-          employee={employee}
-        />
+        {isLoading && !employee ? (
+          <div className="py-24 flex flex-col items-center justify-center text-slate-400">
+            <div className="w-8 h-8 border-2 border-[#0EA5E9] border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p className="text-xs font-semibold text-slate-500">Đang tải thông tin hồ sơ...</p>
+          </div>
+        ) : (
+          <>
+            <ProfileHeader
+              employee={employee || FALLBACK_EMPLOYEE_PROFILE}
+            />
 
-        <BasicInfoSection
-          employee={employee}
-          onEdit={() => setIsEditModalOpen(true)}
-        />
+            <BasicInfoSection
+              employee={employee || FALLBACK_EMPLOYEE_PROFILE}
+              onEdit={() => setIsEditModalOpen(true)}
+            />
 
-        <WorkContactSection
-          employee={employee}
-        />
+            <WorkContactSection
+              employee={employee || FALLBACK_EMPLOYEE_PROFILE}
+            />
 
-        <AccountSettingsSection
-          onLogout={handleLogout}
-        />
+            <AccountSettingsSection
+              onLogout={handleLogout}
+            />
+          </>
+        )}
       </main>
 
       {/* ── Thanh điều hướng dưới cùng ─────────────────────────── */}

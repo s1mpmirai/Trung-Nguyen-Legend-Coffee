@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
 import Login from "./pages/auth/Login";
-import {
-  AttendanceDashboard,
-  EmployeeProfile,
-  EmployeePayroll,
-  LeaveRequests,
-} from "./pages/employee";
+import AttendanceDashboard from "./pages/employee/AttendanceDashboard";
+import EmployeeProfile from "./pages/employee/EmployeeProfile";
+import EmployeePayroll from "./pages/employee/EmployeePayroll";
+import LeaveRequests from "./pages/employee/LeaveRequests";
 
 /**
  * App – Root component tích hợp:

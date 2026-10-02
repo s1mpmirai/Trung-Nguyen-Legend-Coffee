@@ -20,7 +20,7 @@ import {
 import { getEmployeeProfile } from "../../services/employeeService";
 
 /* ── Styles ────────────────────────────────────────────────────── */
-import "./EmployeePayroll.css";
+import "./styles/EmployeePayroll.css";
 
 /**
  * EmployeePayroll – Trang Bảng Lương & Phiếu Thu Nhập (Employee Portal)

@@ -37,8 +37,8 @@ function BasicInfoSection({ employee, onEdit }) {
             type="button"
           >
             <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
-              <path d="M11 4H4a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M15.5 2.5a2.121 2.121 0 013 3L10 14l-4 1 1-4 8.5-8.5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M11 4H4a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M15.5 2.5a2.121 2.121 0 013 3L10 14l-4 1 1-4 8.5-8.5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         )}
@@ -72,7 +72,6 @@ function BasicInfoSection({ employee, onEdit }) {
 
         <InfoRow label="Chức danh">{shortTitle}</InfoRow>
 
-        <InfoRow label="Ngày vào làm">{startDate}</InfoRow>
       </div>
     </section>
   );
