@@ -13,7 +13,6 @@ import RolePermissions from "./RolePermissions";
 import AttendanceManagement from "./AttendanceManagement";
 import PayrollManagement from "./PayrollManagement";
 import PersonnelReport from "./PersonnelReport";
-import SystemSettings from "./SystemSettings";
 import { getManagerDashboardStats } from "../../services/managerService";
 
 export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmployee }) {
@@ -25,6 +24,7 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
   const [exportNotice, setExportNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,18 +64,20 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onSwitchToEmployee={onSwitchToEmployee}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+        onClose={() => setSidebarCollapsed(true)}
       />
 
       {/* ───────────────── TOP HEADER BAR ───────────────── */}
       <ManagerHeader
         userSession={userSession}
         onLogout={onLogout}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
+        collapsed={sidebarCollapsed}
       />
 
       {/* ───────────────── MAIN CONTENT AREA ───────────────── */}
-      <div className="pl-64">
+      <div className={`${sidebarCollapsed ? "pl-20" : "pl-64"} transition-all duration-300`}>
         <main className="pt-16 pb-14 min-h-screen">
           <div className="max-w-[1480px] mx-auto px-8 py-8 flex flex-col gap-6">
             {/* 1. TAB: Quản lý nhân sự */}
@@ -95,9 +97,6 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
 
             {/* 6. TAB: Phân quyền & Vai trò (Từ Stitch) */}
             {activeTab === "roles" && <RolePermissions />}
-
-            {/* 7. TAB: Cài đặt hệ thống (Từ Stitch) */}
-            {activeTab === "settings" && <SystemSettings />}
 
             {/* 7. TAB: Tổng quan & Báo cáo (Default) */}
             {activeTab === "dashboard" && (
