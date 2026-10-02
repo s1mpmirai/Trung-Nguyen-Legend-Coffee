@@ -1,7 +1,7 @@
 # ==============================================================================
 # TRUNG NGUYEN LEGEND COFFEE - DANH MỤC API BACKEND (API LINKS)
 # Tự động cập nhật mỗi khi có API mới hoặc thay đổi endpoint
-# Cập nhật lần cuối: 2026-10-02 12:20:00 (UTC+7)
+# Cập nhật lần cuối: 2026-10-02 16:30:00 (UTC+7)
 # ==============================================================================
 
 [AUTH - XÁC THỰC & ĐĂNG NHẬP]
@@ -19,7 +19,13 @@
 - POST /api/v1/employees/create_employee    | Thêm mới hồ sơ nhân sự
 - GET  /api/v1/employees/get_employee_list  | Lấy danh sách nhân sự (lọc, tìm kiếm, phân trang)
 - GET  /api/v1/employees/profile/{ma_nv}    | Lấy chi tiết hồ sơ cá nhân nhân viên
-- PUT  /api/v1/employees/profile/{ma_nv}    | Cập nhật thông tin hồ sơ nhân viên
+- PUT  /api/v1/employees/profile/{ma_nv}    | Cập nhật thông tin hồ sơ nhân viên trực tiếp (Admin/Hệ thống)
+- POST /api/v1/employees/profile/{ma_nv}/request-update          | [Nhân viên] Gửi yêu cầu chỉnh sửa hồ sơ chờ Quản lý phê duyệt (không sửa DB trực tiếp)
+- GET  /api/v1/employees/profile/{ma_nv}/pending-request         | [Nhân viên] Xem yêu cầu cập nhật hồ sơ đang chờ Quản lý duyệt
+- PUT  /api/v1/employees/profile-request/{ma_yc}/cancel          | [Nhân viên] Tự hủy yêu cầu cập nhật hồ sơ đang chờ duyệt
+- GET  /api/v1/employees/manager/profile-requests                | [Quản lý] Danh sách yêu cầu cập nhật hồ sơ cá nhân cần duyệt / đã xử lý
+- PUT  /api/v1/employees/manager/profile-requests/{ma_yc}/review | [Quản lý] Phê duyệt (áp dụng vào bảng nhan_vien) hoặc Từ chối yêu cầu
+
 
 [ATTENDANCE - CHẤM CÔNG & CA LÀM VIỆC]
 - GET  /api/v1/attendance/dashboard/{ma_nv} | [Nhân viên] Dashboard chấm công, GPS, thống kê tháng, lịch sử gần đây
