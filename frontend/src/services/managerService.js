@@ -36,27 +36,30 @@ export const getManagerDashboardStats = async () => {
   let fullTimeCount = 19;
   let departments = [];
 
-  if (empSettled.status === "fulfilled" && empSettled.value.data?.items) {
-    const items = empSettled.value.data.items;
-    const activeEmps = items.filter((emp) => emp.trang_thai === "DANG_LAM");
-    totalEmployees = activeEmps.length > 0 ? activeEmps.length : items.length;
-    fullTimeCount = totalEmployees;
+  if (empSettled.status === "fulfilled") {
+    const rawEmp = empSettled.value;
+    const items = rawEmp?.items || rawEmp?.data?.items || (Array.isArray(rawEmp) ? rawEmp : []);
+    if (items.length > 0) {
+      const activeEmps = items.filter((emp) => emp.trang_thai === "DANG_LAM");
+      totalEmployees = activeEmps.length > 0 ? activeEmps.length : items.length;
+      fullTimeCount = totalEmployees;
 
-    // Phân bổ cơ cấu theo Phòng ban từ DB thật
-    const deptMap = {};
-    (activeEmps.length > 0 ? activeEmps : items).forEach((emp) => {
-      const deptName = emp.ten_pb || "Khối Chưa phân bổ";
-      deptMap[deptName] = (deptMap[deptName] || 0) + 1;
-    });
+      // Phân bổ cơ cấu theo Phòng ban từ DB thật
+      const deptMap = {};
+      (activeEmps.length > 0 ? activeEmps : items).forEach((emp) => {
+        const deptName = emp.ten_pb || "Khối Chưa phân bổ";
+        deptMap[deptName] = (deptMap[deptName] || 0) + 1;
+      });
 
-    departments = Object.entries(deptMap)
-      .map(([name, count], idx) => ({
-        id: `PB0${idx + 1}`,
-        name,
-        count,
-        color: DEPT_COLORS[idx % DEPT_COLORS.length],
-      }))
-      .sort((a, b) => b.count - a.count);
+      departments = Object.entries(deptMap)
+        .map(([name, count], idx) => ({
+          id: `PB0${idx + 1}`,
+          name,
+          count,
+          color: DEPT_COLORS[idx % DEPT_COLORS.length],
+        }))
+        .sort((a, b) => b.count - a.count);
+    }
   }
 
   // 2. Phân tích dữ liệu Chấm công hôm nay (attendance/daily)
@@ -66,31 +69,37 @@ export const getManagerDashboardStats = async () => {
   let notCheckedIn = Math.max(0, totalEmployees - activeToday);
   let attendanceRate = "94.7";
 
-  if (attSettled.status === "fulfilled" && Array.isArray(attSettled.value.data)) {
-    const daily = attSettled.value.data;
-    activeToday = daily.filter((item) => item.gio_vao).length;
-    onTimeToday = daily.filter((item) => item.loai_cong === "CONG_DU").length;
-    lateToday = daily.filter((item) => item.loai_cong === "DI_TRE").length;
-    notCheckedIn = Math.max(0, totalEmployees - activeToday);
+  if (attSettled.status === "fulfilled") {
+    const rawAtt = attSettled.value;
+    const daily = Array.isArray(rawAtt) ? rawAtt : (rawAtt?.data && Array.isArray(rawAtt.data)) ? rawAtt.data : [];
+    if (daily.length > 0) {
+      activeToday = daily.filter((item) => item.gio_vao).length;
+      onTimeToday = daily.filter((item) => item.loai_cong === "CONG_DU").length;
+      lateToday = daily.filter((item) => item.loai_cong === "DI_TRE").length;
+      notCheckedIn = Math.max(0, totalEmployees - activeToday);
 
-    if (totalEmployees > 0) {
-      attendanceRate = ((activeToday / totalEmployees) * 100).toFixed(1);
+      if (totalEmployees > 0) {
+        attendanceRate = ((activeToday / totalEmployees) * 100).toFixed(1);
+      }
     }
   }
 
   // 3. Phân tích Đơn từ chờ duyệt (leaves/pending)
   let pendingLeavesCount = 2;
-  if (leaveSettled.status === "fulfilled" && Array.isArray(leaveSettled.value.data)) {
-    pendingLeavesCount = leaveSettled.value.data.length;
+  if (leaveSettled.status === "fulfilled") {
+    const rawLeave = leaveSettled.value;
+    const leaves = Array.isArray(rawLeave) ? rawLeave : (rawLeave?.data && Array.isArray(rawLeave.data)) ? rawLeave.data : [];
+    pendingLeavesCount = leaves.length;
   }
 
   // 4. Phân tích Quỹ lương tháng (payroll/summary)
   let monthlyPayroll = "283.775.909 đ";
   let payrollStatus = "Đã chốt lương Net (Tháng 8/2026)";
 
-  if (payrollSettled.status === "fulfilled" && payrollSettled.value.data) {
-    const pData = payrollSettled.value.data;
-    if (pData.tong_tien_net != null) {
+  if (payrollSettled.status === "fulfilled") {
+    const rawPayroll = payrollSettled.value;
+    const pData = rawPayroll?.data || rawPayroll;
+    if (pData && pData.tong_tien_net != null) {
       monthlyPayroll = `${Number(pData.tong_tien_net).toLocaleString("vi-VN")} đ`;
       payrollStatus = `Đã chốt lương Net (Tháng ${pData.thang}/${pData.nam})`;
     }

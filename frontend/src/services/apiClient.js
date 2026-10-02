@@ -7,7 +7,10 @@
  * - Chuẩn hóa xử lý lỗi HTTP và JSON response
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
+let BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
+if (BASE_URL.startsWith("http") && !BASE_URL.includes("/api/v1")) {
+  BASE_URL = `${BASE_URL.replace(/\/+$/, "")}/api/v1`;
+}
 
 export async function request(endpoint, options = {}) {
   const token = localStorage.getItem("access_token");
@@ -18,12 +21,30 @@ export async function request(endpoint, options = {}) {
     ...options.headers,
   };
 
+  const { params, ...restOptions } = options;
+
+  let queryString = "";
+  if (params && typeof params === "object") {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null) {
+        searchParams.append(key, val);
+      }
+    });
+    const qs = searchParams.toString();
+    if (qs) {
+      queryString = (endpoint.includes("?") ? "&" : "?") + qs;
+    }
+  }
+
+  const cleanBase = BASE_URL.replace(/\/+$/, "");
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const url = `${cleanBase}${cleanEndpoint}${queryString}`;
+
   const config = {
-    ...options,
+    ...restOptions,
     headers,
   };
-
-  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   try {
     const response = await fetch(url, config);
