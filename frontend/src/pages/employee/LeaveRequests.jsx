@@ -34,9 +34,61 @@ export default function LeaveRequests({ userSession, onLogout }) {
   const [formLoaiDon, setFormLoaiDon] = useState('NGHI_PHEP');
   const [formNgayBatDau, setFormNgayBatDau] = useState('');
   const [formNgayKetThuc, setFormNgayKetThuc] = useState('');
-  const [formSoNgay, setFormSoNgay] = useState('1');
+  const [formSoNgay, setFormSoNgay] = useState(1);
   const [formLyDo, setFormLyDo] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Hàm tính số ngày nghỉ tự động giữa 2 mốc ngày (tính cả ngày bắt đầu và kết thúc)
+  const calculateLeaveDays = (startStr, endStr) => {
+    if (!startStr || !endStr) return 0;
+    const [sY, sM, sD] = startStr.split('-').map(Number);
+    const [eY, eM, eD] = endStr.split('-').map(Number);
+    const start = new Date(sY, sM - 1, sD);
+    const end = new Date(eY, eM - 1, eD);
+    if (end < start) return 0;
+    const diffTime = end.getTime() - start.getTime();
+    return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  // Tự động điều chỉnh ngày kết thúc nếu chưa chọn hoặc nhỏ hơn ngày bắt đầu
+  const handleStartDateChange = (val) => {
+    setFormNgayBatDau(val);
+    if (!formNgayKetThuc || formNgayKetThuc < val) {
+      setFormNgayKetThuc(val);
+    }
+  };
+
+  // Tự động tính số ngày nghỉ khi ngày bắt đầu hoặc ngày kết thúc thay đổi
+  useEffect(() => {
+    if (formNgayBatDau && formNgayKetThuc) {
+      const days = calculateLeaveDays(formNgayBatDau, formNgayKetThuc);
+      setFormSoNgay(days);
+    } else {
+      setFormSoNgay(0);
+    }
+  }, [formNgayBatDau, formNgayKetThuc]);
+
+  // Lấy ngày hôm nay định dạng YYYY-MM-DD theo giờ địa phương
+  const getTodayDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const todayStr = getTodayDateString();
+
+  // Mở modal tạo đơn và gán ngày mặc định
+  const handleOpenCreateModal = () => {
+    const today = getTodayDateString();
+    setFormLoaiDon('NGHI_PHEP');
+    setFormNgayBatDau(today);
+    setFormNgayKetThuc(today);
+    setFormSoNgay(1);
+    setFormLyDo('');
+    setShowCreateModal(true);
+  };
 
   const currentYear = new Date().getFullYear();
 
@@ -79,17 +131,14 @@ export default function LeaveRequests({ userSession, onLogout }) {
     return item.trang_thai === activeFilter;
   });
 
-  // Tên loại đơn
+  // Tên 3 loại đơn hợp lệ theo yêu cầu
   const getTenLoaiDon = (loai) => {
     switch (loai) {
       case 'NGHI_PHEP':
-        return 'Đơn xin nghỉ phép năm';
+        return 'Đơn xin nghỉ phép';
       case 'NGHI_OM':
-        return 'Đơn nghỉ ốm đau';
       case 'NGHI_THAI_SAN':
-        return 'Đơn nghỉ thai sản';
-      case 'NGHI_KHONG_LUONG':
-        return 'Đơn nghỉ không lương';
+        return 'Đơn nghỉ ốm đau, thai sản';
       case 'NGHI_VIEC':
         return 'Đơn xin thôi việc';
       default:
@@ -107,14 +156,18 @@ export default function LeaveRequests({ userSession, onLogout }) {
           </div>
         );
       case 'NGHI_OM':
+      case 'NGHI_THAI_SAN':
         return (
           <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-100/60">
             <HeartPulse size={20} className="stroke-[2.2]" />
           </div>
         );
-      case 'NGHI_THAI_SAN':
-      case 'NGHI_KHONG_LUONG':
       case 'NGHI_VIEC':
+        return (
+          <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0 border border-rose-100/60">
+            <LogOut size={20} className="stroke-[2.2]" />
+          </div>
+        );
       default:
         return (
           <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0 border border-indigo-100/60">
@@ -166,9 +219,37 @@ export default function LeaveRequests({ userSession, onLogout }) {
   // Xử lý tạo đơn
   const handleCreateLeaveSubmit = async (e) => {
     e.preventDefault();
-    if (!formNgayBatDau || !formNgayKetThuc || !formLyDo.trim()) {
+    if (!formNgayBatDau || !formLyDo.trim()) {
       showToast('Vui lòng nhập đầy đủ thông tin đơn');
       return;
+    }
+
+    const todayStr = getTodayDateString();
+    if (formNgayBatDau < todayStr) {
+      showToast('Ngày bắt đầu không được chọn ngày trong quá khứ');
+      return;
+    }
+
+    let finalEndDate = formNgayKetThuc;
+    let calculatedDays = 1;
+
+    if (formLoaiDon === 'NGHI_VIEC') {
+      finalEndDate = formNgayBatDau;
+      calculatedDays = 1;
+    } else {
+      if (!formNgayKetThuc) {
+        showToast('Vui lòng chọn ngày kết thúc nghỉ');
+        return;
+      }
+      calculatedDays = calculateLeaveDays(formNgayBatDau, formNgayKetThuc);
+      if (calculatedDays <= 0) {
+        showToast('Ngày kết thúc nghỉ phải bằng hoặc sau ngày bắt đầu nghỉ');
+        return;
+      }
+      if (formLoaiDon === 'NGHI_PHEP' && calculatedDays > conLai) {
+        showToast(`Số ngày nghỉ (${calculatedDays} ngày) vượt quá quỹ phép năm còn lại (${conLai} ngày)`);
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -180,8 +261,8 @@ export default function LeaveRequests({ userSession, onLogout }) {
           ma_nv: userSession?.ma_nv || 'NV10',
           loai_don: formLoaiDon,
           ngay_bat_dau: formNgayBatDau,
-          ngay_ket_thuc: formNgayKetThuc,
-          so_ngay: parseFloat(formSoNgay) || 1,
+          ngay_ket_thuc: finalEndDate,
+          so_ngay: calculatedDays,
           ly_do: formLyDo.trim(),
         }),
       });
@@ -237,8 +318,8 @@ export default function LeaveRequests({ userSession, onLogout }) {
           </div>
 
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center space-x-1.5 bg-[#0EA5E9] hover:bg-[#0284C7] active:scale-[0.98] text-white px-3.5 py-2 rounded-full font-bold text-xs shadow-md shadow-sky-500/25 transition-all"
+            onClick={handleOpenCreateModal}
+            className="flex items-center space-x-1.5 bg-[#0EA5E9] hover:bg-[#0284C7] active:scale-[0.98] text-white px-3.5 py-2 rounded-full font-bold text-xs shadow-md shadow-sky-500/25 transition-all cursor-pointer"
           >
             <Plus size={16} className="stroke-[3]" />
             <span>Tạo đơn</span>
@@ -373,9 +454,15 @@ export default function LeaveRequests({ userSession, onLogout }) {
                       <span>Thời gian</span>
                     </span>
                     <span className="font-bold text-slate-800">
-                      {formatDateVN(item.ngay_bat_dau)}
-                      {item.ngay_bat_dau !== item.ngay_ket_thuc && ` - ${formatDateVN(item.ngay_ket_thuc)}`}
-                      {' '}({item.so_ngay || 1} ngày)
+                      {item.loai_don === 'NGHI_VIEC' ? (
+                        `Nghỉ việc từ: ${formatDateVN(item.ngay_bat_dau)}`
+                      ) : (
+                        <>
+                          {formatDateVN(item.ngay_bat_dau)}
+                          {item.ngay_bat_dau !== item.ngay_ket_thuc && ` - ${formatDateVN(item.ngay_ket_thuc)}`}
+                          {' '}({item.so_ngay || 1} ngày)
+                        </>
+                      )}
                     </span>
                   </div>
 
@@ -452,18 +539,33 @@ export default function LeaveRequests({ userSession, onLogout }) {
                 <span className="text-slate-400 font-medium">Trạng thái:</span>
                 <div>{renderStatusBadge(selectedLeave.trang_thai)}</div>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-400 font-medium">Từ ngày:</span>
-                <span className="font-bold text-slate-800">{formatDateVN(selectedLeave.ngay_bat_dau)}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-400 font-medium">Đến ngày:</span>
-                <span className="font-bold text-slate-800">{formatDateVN(selectedLeave.ngay_ket_thuc)}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-400 font-medium">Số ngày nghỉ:</span>
-                <span className="font-bold text-slate-800">{selectedLeave.so_ngay || 1} ngày</span>
-              </div>
+              {selectedLeave.loai_don === 'NGHI_VIEC' ? (
+                <>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-400 font-medium">Ngày bắt đầu thôi việc:</span>
+                    <span className="font-bold text-slate-800">{formatDateVN(selectedLeave.ngay_bat_dau)}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-400 font-medium">Hình thức:</span>
+                    <span className="font-bold text-rose-600">Chấm dứt HĐ lao động</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-400 font-medium">Ngày bắt đầu nghỉ:</span>
+                    <span className="font-bold text-slate-800">{formatDateVN(selectedLeave.ngay_bat_dau)}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-400 font-medium">Ngày kết thúc nghỉ:</span>
+                    <span className="font-bold text-slate-800">{formatDateVN(selectedLeave.ngay_ket_thuc)}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50">
+                    <span className="text-slate-400 font-medium">Tổng số ngày nghỉ:</span>
+                    <span className="font-bold text-slate-800">{selectedLeave.so_ngay || 1} ngày</span>
+                  </div>
+                </>
+              )}
               <div className="py-1 border-b border-slate-50">
                 <span className="text-slate-400 font-medium block mb-1">Lý do nghỉ:</span>
                 <p className="font-semibold text-slate-800 bg-slate-50 p-2.5 rounded-lg">
@@ -511,59 +613,120 @@ export default function LeaveRequests({ userSession, onLogout }) {
                 <label className="font-bold text-slate-700 block mb-1">Loại đơn</label>
                 <select
                   value={formLoaiDon}
-                  onChange={(e) => setFormLoaiDon(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormLoaiDon(val);
+                    if (val === 'NGHI_VIEC') {
+                      if (formNgayBatDau) setFormNgayKetThuc(formNgayBatDau);
+                      setFormSoNgay(1);
+                    }
+                  }}
                   className="w-full p-2.5 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:outline-none focus:border-[#0EA5E9]"
                 >
-                  <option value="NGHI_PHEP">Đơn xin nghỉ phép năm</option>
-                  <option value="NGHI_OM">Đơn nghỉ ốm đau</option>
-                  <option value="NGHI_KHONG_LUONG">Đơn nghỉ không lương</option>
+                  <option value="NGHI_PHEP">Đơn xin nghỉ phép</option>
+                  <option value="NGHI_OM">Đơn nghỉ ốm đau, thai sản</option>
                   <option value="NGHI_VIEC">Đơn xin thôi việc</option>
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              {formLoaiDon === 'NGHI_VIEC' ? (
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Từ ngày</label>
+                  <label className="font-bold text-slate-700 block mb-1">Ngày bắt đầu thôi việc</label>
                   <input
                     type="date"
+                    min={todayStr}
                     value={formNgayBatDau}
-                    onChange={(e) => setFormNgayBatDau(e.target.value)}
+                    onChange={(e) => {
+                      setFormNgayBatDau(e.target.value);
+                      setFormNgayKetThuc(e.target.value);
+                      setFormSoNgay(1);
+                    }}
                     className="w-full p-2 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-[#0EA5E9]"
                     required
                   />
                 </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Ngày bắt đầu nghỉ</label>
+                    <input
+                      type="date"
+                      min={todayStr}
+                      value={formNgayBatDau}
+                      onChange={(e) => handleStartDateChange(e.target.value)}
+                      className="w-full p-2 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-[#0EA5E9]"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Ngày kết thúc nghỉ</label>
+                    <input
+                      type="date"
+                      min={formNgayBatDau || todayStr}
+                      value={formNgayKetThuc}
+                      onChange={(e) => setFormNgayKetThuc(e.target.value)}
+                      className="w-full p-2 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-[#0EA5E9]"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formLoaiDon === 'NGHI_VIEC' ? (
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Đến ngày</label>
-                  <input
-                    type="date"
-                    value={formNgayKetThuc}
-                    onChange={(e) => setFormNgayKetThuc(e.target.value)}
-                    className="w-full p-2 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-[#0EA5E9]"
-                    required
-                  />
+                  <label className="font-bold text-slate-700 block mb-1">Hình thức đơn từ</label>
+                  <div className="w-full p-2.5 bg-rose-50/70 border border-rose-100 rounded-xl flex items-center justify-between text-xs">
+                    <span className="font-bold text-rose-700">Chấm dứt hợp đồng lao động</span>
+                    <span className="text-[11px] text-rose-500 font-medium">Bàn giao nhân sự</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Tổng số ngày nghỉ
+                  </label>
+                  <div className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                    <span className={formSoNgay > 0 ? (formLoaiDon === 'NGHI_OM' ? "font-bold text-emerald-700 text-sm" : "font-bold text-sky-700 text-sm") : "font-normal text-slate-400 text-xs"}>
+                      {formSoNgay > 0 ? `${formSoNgay} ngày nghỉ` : 'Vui lòng chọn ngày hợp lệ'}
+                    </span>
+                    {formSoNgay > 0 && formNgayBatDau && formNgayKetThuc && (
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        {formatDateVN(formNgayBatDau)} {formNgayBatDau !== formNgayKetThuc ? `→ ${formatDateVN(formNgayKetThuc)}` : ''}
+                      </span>
+                    )}
+                  </div>
+                  {formLoaiDon === 'NGHI_PHEP' && (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Trừ vào quỹ phép năm (còn lại: <strong className="text-slate-700">{conLai} ngày</strong>)
+                    </p>
+                  )}
+                  {formLoaiDon === 'NGHI_OM' && (
+                    <p className="mt-1 text-[11px] text-emerald-600 font-medium">
+                      ✓ Chế độ bảo hiểm xã hội (BHXH chi trả, không trừ phép năm)
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Số ngày</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  value={formSoNgay}
-                  onChange={(e) => setFormSoNgay(e.target.value)}
-                  className="w-full p-2 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-[#0EA5E9]"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Lý do nghỉ</label>
+                <label className="font-bold text-slate-700 block mb-1">
+                  {formLoaiDon === 'NGHI_VIEC'
+                    ? 'Lý do thôi việc'
+                    : formLoaiDon === 'NGHI_OM'
+                      ? 'Lý do nghỉ ốm đau / thai sản'
+                      : 'Lý do xin nghỉ phép'}
+                </label>
                 <textarea
                   rows="3"
                   value={formLyDo}
                   onChange={(e) => setFormLyDo(e.target.value)}
-                  placeholder="Nhập lý do cụ thể..."
+                  placeholder={
+                    formLoaiDon === 'NGHI_VIEC'
+                      ? 'Nhập lý do xin thôi việc và kế hoạch bàn giao công việc...'
+                      : formLoaiDon === 'NGHI_OM'
+                        ? 'Ghi rõ lý do (khám bệnh, điều trị nội trú, chế độ thai sản...)...'
+                        : 'Nhập lý do nghỉ phép cụ thể...'
+                  }
                   className="w-full p-2.5 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-[#0EA5E9]"
                   required
                 ></textarea>

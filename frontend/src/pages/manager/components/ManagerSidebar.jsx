@@ -47,7 +47,7 @@ export default function ManagerSidebar({
     { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
     { id: "reports", label: "Báo cáo nhân sự", icon: FileBarChart2 },
     { id: "employees", label: "Quản lý nhân sự", icon: Users },
-    { id: "leaves", label: "Duyệt đơn từ", icon: ClipboardCheck },
+    { id: "leaves", label: "Duyệt đơn", icon: ClipboardCheck },
     { id: "attendance", label: "Chấm công & Ca làm", icon: Clock },
     { id: "payroll", label: "Bảng tính lương", icon: CreditCard },
     { id: "roles", label: "Phân quyền & Vai trò", icon: Shield },
@@ -61,11 +61,10 @@ export default function ManagerSidebar({
           onToggleCollapse && onToggleCollapse();
         }
       }}
-      className={`fixed left-0 top-0 h-full ${
-        collapsed
+      className={`fixed left-0 top-0 h-full ${collapsed
           ? "w-20 cursor-pointer hover:border-sky-300 hover:shadow-md"
           : "w-64"
-      } bg-white border-r border-slate-200/80 z-50 flex flex-col justify-between py-6 select-none transition-all duration-300`}
+        } bg-white border-r border-slate-200/80 z-50 flex flex-col justify-between py-6 select-none transition-all duration-300`}
       title={collapsed ? "Bấm vào bất kỳ đâu để mở rộng menu" : undefined}
     >
       <div className="flex flex-col gap-6">
@@ -132,15 +131,13 @@ export default function ManagerSidebar({
                   }
                 }}
                 title={item.label}
-                className={`flex items-center ${
-                  collapsed ? "justify-center px-0 py-3" : "gap-3 px-3.5 py-2.5"
-                } rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
-                  isActive
+                className={`flex items-center ${collapsed ? "justify-center px-0 py-3" : "gap-3 px-3.5 py-2.5"
+                  } rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${isActive
                     ? collapsed
                       ? "bg-sky-50 text-sky-600 shadow-xs"
                       : "bg-sky-50 text-sky-600 border-l-[3px] border-sky-600 pl-3 shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                }`}
+                  }`}
               >
                 <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-sky-600" : "text-slate-400"}`} />
                 {!collapsed && <span className="truncate">{item.label}</span>}

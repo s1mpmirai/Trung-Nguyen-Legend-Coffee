@@ -42,23 +42,17 @@ export default function LeaveApprovals() {
 
   // Helper ánh xạ dữ liệu từ backend sang format bảng
   const mapBackendLeave = (item) => {
-    let type = "Phép năm (AL)";
+    let type = "Đơn xin nghỉ phép";
     let typeCategory = "annual";
     if (item.loai_don === "NGHI_VIEC") {
-      type = "Xin thôi việc";
+      type = "Đơn xin thôi việc";
       typeCategory = "resignation";
-    } else if (item.loai_don === "NGHI_OM") {
-      type = "Nghỉ ốm (BHXH)";
+    } else if (item.loai_don === "NGHI_OM" || item.loai_don === "NGHI_THAI_SAN") {
+      type = "Đơn nghỉ ốm đau, thai sản";
       typeCategory = "sick";
-    } else if (item.loai_don === "NGHI_THAI_SAN") {
-      type = "Nghỉ thai sản";
-      typeCategory = "special";
-    } else if (item.loai_don === "NGHI_KHONG_LUONG") {
-      type = "Nghỉ không lương";
-      typeCategory = "unpaid";
-    } else if (item.loai_don === "KHAC") {
-      type = "Nghỉ khác";
-      typeCategory = "special";
+    } else if (item.loai_don === "NGHI_KHONG_LUONG" || item.loai_don === "KHAC") {
+      type = "Đơn xin nghỉ phép";
+      typeCategory = "annual";
     }
 
     const initials = item.ho_ten
@@ -84,7 +78,7 @@ export default function LeaveApprovals() {
       statusText = "Đã hủy";
     }
 
-    // Helper định dạng ngày hiển thị tiếng Việt
+    // Helper định dạng ngày hiển thị tiếng Việt (DD/MM/YYYY)
     const formatDisplayDate = (val) => {
       if (!val) return "—";
       try {
@@ -100,9 +94,33 @@ export default function LeaveApprovals() {
       }
     };
 
+    // Helper định dạng ngày và giờ phút chi tiết (HH:mm - DD/MM/YYYY)
+    const formatDisplayDateTime = (val) => {
+      if (!val) return "—";
+      try {
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return String(val);
+        const dateStr = d.toLocaleDateString("vi-VN", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+        const timeStr = d.toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        return `${timeStr} - ${dateStr}`;
+      } catch {
+        return String(val);
+      }
+    };
+
     const startDate = formatDisplayDate(item.ngay_bat_dau);
     const endDate = formatDisplayDate(item.ngay_ket_thuc);
     const createdAt = formatDisplayDate(item.ngay_tao);
+    const createdDateTime = formatDisplayDateTime(item.ngay_tao);
+    const isResignation = item.loai_don === "NGHI_VIEC";
+    const totalDays = isResignation ? "Thôi việc" : `${item.so_ngay || 1} ngày`;
 
     const period =
       startDate === endDate
@@ -113,16 +131,20 @@ export default function LeaveApprovals() {
       id: item.ma_don,
       empId: item.ma_nv,
       name: item.ho_ten || item.ma_nv,
+      rawLoaiDon: item.loai_don,
+      rawDays: parseFloat(item.so_ngay) || 1,
       initials: initials,
       dept: item.ten_pb || "Phòng ban nội bộ",
       type: type,
       typeCategory: typeCategory,
       priority: item.loai_don === "NGHI_VIEC" || item.so_ngay >= 3 ? "Ưu tiên cao" : null,
       createdAt: createdAt,
+      createdDateTime: createdDateTime,
       startDate: startDate,
       endDate: endDate,
+      totalDays: totalDays,
       period: period,
-      subPeriod: `${item.so_ngay || 1} ngày`,
+      subPeriod: totalDays,
       reason: item.ly_do || "Không có ghi chú lý do",
       handover: item.ban_giao || "",
       leaveBalance: "8/12 ngày",
@@ -152,6 +174,21 @@ export default function LeaveApprovals() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Tính số ngày phép năm còn lại của nhân viên
+  const calculateEmployeeLeaveBalance = (empId) => {
+    const tongPhep = 12.0;
+    const daDung = requests
+      .filter(
+        (r) =>
+          r.empId === empId &&
+          (r.rawLoaiDon === "NGHI_PHEP" || r.typeCategory === "annual" || r.type === "Đơn xin nghỉ phép") &&
+          r.status === "approved"
+      )
+      .reduce((sum, item) => sum + (parseFloat(item.rawDays) || 1), 0);
+    const conLai = Math.max(0, tongPhep - daDung);
+    return { tongPhep, daDung, conLai };
   };
 
   useEffect(() => {
@@ -216,6 +253,7 @@ export default function LeaveApprovals() {
 
   // Mở Popup xác nhận từ chối (Icon X)
   const openRejectModal = (req) => {
+    setSelectedRequest(null); // Tự động đóng popup chi tiết đơn để không bị đè
     setRejectModalData(req);
     setRejectionReason("");
     setRejectError("");
@@ -293,12 +331,12 @@ export default function LeaveApprovals() {
 
   const filtered = requests.filter((r) => {
     const matchTab = activeFilter === "all" || r.status === activeFilter;
-    const q = searchQuery.toLowerCase();
+    const q = (searchQuery || "").toLowerCase().trim();
     const matchSearch =
       !q ||
-      r.name.toLowerCase().includes(q) ||
-      r.id.toLowerCase().includes(q) ||
-      r.dept.toLowerCase().includes(q);
+      (r.name && r.name.toLowerCase().includes(q)) ||
+      (r.id && r.id.toLowerCase().includes(q)) ||
+      (r.dept && r.dept.toLowerCase().includes(q));
     return matchTab && matchSearch;
   });
 
@@ -317,7 +355,7 @@ export default function LeaveApprovals() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-1 font-['Plus_Jakarta_Sans',sans-serif]">
-            Duyệt đơn từ nhân viên
+            DUYỆT ĐƠN NGHỈ PHÉP / THÔI VIỆC
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Xem xét và phê duyệt các yêu cầu nghỉ phép, xin thôi việc, công tác và làm việc linh hoạt
@@ -338,10 +376,6 @@ export default function LeaveApprovals() {
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 shadow-2xs">
             <Calendar className="w-3.5 h-3.5 text-sky-600" />
             <span>Tháng 10, 2026</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 shadow-2xs">
-            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <span>Tất cả chi nhánh & nhà máy</span>
           </div>
         </div>
       </div>
@@ -373,7 +407,6 @@ export default function LeaveApprovals() {
                 ? "Có đơn thôi việc cần duyệt gấp"
                 : "Không có đơn thôi việc tồn đọng"}
             </span>
-            <span className="text-slate-400 font-medium">Đồng bộ tự động</span>
           </div>
         </div>
 
@@ -394,9 +427,6 @@ export default function LeaveApprovals() {
             <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <CheckCircle2 className="w-5 h-5" />
             </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-1 text-xs text-emerald-600 font-semibold">
-            <span>+12.4% so với chu kỳ tháng trước</span>
           </div>
         </div>
       </div>
@@ -477,10 +507,10 @@ export default function LeaveApprovals() {
                 <th className="py-3 px-4">Mã đơn</th>
                 <th className="py-3 px-4">Nhân viên</th>
                 <th className="py-3 px-4">Loại đơn</th>
-                <th className="py-3 px-4 whitespace-nowrap">Thời gian bắt đầu</th>
-                <th className="py-3 px-4 whitespace-nowrap">Thời gian kết thúc</th>
+                <th className="py-3 px-4 whitespace-nowrap">Ngày bắt đầu</th>
+                <th className="py-3 px-4 whitespace-nowrap">Ngày kết thúc</th>
                 <th className="py-3 px-4 min-w-[200px]">Lý do & Bàn giao</th>
-                <th className="py-3 px-4 text-center">Phép năm</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Số ngày nghỉ</th>
                 <th className="py-3 px-4 text-center">Trạng thái</th>
                 <th className="py-3 px-4 text-right">Thao tác</th>
               </tr>
@@ -535,11 +565,8 @@ export default function LeaveApprovals() {
                       {req.startDate || req.period}
                     </td>
                     {/* Cột 6: Thời gian kết thúc */}
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-slate-800">{req.endDate || req.period}</span>
-                        <span className="text-[10px] text-slate-400 font-medium">{req.subPeriod}</span>
-                      </div>
+                    <td className="py-3 px-4 whitespace-nowrap text-slate-800 font-semibold">
+                      {req.typeCategory === "resignation" ? "—" : (req.endDate || req.period)}
                     </td>
                     <td className="py-3 px-4">
                       <p className="text-slate-700 line-clamp-1">{req.reason}</p>
@@ -548,8 +575,9 @@ export default function LeaveApprovals() {
                         {req.handover}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-center font-mono font-medium text-slate-600">
-                      {req.leaveBalance}
+                    {/* Cột 8: Số ngày nghỉ - hiển thị chữ đen đơn giản, không khung */}
+                    <td className="py-3 px-4 text-center whitespace-nowrap text-slate-800 font-medium">
+                      {req.totalDays}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span
@@ -688,7 +716,7 @@ export default function LeaveApprovals() {
 
       {/* ──────────────── POPUP XÁC NHẬN TỪ CHỐI & NÊU LÝ DO ──────────────── */}
       {rejectModalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
             {/* Header Popup */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -727,9 +755,13 @@ export default function LeaveApprovals() {
                 <span className="text-slate-700 font-medium">{rejectModalData.dept}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Thời gian nghỉ:</span>
+                <span className="text-slate-500">
+                  {rejectModalData.typeCategory === "resignation" ? "Thời gian thôi việc:" : "Thời gian nghỉ:"}
+                </span>
                 <span className="text-slate-700 font-medium">
-                  {rejectModalData.period} ({rejectModalData.subPeriod})
+                  {rejectModalData.typeCategory === "resignation"
+                    ? `Từ ${rejectModalData.startDate}`
+                    : `${rejectModalData.period} (${rejectModalData.subPeriod})`}
                 </span>
               </div>
               <div className="pt-1 border-t border-slate-200/60 text-slate-600 italic">
@@ -818,12 +850,24 @@ export default function LeaveApprovals() {
       {selectedRequest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-sky-600 text-sm">
-                  #{selectedRequest.id}
-                </span>
-                <span className="text-xs font-bold text-slate-800">{selectedRequest.type}</span>
+            {/* Header Popup: Hiển thị Mã đơn, Loại đơn và Thời gian gửi chi tiết (kèm giờ phút) trên đầu, không bỏ vào khung */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-sky-600 text-sm">
+                    #{selectedRequest.id}
+                  </span>
+                  <span className="text-xs font-bold text-slate-800">{selectedRequest.type}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>
+                    Thời gian gửi đơn:{" "}
+                    <span className="font-semibold text-slate-700">
+                      {selectedRequest.createdDateTime || selectedRequest.createdAt || "—"}
+                    </span>
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
@@ -837,30 +881,66 @@ export default function LeaveApprovals() {
             <div className="flex flex-col gap-2.5 text-xs">
               <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
                 <span className="text-slate-400">Người làm đơn:</span>
-                <span className="font-semibold text-slate-800">
-                  {selectedRequest.name} ({selectedRequest.empId})
-                </span>
+                <span className="font-semibold text-slate-800">{selectedRequest.name}</span>
+              </div>
+              <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
+                <span className="text-slate-400">Mã nhân viên:</span>
+                <span className="font-semibold font-mono text-slate-800">{selectedRequest.empId}</span>
               </div>
               <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
                 <span className="text-slate-400">Phòng ban:</span>
                 <span className="font-semibold text-slate-800">{selectedRequest.dept}</span>
               </div>
-              <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
-                <span className="text-slate-400">Thời gian gửi đơn:</span>
-                <span className="font-semibold text-slate-800">{selectedRequest.createdAt || "—"}</span>
-              </div>
-              <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
-                <span className="text-slate-400">Thời gian bắt đầu:</span>
-                <span className="font-semibold text-slate-800">
-                  {selectedRequest.startDate || selectedRequest.period}
-                </span>
-              </div>
-              <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
-                <span className="text-slate-400">Thời gian kết thúc:</span>
-                <span className="font-semibold text-slate-800">
-                  {selectedRequest.endDate || selectedRequest.period} ({selectedRequest.subPeriod})
-                </span>
-              </div>
+              {selectedRequest.typeCategory === "resignation" || selectedRequest.type === "Đơn xin thôi việc" ? (
+                <>
+                  <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
+                    <span className="text-slate-400">Ngày bắt đầu thôi việc:</span>
+                    <span className="font-semibold text-slate-800">
+                      {selectedRequest.startDate || selectedRequest.period}
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-2.5 rounded-xl bg-rose-50/70 border border-rose-100">
+                    <span className="text-rose-600 font-semibold">Hình thức đơn từ:</span>
+                    <span className="font-bold text-rose-700">Chấm dứt hợp đồng lao động</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
+                    <span className="text-slate-400">Ngày bắt đầu nghỉ:</span>
+                    <span className="font-semibold text-slate-800">
+                      {selectedRequest.startDate || selectedRequest.period}
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
+                    <span className="text-slate-400">Ngày kết thúc nghỉ:</span>
+                    <span className="font-semibold text-slate-800">
+                      {selectedRequest.endDate || selectedRequest.period}
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
+                    <span className="text-slate-400">Tổng số ngày nghỉ:</span>
+                    <span className="font-semibold text-slate-800">
+                      {selectedRequest.totalDays || selectedRequest.subPeriod || "1 ngày"}
+                    </span>
+                  </div>
+                  {/* Hiển thị rõ số phép năm còn lại đối với đơn xin nghỉ phép */}
+                  {(selectedRequest.typeCategory === "annual" || selectedRequest.rawLoaiDon === "NGHI_PHEP" || selectedRequest.type === "Đơn xin nghỉ phép") && (
+                    <div className="flex justify-between p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80">
+                      <span className="text-amber-800 font-semibold flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                        Số phép năm còn lại:
+                      </span>
+                      <span className="font-bold text-amber-900">
+                        {calculateEmployeeLeaveBalance(selectedRequest.empId).conLai} / 12 ngày
+                        <span className="text-[11px] text-amber-600 font-normal ml-1.5">
+                          (Đã nghỉ: {calculateEmployeeLeaveBalance(selectedRequest.empId).daDung} ngày)
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
               <div className="p-3 rounded-xl bg-slate-50 flex flex-col gap-1">
                 <span className="text-slate-400 font-semibold">Lý do chi tiết:</span>
                 <p className="text-slate-700 leading-relaxed">{selectedRequest.reason}</p>
@@ -918,7 +998,10 @@ export default function LeaveApprovals() {
                   {/* Nút Từ chối với Icon X */}
                   <button
                     type="button"
-                    onClick={() => openRejectModal(selectedRequest)}
+                    onClick={() => {
+                      setSelectedRequest(null);
+                      openRejectModal(selectedRequest);
+                    }}
                     className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-xl cursor-pointer transition-all shadow-2xs active:scale-95"
                     title="Từ chối đơn"
                   >
