@@ -1,0 +1,16 @@
+export { default as ManagerDashboard } from "./ManagerDashboard";
+export { default as EmployeeManagement } from "./EmployeeManagement";
+export { default as LeaveApprovals } from "./LeaveApprovals";
+export { default as AttendanceManagement } from "./AttendanceManagement";
+export { default as PayrollManagement } from "./PayrollManagement";
+export { default as PersonnelReport } from "./PersonnelReport";
+export { default as RolePermissions } from "./RolePermissions";
+export { default as AddEmployeeModal } from "./components/AddEmployeeModal";
+export { default as ManagerSidebar } from "./components/ManagerSidebar";
+export { default as ManagerHeader } from "./components/ManagerHeader";
+export { default as StatMetricCards } from "./components/StatMetricCards";
+export { default as EducationChartCard } from "./components/EducationChartCard";
+export { default as TenureStatsCard } from "./components/TenureStatsCard";
+export { default as PayrollDepartmentCard } from "./components/PayrollDepartmentCard";
+export { default as RecentPersonnelTable } from "./components/RecentPersonnelTable";
+export { default as SystemSettings } from "./SystemSettings";

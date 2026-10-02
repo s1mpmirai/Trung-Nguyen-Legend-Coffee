@@ -16,4 +16,5 @@ export * from "./employeeService";
 export * from "./payrollService";
 export * from "./attendanceService";
 export * from "./leaveService";
+export * from "./managerService";
 export { default as apiClient } from "./apiClient";

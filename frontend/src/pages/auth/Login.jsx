@@ -64,12 +64,13 @@ export default function Login({ onLoginSuccess }) {
       }
 
       const data = await response.json();
-      if (rememberMe) {
+      const role = data.ma_vai_tro || 'NHAN_VIEN';
+      localStorage.setItem('user_role', role);
+      localStorage.setItem('user_ma_nv', data.ma_nv);
+      localStorage.setItem('ma_nv', data.ma_nv);
+      if (data.access_token) {
         localStorage.setItem('auth_token', data.access_token);
-        localStorage.setItem('user_ma_nv', data.ma_nv);
-        if (data.ma_vai_tro) {
-          localStorage.setItem('user_role', data.ma_vai_tro);
-        }
+        localStorage.setItem('access_token', data.access_token);
       }
 
       setIsLoading(false);
@@ -77,7 +78,7 @@ export default function Login({ onLoginSuccess }) {
         onLoginSuccess({
           ma_nv: data.ma_nv,
           token: data.access_token,
-          role: data.ma_vai_tro,
+          role: role,
         });
       }
     } catch (err) {
