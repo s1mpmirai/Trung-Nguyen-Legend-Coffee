@@ -1,97 +1,57 @@
 from datetime import date, datetime
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
 
 class employee_profile(BaseModel):
+    """Schema thông tin nhân viên cơ sở (bảng nhan_vien)."""
     ma_nv: str = Field(..., description="Mã nhân viên")
     ho_ten: str = Field(..., description="Họ tên nhân viên")
     ngay_sinh: date = Field(..., description="Ngày sinh")
-    gioi_tinh: str = Field(..., description="Giới tính")
-    cccd: Optional[str] = Field(None, description="CCCD")
-    dia_chi: Optional[str] = Field(None, description="Địa chỉ")
-    sdt: Optional[str] = Field(None, description="Số điện thoại")
-    email: Optional[EmailStr] = Field(None, description="Email")
+    gioi_tinh: str = Field("Nam", description="Giới tính: Nam, Nu, Khac")
+    cccd: Optional[str] = Field(None, description="Số CCCD/CMND")
+    dia_chi: Optional[str] = Field(None, description="Địa chỉ thường trú")
+    sdt: Optional[str] = Field(None, description="Số điện thoại liên lạc")
+    email: Optional[EmailStr] = Field(None, description="Email công việc")
     so_nguoi_pt: Optional[int] = Field(0, description="Số người phụ thuộc")
     ma_pb: str = Field(..., description="Mã phòng ban")
     ma_cv: str = Field(..., description="Mã chức vụ")
-    ma_cn: Optional[str] = Field(None, description="Mã chuyên ngành")
+    ma_cn: Optional[str] = Field(None, description="Mã chi nhánh")
     ma_ngl: Optional[str] = Field(None, description="Mã ngạch lương")
     ngay_vao_lam: date = Field(..., description="Ngày vào làm")
     ngay_nghi_viec: Optional[date] = Field(None, description="Ngày nghỉ việc")
-    trang_thai: str = Field('DANG_LAM', description="Trạng thái nhân viên")
-    hinh_thuc_lam_viec: Optional[str] = Field('FULL_TIME', description="Hình thức làm việc: FULL_TIME hoặc PART_TIME")
+    trang_thai: str = Field("DANG_LAM", description="Trạng thái: DANG_LAM, NGHI_PHEP, DA_NGHI_VIEC")
+    hinh_thuc_lam_viec: Optional[str] = Field("FULL_TIME", description="Hình thức: FULL_TIME hoặc PART_TIME")
     so_tai_khoan: Optional[str] = Field(None, description="Số tài khoản ngân hàng")
-    ngan_hang: Optional[str] = Field(None, description="Ngân hàng")
-    ma_so_thue: Optional[str] = Field(None, description="Mã số thuế")
-    so_bhxh: Optional[str] = Field(None, description="Số BHXH")
-    ngay_tao: datetime = Field(None, description="Ngày tạo")    
-    ngay_cap_nhat: datetime = Field(None, description="Ngày cập nhật")
-    
+    ngan_hang: Optional[str] = Field(None, description="Tên ngân hàng")
+    ma_so_thue: Optional[str] = Field(None, description="Mã số thuế cá nhân")
+    so_bhxh: Optional[str] = Field(None, description="Số sổ BHXH")
+    ngay_tao: Optional[datetime] = Field(None, description="Ngày tạo bản ghi")
+    ngay_cap_nhat: Optional[datetime] = Field(None, description="Ngày cập nhật gần nhất")
+
+    class Config:
+        from_attributes = True
+
+
 class employee_profile_create(employee_profile):
-    ma_nv: str = Field(None, description="Tự động sinh")
-    ho_ten: str = Field(..., description="Họ tên nhân viên")
-    ngay_sinh: date = Field(..., description="Ngày sinh")
-    gioi_tinh: str = Field(..., description="Giới tính")
-    cccd: Optional[str] = Field(None, description="CCCD")
-    dia_chi: Optional[str] = Field(None, description="Địa chỉ")
-    sdt: Optional[str] = Field(None, description="Số điện thoại")
-    email: Optional[EmailStr] = Field(None, description="Email")
-    so_nguoi_pt: Optional[int] = Field(0, description="Số người phụ thuộc")
-    ma_pb: str = Field(..., description="Mã phòng ban")
-    ma_cv: str = Field(..., description="Mã chức vụ")
-    ma_cn: Optional[str] = Field(None, description="Mã chuyên ngành")
-    ma_ngl: Optional[str] = Field(None, description="Mã ngạch lương")
-    ngay_vao_lam: date = Field(..., description="Ngày vào làm")
-    ngay_nghi_viec: Optional[date] = Field(None, description="Ngày nghỉ việc")
-    trang_thai: str = Field('DANG_LAM', description="Trạng thái nhân viên")
-    so_tai_khoan: Optional[str] = Field(None, description="Số tài khoản ngân hàng")
-    ngan_hang: Optional[str] = Field(None, description="Ngân hàng")
-    ma_so_thue: Optional[str] = Field(None, description="Mã số thuế")
-    so_bhxh: Optional[str] = Field(None, description="Số BHXH")
-    ngay_tao: datetime = Field(None, description="Ngày tạo")
-    ngay_cap_nhat: datetime = Field(None, description="Ngày cập nhật")
+    """Schema tạo mới nhân viên (mã nhân viên được sinh tự động bởi hệ thống)."""
+    ma_nv: Optional[str] = Field(None, description="Tự động sinh (bỏ trống khi tạo)")
 
-class employee_profile_create_response(employee_profile):
-    class Config:
-        orm_mode = True
 
-class employee_profile_update(employee_profile):
-    ho_ten: str = Field(..., description="Họ tên nhân viên")
-    ngay_sinh: date = Field(..., description="Ngày sinh")
-    gioi_tinh: str = Field(..., description="Giới tính")
-    cccd: Optional[str] = Field(None, description="CCCD")
-    dia_chi: Optional[str] = Field(None, description="Địa chỉ")
-    sdt: Optional[str] = Field(None, description="Số điện thoại")
-    email: Optional[EmailStr] = Field(None, description="Email")
-    so_nguoi_pt: Optional[int] = Field(0, description="Số người phụ thuộc")
-    ma_pb: str = Field(..., description="Mã phòng ban")
-    ma_cv: str = Field(..., description="Mã chức vụ")
-    ma_cn: Optional[str] = Field(None, description="Mã chuyên ngành")
-    ma_ngl: Optional[str] = Field(None, description="Mã ngạch lương")
-    ngay_vao_lam: date = Field(..., description="Ngày vào làm")
-    ngay_nghi_viec: Optional[date] = Field(None, description="Ngày nghỉ việc")
-    trang_thai: str = Field('DANG_LAM', description="Trạng thái nhân viên")
-    so_tai_khoan: Optional[str] = Field(None, description="Số tài khoản ngân hàng")
-    ngan_hang: Optional[str] = Field(None, description="Ngân hàng")
-    ma_so_thue: Optional[str] = Field(None, description="Mã số thuế")
-    so_bhxh: Optional[str] = Field(None, description="Số BHXH")
-    ngay_cap_nhat: datetime = Field(None, description="Ngày cập nhật")
-    
-class employee_profile_update_response(employee_profile):
-    class Config:
-        orm_mode = True
-    
 class employee_profile_response(employee_profile):
-    class Config:
-        orm_mode = True
-        
+    """Schema trả về thông tin cơ bản nhân viên."""
+    pass
+
+
 class employee_list_response(BaseModel):
+    """Schema danh sách nhân viên phân trang."""
     total: int = Field(..., description="Tổng số nhân viên")
-    items: List[employee_profile_response] = Field(..., description="Danh sách nhân viên")
+    items: list[employee_profile_response] = Field(..., description="Danh sách nhân viên")
+
 
 class employee_detail_response(BaseModel):
+    """Schema chi tiết hồ sơ cá nhân đầy đủ (kèm thông tin phòng ban, chức vụ, hợp đồng)."""
     ma_nv: str = Field(..., description="Mã nhân viên")
     ho_ten: str = Field(..., description="Họ và tên")
     ngay_sinh: Optional[date] = None
@@ -122,11 +82,14 @@ class employee_detail_response(BaseModel):
     class Config:
         from_attributes = True
 
+
 class employee_contact_update(BaseModel):
+    """Schema cho nhân viên tự cập nhật thông tin cá nhân & liên hệ."""
     ngay_sinh: Optional[date] = Field(None, description="Ngày sinh")
-    gioi_tinh: Optional[str] = Field(None, description="Giới tính (Nam, Nu, Khac)")
+    gioi_tinh: Optional[str] = Field(None, description="Giới tính: Nam, Nu, Khac")
     sdt: Optional[str] = Field(None, description="Số điện thoại")
     email: Optional[EmailStr] = Field(None, description="Email")
     dia_chi: Optional[str] = Field(None, description="Địa chỉ")
     so_tai_khoan: Optional[str] = Field(None, description="Số tài khoản ngân hàng")
     ngan_hang: Optional[str] = Field(None, description="Tên ngân hàng")
+    hinh_thuc_lam_viec: Optional[str] = Field(None, description="Hình thức: FULL_TIME hoặc PART_TIME")
