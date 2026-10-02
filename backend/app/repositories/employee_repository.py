@@ -62,11 +62,27 @@ def get_employee_list(
 
     query = """
         SELECT nv.ma_nv, nv.ho_ten, nv.ngay_sinh, nv.gioi_tinh, nv.cccd, nv.dia_chi, nv.sdt, nv.email,
-               nv.so_nguoi_pt, nv.ma_pb, pb.ten_pb, nv.ma_cv, cv.ten_cv, nv.ma_cn, nv.ngay_vao_lam, nv.ngay_nghi_viec,
-               nv.trang_thai, 'FULL_TIME' AS hinh_thuc_lam_viec, nv.so_tai_khoan, nv.ngan_hang, nv.ma_so_thue, nv.so_bhxh
+               nv.so_nguoi_pt, nv.ma_pb, pb.ten_pb, nv.ma_cv, cv.ten_cv, nv.ma_cn, cn.ten_cn, nv.ngay_vao_lam, nv.ngay_nghi_viec,
+               nv.trang_thai, 'FULL_TIME' AS hinh_thuc_lam_viec, nv.so_tai_khoan, nv.ngan_hang, nv.ma_so_thue, nv.so_bhxh,
+               COALESCE(bl_latest.luong_net, bac.muc_luong, 15000000) AS muc_luong,
+               bc.trinh_do, bc.chuyen_nganh, bc.noi_dao_tao, bc.nam_tot_nghiep
         FROM nhan_vien nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+        LEFT JOIN chi_nhanh cn ON nv.ma_cn = cn.ma_cn
+        LEFT JOIN bac_luong bac ON nv.ma_bac = bac.ma_bac
+        LEFT JOIN (
+            SELECT ma_nv, MAX(luong_net) AS luong_net
+            FROM bang_luong
+            GROUP BY ma_nv
+        ) bl_latest ON nv.ma_nv = bl_latest.ma_nv
+        LEFT JOIN (
+            SELECT bc1.*
+            FROM bang_cap bc1
+            INNER JOIN (
+                SELECT ma_nv, MIN(ma_bc) as min_bc FROM bang_cap GROUP BY ma_nv
+            ) bc2 ON bc1.ma_bc = bc2.min_bc
+        ) bc ON nv.ma_nv = bc.ma_nv
         ORDER BY nv.ma_nv ASC
         LIMIT :limit OFFSET :offset
     """
