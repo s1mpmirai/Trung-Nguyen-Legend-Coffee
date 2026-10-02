@@ -1,29 +1,32 @@
 import React from "react";
-import { Users, CheckCircle2, Umbrella, UserMinus, TrendingUp } from "lucide-react";
+import { Users, CheckCircle2, ClockAlert, CreditCard, ArrowUpRight } from "lucide-react";
 
-export default function StatMetricCards({ stats }) {
+export default function StatMetricCards({ stats, onNavigateTab }) {
   const data = stats || {
-    totalEmployees: 1280,
-    newThisMonth: 14,
-    targetEmployees: 1350,
-    targetRate: 94.8,
-    activeToday: 1215,
-    activeRate: 94.9,
-    onTimeRate: 98.2,
-    leavesTotal: 42,
-    annualLeaves: 38,
-    sickLeaves: 4,
-    turnoverCount: 23,
-    turnoverRate: 1.8,
-    turnoverStatus: "Tốt",
+    totalEmployees: 19,
+    activeStatus: "19 Đang làm • 1 Đã nghỉ",
+    fullTimeCount: 19,
+    partTimeCount: 0,
+    attendanceRate: "95.0",
+    activeToday: 18,
+    onTimeToday: 16,
+    lateToday: 2,
+    notCheckedIn: 1,
+    pendingLeavesCount: 2,
+    pendingProfileCount: 2,
+    totalPendingCount: 4,
+    monthlyPayroll: "428.500.000 đ",
+    payrollStatus: "Đã duyệt bảng lương",
   };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* Card 1: Tổng nhân sự */}
+      {/* 1. QUÂN SỐ NHÂN SỰ */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow flex flex-col justify-between">
         <div className="flex items-center justify-between text-slate-500 mb-2">
-          <span className="text-xs font-medium">Tổng nhân sự</span>
+          <span className="text-xs font-bold tracking-wider text-slate-700 uppercase">
+            QUÂN SỐ NHÂN SỰ
+          </span>
           <span className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
             <Users className="w-4 h-4" />
           </span>
@@ -31,24 +34,23 @@ export default function StatMetricCards({ stats }) {
         <div>
           <div className="flex items-baseline gap-2 mb-2">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight">
-              {data.totalEmployees?.toLocaleString("vi-VN") || "1,280"}
+              {data.totalEmployees || 19}
             </span>
-            <span className="text-xs font-semibold text-emerald-600 flex items-center gap-0.5">
-              <TrendingUp className="w-3 h-3" />
-              +{data.newThisMonth || 14} tháng này
-            </span>
+            <span className="text-xs font-medium text-slate-500">nhân viên đang làm</span>
           </div>
-          <div className="flex justify-between items-center text-[11px] text-slate-400 pt-2 border-t border-slate-100">
-            <span>Chỉ tiêu: {data.targetEmployees || 1350} NV</span>
-            <span className="font-medium text-slate-600">Đạt {data.targetRate || 94.8}%</span>
+          <div className="flex justify-between items-center text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+            <span>{data.fullTimeCount || 19} Toàn thời gian</span>
+            <span className="font-semibold text-emerald-600">100% có HĐLĐ</span>
           </div>
         </div>
       </div>
 
-      {/* Card 2: Đi làm hôm nay */}
+      {/* 2. ĐIỂM DANH HÔM NAY */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow flex flex-col justify-between">
         <div className="flex items-center justify-between text-slate-500 mb-2">
-          <span className="text-xs font-medium">Tỷ lệ đi làm hôm nay</span>
+          <span className="text-xs font-bold tracking-wider text-slate-700 uppercase">
+            ĐIỂM DANH HÔM NAY
+          </span>
           <span className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
             <CheckCircle2 className="w-4 h-4" />
           </span>
@@ -56,57 +58,73 @@ export default function StatMetricCards({ stats }) {
         <div>
           <div className="flex items-baseline gap-2 mb-2">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-emerald-600 tracking-tight">
-              {data.activeRate || 94.9}%
+              {data.attendanceRate || "95.0"}%
             </span>
-            <span className="text-xs text-slate-500 font-medium">{data.activeToday?.toLocaleString("vi-VN") || "1,215"} người</span>
-          </div>
-          <div className="flex justify-between items-center text-[11px] text-slate-400 pt-2 border-t border-slate-100">
-            <span>Điểm danh đúng giờ</span>
-            <span className="font-medium text-emerald-600">{data.onTimeRate || 98.2}%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Card 3: Nghỉ phép / Vắng mặt */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow flex flex-col justify-between">
-        <div className="flex items-center justify-between text-slate-500 mb-2">
-          <span className="text-xs font-medium">Nghỉ phép & Vắng mặt</span>
-          <span className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Umbrella className="w-4 h-4" />
-          </span>
-        </div>
-        <div>
-          <div className="flex items-baseline gap-2 mb-2">
-            <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight">
-              {data.leavesTotal || 42}
+            <span className="text-xs text-slate-500 font-medium">
+              {data.activeToday || 18} người có mặt
             </span>
-            <span className="text-xs text-slate-500 font-medium">trường hợp</span>
           </div>
           <div className="flex justify-between items-center text-[11px] text-slate-500 pt-2 border-t border-slate-100">
-            <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 font-medium">{data.annualLeaves || 38} Phép năm</span>
-            <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium">{data.sickLeaves || 4} Nghỉ ốm</span>
+            <span className="text-emerald-700 font-medium">{data.onTimeToday || 16} đúng giờ</span>
+            <span className="text-amber-700 font-medium">{data.lateToday || 2} đi trễ</span>
+            <span className="text-slate-400">{data.notCheckedIn || 1} vắng</span>
           </div>
         </div>
       </div>
 
-      {/* Card 4: Tỷ lệ thôi việc */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow flex flex-col justify-between">
+      {/* 3. VIỆC CẦN DUYỆT GẤP */}
+      <div
+        onClick={() => onNavigateTab && onNavigateTab("leaves")}
+        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-amber-300 transition-all flex flex-col justify-between cursor-pointer group"
+      >
         <div className="flex items-center justify-between text-slate-500 mb-2">
-          <span className="text-xs font-medium">Tỷ lệ thôi việc tháng</span>
-          <span className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-            <UserMinus className="w-4 h-4" />
+          <span className="text-xs font-bold tracking-wider text-slate-700 uppercase group-hover:text-amber-700 transition-colors">
+            VIỆC CẦN DUYỆT GẤP
+          </span>
+          <span className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+            <ClockAlert className="w-4 h-4" />
           </span>
         </div>
         <div>
-          <div className="flex items-baseline gap-2 mb-2">
-            <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight">
-              {data.turnoverRate || 1.8}%
-            </span>
-            <span className="text-xs text-slate-500 font-medium">{data.turnoverCount || 23} nhân sự</span>
+          <div className="flex items-baseline justify-between mb-2">
+            <div className="flex items-baseline gap-2">
+              <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-amber-600 tracking-tight">
+                {data.totalPendingCount || 4}
+              </span>
+              <span className="text-xs text-slate-500 font-medium">yêu cầu chờ xử lý</span>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
           </div>
-          <div className="flex justify-between items-center text-[11px] text-slate-400 pt-2 border-t border-slate-100">
-            <span>Ngưỡng an toàn (&lt; 2.5%)</span>
-            <span className="font-medium text-emerald-600">{data.turnoverStatus || "Tốt"}</span>
+          <div className="flex justify-between items-center text-[11px] pt-2 border-t border-slate-100">
+            <span className="text-sky-700 font-medium">{data.pendingLeavesCount || 2} Đơn nghỉ phép</span>
+            <span className="text-emerald-700 font-medium">{data.pendingProfileCount || 2} Sửa hồ sơ</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. QUỸ LƯƠNG THÁNG */}
+      <div
+        onClick={() => onNavigateTab && onNavigateTab("payroll")}
+        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-sky-300 transition-all flex flex-col justify-between cursor-pointer group"
+      >
+        <div className="flex items-center justify-between text-slate-500 mb-2">
+          <span className="text-xs font-bold tracking-wider text-slate-700 uppercase group-hover:text-sky-700 transition-colors">
+            QUỸ LƯƠNG THÁNG
+          </span>
+          <span className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center group-hover:bg-sky-100 transition-colors">
+            <CreditCard className="w-4 h-4" />
+          </span>
+        </div>
+        <div>
+          <div className="flex items-baseline justify-between mb-2">
+            <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-xl text-slate-900 tracking-tight truncate max-w-[200px]">
+              {data.monthlyPayroll || "428.500.000 đ"}
+            </span>
+            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-sky-600 transition-colors" />
+          </div>
+          <div className="flex justify-between items-center text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+            <span>Kỳ lương Tháng 10/2026</span>
+            <span className="font-medium text-emerald-600">Đã chốt lương Net</span>
           </div>
         </div>
       </div>
