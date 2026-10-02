@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+
 def get_by_cccd(db: Session, cccd: str) -> dict | None:
     row = db.execute(
         text("SELECT ma_nv, cccd FROM nhan_vien WHERE cccd = :cccd LIMIT 1"),

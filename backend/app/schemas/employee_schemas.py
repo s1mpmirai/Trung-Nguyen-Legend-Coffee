@@ -1,7 +1,9 @@
+from datetime import date, datetime
+from typing import List, Optional
+
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, List
-from datetime import datetime, date
-    
+
+
 class employee_profile(BaseModel):
     ma_nv: str = Field(..., description="Mã nhân viên")
     ho_ten: str = Field(..., description="Họ tên nhân viên")
@@ -127,4 +129,4 @@ class employee_contact_update(BaseModel):
     email: Optional[EmailStr] = Field(None, description="Email")
     dia_chi: Optional[str] = Field(None, description="Địa chỉ")
     so_tai_khoan: Optional[str] = Field(None, description="Số tài khoản ngân hàng")
-    ngan_hang: Optional[str] = Field(None, description="Tên ngân hàng")
+    ngan_hang: Optional[str] = Field(None, description="Tên ngân hàng")
