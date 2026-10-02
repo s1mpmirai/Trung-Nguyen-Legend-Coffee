@@ -125,16 +125,12 @@ export function mapBackendToProfile(data) {
     ? (typeof data.ngay_sinh === "string" ? data.ngay_sinh.split("T")[0] : data.ngay_sinh)
     : "";
 
-  // Phân biệt Full-time / Part-time
-  const isPartTime =
-    data.hinh_thuc_lam_viec === "PART_TIME" ||
-    data.loai_hd === "THOI_VU" ||
-    !data.loai_hd;
+  // Phân biệt Full-time / Part-time chuẩn hóa theo Database
+  const isPartTime = data.hinh_thuc_lam_viec === "PART_TIME";
 
   const workingType = isPartTime ? "PART_TIME" : "FULL_TIME";
   const workingTypeLabel = isPartTime ? "Bán thời gian (Part-time)" : "Toàn thời gian (Full-time)";
 
-  // Nếu là thời vụ hoặc chưa có HĐ chính thức, hiển thị "Nhân viên thời vụ"
   const defaultStatus = isPartTime ? "Nhân viên thời vụ" : "Nhân viên chính thức";
   const displayStatus = statusMap[data.trang_thai] || defaultStatus;
 

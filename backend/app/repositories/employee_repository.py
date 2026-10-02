@@ -24,17 +24,19 @@ def get_latest_employee_code(db: Session) -> str | None:
 
 
 def create(db: Session, employee: dict) -> dict:
+    if "hinh_thuc_lam_viec" not in employee or not employee["hinh_thuc_lam_viec"]:
+        employee["hinh_thuc_lam_viec"] = "FULL_TIME"
     db.execute(
         text(
             """
             INSERT INTO nhan_vien (
                 ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
                 so_nguoi_pt, ma_pb, ma_cv, ma_cn, ngay_vao_lam, ngay_nghi_viec,
-                trang_thai, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
+                trang_thai, hinh_thuc_lam_viec, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
             ) VALUES (
                 :ma_nv, :ho_ten, :ngay_sinh, :gioi_tinh, :cccd, :dia_chi, :sdt, :email,
                 :so_nguoi_pt, :ma_pb, :ma_cv, :ma_cn, :ngay_vao_lam, :ngay_nghi_viec,
-                :trang_thai, :so_tai_khoan, :ngan_hang, :ma_so_thue, :so_bhxh
+                :trang_thai, :hinh_thuc_lam_viec, :so_tai_khoan, :ngan_hang, :ma_so_thue, :so_bhxh
             )
             """
         ),
@@ -54,7 +56,7 @@ def get_employee_list(
     query = """
         SELECT ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
                so_nguoi_pt, ma_pb, ma_cv, ma_cn, ngay_vao_lam, ngay_nghi_viec,
-               trang_thai, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
+               trang_thai, hinh_thuc_lam_viec, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
         FROM nhan_vien
         ORDER BY ma_nv ASC
         LIMIT :limit OFFSET :offset
@@ -92,6 +94,7 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
             nv.ngay_vao_lam,
             nv.ngay_nghi_viec,
             nv.trang_thai,
+            nv.hinh_thuc_lam_viec,
             nv.so_tai_khoan,
             nv.ngan_hang,
             nv.ma_so_thue,
@@ -99,11 +102,7 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
             hd.ma_hd,
             hd.loai_hd,
             hd.trang_thai AS trang_thai_hd,
-            CASE 
-                WHEN hd.loai_hd = 'THOI_VU' THEN 'PART_TIME'
-                WHEN hd.loai_hd IS NOT NULL THEN 'FULL_TIME'
-                ELSE 'PART_TIME'
-            END AS hinh_thuc_lam_viec,
+            COALESCE(nv.hinh_thuc_lam_viec, 'FULL_TIME') AS hinh_thuc_lam_viec,
             tk.lan_dn_cuoi,
             tk.ngay_cap_nhat AS ngay_cap_nhat_tk
         FROM nhan_vien nv
@@ -124,7 +123,7 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
 
 def update_contact(db: Session, ma_nv: str, data: dict) -> dict | None:
     # Cho phép nhân viên cập nhật thông tin cá nhân & liên hệ
-    allowed_fields = {"sdt", "email", "dia_chi", "so_tai_khoan", "ngan_hang", "ngay_sinh", "gioi_tinh"}
+    allowed_fields = {"sdt", "email", "dia_chi", "so_tai_khoan", "ngan_hang", "ngay_sinh", "gioi_tinh", "hinh_thuc_lam_viec"}
     update_data = {k: v for k, v in data.items() if k in allowed_fields and v is not None}
     
     # Chuẩn hóa giới tính theo enum ENUM('Nam', 'Nu', 'Khac')

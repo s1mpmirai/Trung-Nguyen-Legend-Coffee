@@ -19,6 +19,7 @@ class employee_profile(BaseModel):
     ngay_vao_lam: date = Field(..., description="Ngày vào làm")
     ngay_nghi_viec: Optional[date] = Field(None, description="Ngày nghỉ việc")
     trang_thai: str = Field('DANG_LAM', description="Trạng thái nhân viên")
+    hinh_thuc_lam_viec: Optional[str] = Field('FULL_TIME', description="Hình thức làm việc: FULL_TIME hoặc PART_TIME")
     so_tai_khoan: Optional[str] = Field(None, description="Số tài khoản ngân hàng")
     ngan_hang: Optional[str] = Field(None, description="Ngân hàng")
     ma_so_thue: Optional[str] = Field(None, description="Mã số thuế")
@@ -112,7 +113,7 @@ class employee_detail_response(BaseModel):
     ma_hd: Optional[str] = None
     loai_hd: Optional[str] = None
     trang_thai_hd: Optional[str] = None
-    hinh_thuc_lam_viec: Optional[str] = "PART_TIME"
+    hinh_thuc_lam_viec: Optional[str] = "FULL_TIME"
     lan_dn_cuoi: Optional[datetime] = None
     ngay_cap_nhat_tk: Optional[datetime] = None
 

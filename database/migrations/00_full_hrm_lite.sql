@@ -88,6 +88,7 @@ CREATE TABLE nhan_vien (
     ngay_vao_lam DATE NOT NULL,
     ngay_nghi_viec DATE NULL,
     trang_thai ENUM('DANG_LAM', 'NGHI_PHEP', 'NGHI_THAI_SAN', 'TAM_HOAN_HD', 'DA_NGHI_VIEC') DEFAULT 'DANG_LAM',
+    hinh_thuc_lam_viec ENUM('FULL_TIME', 'PART_TIME') DEFAULT 'FULL_TIME' COMMENT 'Hình thức: Toàn thời gian / Bán thời gian',
     so_tai_khoan VARCHAR(30),
     ngan_hang VARCHAR(80),
     ma_so_thue VARCHAR(20),
