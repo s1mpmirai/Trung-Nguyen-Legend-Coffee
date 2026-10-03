@@ -72,9 +72,30 @@ class AttendanceHistoryResponse(BaseModel):
 
 class AttendanceAdjustRequest(BaseModel):
     """Schema dành cho Quản lý điều chỉnh/chốt công thủ công."""
+    ma_ca: Optional[str] = Field(None, description="Mã ca làm việc (CA01, CA02, CA03, CA04)")
     gio_vao: Optional[str] = Field(None, description="Giờ vào ca định dạng HH:MM:SS hoặc HH:MM")
     gio_ra: Optional[str] = Field(None, description="Giờ ra ca định dạng HH:MM:SS hoặc HH:MM")
     loai_cong: Optional[str] = Field(None, description="CONG_DU, DI_TRE, VE_SOM, NUA_CONG, NGHI_PHEP...")
     so_cong: Optional[float] = Field(None, description="Hệ số công (1.0, 0.5, 0.0)")
+    so_gio_lam: Optional[float] = Field(None, description="Số giờ làm việc")
     so_gio_tang_ca: Optional[float] = Field(None, description="Số giờ làm thêm OT")
     ghi_chu: Optional[str] = Field(None, description="Lý do điều chỉnh của quản lý")
+
+
+class AttendanceLockRequest(BaseModel):
+    """Yêu cầu Chốt hoặc Mở khóa bảng chấm công tháng."""
+    thang: int = Field(..., ge=1, le=12, description="Tháng cần chốt công")
+    nam: int = Field(..., ge=2000, description="Năm")
+    khoa: bool = Field(True, description="True = Khóa/Chốt, False = Mở khóa")
+    ghi_chu: Optional[str] = Field(None, description="Ghi chú khi chốt công")
+
+
+class AttendanceLockStatusResponse(BaseModel):
+    """Trạng thái Chốt/Khóa bảng công tháng."""
+    thang: int
+    nam: int
+    is_locked: bool
+    nguoi_chot: Optional[str] = None
+    ngay_chot: Optional[str] = None
+    ghi_chu: Optional[str] = None
+

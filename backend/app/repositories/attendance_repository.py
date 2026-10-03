@@ -41,7 +41,8 @@ def get_recent_attendance_records(
         SELECT 
             bcc.ma_cc, bcc.ngay_cong, bcc.gio_vao, bcc.gio_ra, 
             bcc.so_gio_lam, bcc.so_gio_tang_ca, bcc.loai_cong, bcc.ghi_chu,
-            COALESCE(ca.ten_ca, 'Hành chính') as ca_lam_viec
+            COALESCE(ca.ten_ca, 'Hành chính') as ca_lam_viec,
+            ca.gio_vao as ca_gio_vao, ca.gio_ra as ca_gio_ra
         FROM bang_cham_cong bcc
         LEFT JOIN ca_lam_viec ca ON bcc.ma_ca = ca.ma_ca
         WHERE bcc.ma_nv = :ma_nv
@@ -129,6 +130,7 @@ def record_check_in(
     ma_nv: str,
     today: date,
     gio_vao: str,
+    ma_ca: str = "CA01",
     loai_cong: str = "CONG_DU",
     so_cong: float = 1.0,
     so_gio_lam: float = 8.0,
@@ -152,11 +154,12 @@ def record_check_in(
     if existing:
         update_sql = text("""
             UPDATE bang_cham_cong 
-            SET gio_vao = :gio_vao, loai_cong = :loai_cong, 
+            SET ma_ca = :ma_ca, gio_vao = :gio_vao, loai_cong = :loai_cong, 
                 so_cong = :so_cong, so_gio_lam = :so_gio_lam, ghi_chu = :ghi_chu
             WHERE ma_cc = :ma_cc
         """)
         db.execute(update_sql, {
+            "ma_ca": ma_ca,
             "gio_vao": gio_vao,
             "loai_cong": loai_cong,
             "so_cong": so_cong,
@@ -168,11 +171,12 @@ def record_check_in(
     else:
         insert_sql = text("""
             INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_vao, loai_cong, so_cong, so_gio_lam, ghi_chu)
-            VALUES (:ma_nv, :ngay_cong, 'CA01', :gio_vao, :loai_cong, :so_cong, :so_gio_lam, :ghi_chu)
+            VALUES (:ma_nv, :ngay_cong, :ma_ca, :gio_vao, :loai_cong, :so_cong, :so_gio_lam, :ghi_chu)
         """)
         res = db.execute(insert_sql, {
             "ma_nv": ma_nv,
             "ngay_cong": today,
+            "ma_ca": ma_ca,
             "gio_vao": gio_vao,
             "loai_cong": loai_cong,
             "so_cong": so_cong,
@@ -193,9 +197,18 @@ def record_check_in(
 
 
 def record_check_out(
-    db: Session, ma_nv: str, today: date, gio_ra: str, so_gio_lam: Optional[float] = None
+    db: Session,
+    ma_nv: str,
+    today: date,
+    gio_ra: str,
+    so_gio_lam: Optional[float] = None,
+    so_gio_tang_ca: Optional[float] = None,
+    ma_ca: Optional[str] = None,
+    so_cong: Optional[float] = None,
+    loai_cong: Optional[str] = None,
+    ghi_chu: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Thực hiện lưu hoặc cập nhật lượt check-out hôm nay."""
+    """Thực hiện lưu hoặc cập nhật lượt check-out hôm nay với các trường tự động đối soát."""
     existing = get_today_attendance(db, ma_nv, today)
 
     if existing:
@@ -204,27 +217,67 @@ def record_check_out(
         if current_gio_lam == 7.0 and target_gio_lam > 7.0:
             target_gio_lam = 7.0
 
-        update_sql = text("""
+        set_clauses = ["gio_ra = :gio_ra", "so_gio_lam = :so_gio_lam"]
+        params: dict[str, Any] = {
+            "gio_ra": gio_ra,
+            "so_gio_lam": target_gio_lam,
+            "ma_cc": existing["ma_cc"],
+        }
+
+        if so_gio_tang_ca is not None:
+            set_clauses.append("so_gio_tang_ca = :so_gio_tang_ca")
+            params["so_gio_tang_ca"] = so_gio_tang_ca
+
+        if ma_ca is not None:
+            set_clauses.append("ma_ca = :ma_ca")
+            params["ma_ca"] = ma_ca
+
+        if so_cong is not None:
+            set_clauses.append("so_cong = :so_cong")
+            params["so_cong"] = so_cong
+
+        if loai_cong is not None:
+            set_clauses.append("loai_cong = :loai_cong")
+            params["loai_cong"] = loai_cong
+
+        if ghi_chu is not None:
+            set_clauses.append("ghi_chu = :ghi_chu")
+            params["ghi_chu"] = ghi_chu
+
+        update_sql = text(f"""
             UPDATE bang_cham_cong 
-            SET gio_ra = :gio_ra, so_gio_lam = :so_gio_lam
+            SET {', '.join(set_clauses)}
             WHERE ma_cc = :ma_cc
         """)
-        db.execute(update_sql, {"gio_ra": gio_ra, "so_gio_lam": target_gio_lam, "ma_cc": existing["ma_cc"]})
+        db.execute(update_sql, params)
         ma_cc = existing["ma_cc"]
     else:
         target_gio_lam = so_gio_lam if so_gio_lam is not None else 8.0
+        target_ot = so_gio_tang_ca if so_gio_tang_ca is not None else 0.0
+        target_ca = ma_ca or "CA01"
+        target_cong = so_cong if so_cong is not None else 1.0
+        target_loai = loai_cong or "CONG_DU"
+        target_ghi_chu = ghi_chu or ""
+
         insert_sql = text("""
-            INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_ra, loai_cong, so_cong, so_gio_lam)
-            VALUES (:ma_nv, :ngay_cong, 'CA01', :gio_ra, 'CONG_DU', 1.0, :so_gio_lam)
+            INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_ra, loai_cong, so_cong, so_gio_lam, so_gio_tang_ca, ghi_chu)
+            VALUES (:ma_nv, :ngay_cong, :ma_ca, :gio_ra, :loai_cong, :so_cong, :so_gio_lam, :so_gio_tang_ca, :ghi_chu)
         """)
         res = db.execute(
             insert_sql,
-            {"ma_nv": ma_nv, "ngay_cong": today, "gio_ra": gio_ra, "so_gio_lam": target_gio_lam}
+            {
+                "ma_nv": ma_nv,
+                "ngay_cong": today,
+                "ma_ca": target_ca,
+                "gio_ra": gio_ra,
+                "loai_cong": target_loai,
+                "so_cong": target_cong,
+                "so_gio_lam": target_gio_lam,
+                "so_gio_tang_ca": target_ot,
+                "ghi_chu": target_ghi_chu,
+            }
         )
         ma_cc = res.lastrowid
-
-    db.commit()
-    return {"ma_cc": ma_cc, "gio_ra": gio_ra}
 
     db.commit()
     return {"ma_cc": ma_cc, "gio_ra": gio_ra}
@@ -281,7 +334,11 @@ def get_daily_attendance_all(
             nv.ma_nv, nv.ho_ten, pb.ten_pb, cv.ten_cv,
             bcc.ma_cc, bcc.ngay_cong, bcc.gio_vao, bcc.gio_ra,
             bcc.so_gio_lam, bcc.so_gio_tang_ca, bcc.loai_cong, bcc.so_cong, bcc.ghi_chu,
-            ca.ten_ca
+            COALESCE(bcc.ma_ca, ca.ma_ca, 'CA01') as ma_ca,
+            COALESCE(ca.ten_ca, 'Hành chính') as ten_ca,
+            ca.gio_vao as ca_gio_vao,
+            ca.gio_ra as ca_gio_ra,
+            ca.he_so as ca_he_so
         FROM nhan_vien nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
@@ -292,6 +349,7 @@ def get_daily_attendance_all(
     """)
     rows = db.execute(query, params).fetchall()
     return [dict(r._mapping) for r in rows]
+
 
 
 def get_monthly_attendance_summary(
@@ -411,3 +469,116 @@ def log_attendance_adjustment(
         "gio_ra_moi": gio_ra_moi,
         "ly_do": ly_do,
     })
+
+
+def get_all_shifts(db: Session) -> list[dict[str, Any]]:
+    """Lấy danh sách tất cả các ca làm việc."""
+    query = text("""
+        SELECT ma_ca, ten_ca, gio_vao, gio_ra, so_gio_chuan, he_so
+        FROM ca_lam_viec
+        ORDER BY gio_vao ASC
+    """)
+    rows = db.execute(query).fetchall()
+    results = []
+    for r in rows:
+        d = dict(r._mapping)
+        d["gio_vao"] = str(d.get("gio_vao"))[:5] if d.get("gio_vao") else "--:--"
+        d["gio_ra"] = str(d.get("gio_ra"))[:5] if d.get("gio_ra") else "--:--"
+        d["so_gio_chuan"] = float(d.get("so_gio_chuan") or 8.0)
+        d["he_so"] = float(d.get("he_so") or 1.0)
+        results.append(d)
+    return results
+
+
+def get_shift_by_code(db: Session, ma_ca: str) -> Optional[dict[str, Any]]:
+    """Lấy thông tin một ca làm việc theo mã ca."""
+    query = text("""
+        SELECT ma_ca, ten_ca, gio_vao, gio_ra, so_gio_chuan, he_so
+        FROM ca_lam_viec
+        WHERE ma_ca = :ma_ca
+        LIMIT 1
+    """)
+    row = db.execute(query, {"ma_ca": ma_ca}).fetchone()
+    if not row:
+        return None
+    d = dict(row._mapping)
+    d["gio_vao_str"] = str(d.get("gio_vao"))[:8] if d.get("gio_vao") else "08:00:00"
+    d["gio_ra_str"] = str(d.get("gio_ra"))[:8] if d.get("gio_ra") else "17:00:00"
+    d["so_gio_chuan"] = float(d.get("so_gio_chuan") or 8.0)
+    d["he_so"] = float(d.get("he_so") or 1.0)
+    return d
+
+
+def ensure_attendance_lock_table(db: Session):
+    """Tạo bảng chốt công tháng nếu chưa tồn tại."""
+    create_sql = text("""
+        CREATE TABLE IF NOT EXISTS chot_cong_thang (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            thang TINYINT NOT NULL,
+            nam SMALLINT NOT NULL,
+            trang_thai VARCHAR(20) DEFAULT 'DA_CHOT',
+            nguoi_chot VARCHAR(50) NULL,
+            ngay_chot DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ghi_chu VARCHAR(255) NULL,
+            UNIQUE (thang, nam)
+        ) ENGINE=InnoDB;
+    """)
+    db.execute(create_sql)
+    db.commit()
+
+
+def get_monthly_attendance_lock(db: Session, thang: int, nam: int) -> dict[str, Any]:
+    """Kiểm tra trạng thái Chốt/Khóa bảng công tháng."""
+    ensure_attendance_lock_table(db)
+    query = text("""
+        SELECT thang, nam, trang_thai, nguoi_chot, ngay_chot, ghi_chu
+        FROM chot_cong_thang
+        WHERE thang = :thang AND nam = :nam
+    """)
+    row = db.execute(query, {"thang": thang, "nam": nam}).fetchone()
+    if row:
+        m = dict(row._mapping)
+        is_locked = bool(m.get("trang_thai") == "DA_CHOT")
+        return {
+            "thang": thang,
+            "nam": nam,
+            "is_locked": is_locked,
+            "nguoi_chot": m.get("nguoi_chot") or "Quản lý nhân sự",
+            "ngay_chot": str(m.get("ngay_chot")) if m.get("ngay_chot") else "",
+            "ghi_chu": m.get("ghi_chu") or "",
+        }
+    return {
+        "thang": thang,
+        "nam": nam,
+        "is_locked": False,
+        "nguoi_chot": None,
+        "ngay_chot": None,
+        "ghi_chu": None,
+    }
+
+
+def set_monthly_attendance_lock(
+    db: Session, thang: int, nam: int, is_locked: bool, nguoi_chot: str = "Quản lý", ghi_chu: str = ""
+) -> dict[str, Any]:
+    """Khóa hoặc Mở khóa bảng công tháng."""
+    ensure_attendance_lock_table(db)
+    trang_thai = "DA_CHOT" if is_locked else "CHO_CHOT"
+    upsert_sql = text("""
+        INSERT INTO chot_cong_thang (thang, nam, trang_thai, nguoi_chot, ngay_chot, ghi_chu)
+        VALUES (:thang, :nam, :trang_thai, :nguoi_chot, NOW(), :ghi_chu)
+        ON DUPLICATE KEY UPDATE
+            trang_thai = VALUES(trang_thai),
+            nguoi_chot = VALUES(nguoi_chot),
+            ngay_chot = NOW(),
+            ghi_chu = VALUES(ghi_chu)
+    """)
+    db.execute(upsert_sql, {
+        "thang": thang,
+        "nam": nam,
+        "trang_thai": trang_thai,
+        "nguoi_chot": nguoi_chot,
+        "ghi_chu": ghi_chu or ("Đã chốt bảng công tháng" if is_locked else "Đã mở khóa bảng công tháng"),
+    })
+    db.commit()
+    return get_monthly_attendance_lock(db, thang, nam)
+

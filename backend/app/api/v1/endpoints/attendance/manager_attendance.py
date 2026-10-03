@@ -53,7 +53,7 @@ def adjust_attendance_endpoint(
     db: DbSession = None,
 ):
     """
-    Quản lý điều chỉnh giờ vào/ra, loại công (CONG_DU, DI_TRE, VE_SOM, NUA_CONG...),
+    Quản lý điều chỉnh giờ vào/ra, ca làm việc, loại công,
     số công và ghi chú khi nhân viên quên chấm công hoặc giải trình hợp lệ.
     """
     try:
@@ -62,3 +62,47 @@ def adjust_attendance_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)
         ) from err
+
+
+@router.get(
+    "/shifts",
+    summary="[Quản lý] Danh sách các ca làm việc",
+)
+def get_shifts_endpoint(
+    db: DbSession = None,
+):
+    """Lấy danh mục các ca làm việc trong hệ thống."""
+    return attendance_service.get_all_shifts(db)
+
+
+@router.get(
+    "/lock-status",
+    summary="[Quản lý] Kiểm tra trạng thái Chốt/Khóa bảng công tháng",
+)
+def get_attendance_lock_status_endpoint(
+    thang: int = Query(..., ge=1, le=12, description="Tháng"),
+    nam: int = Query(..., ge=2000, description="Năm"),
+    db: DbSession = None,
+):
+    """Xem tháng đó đã chốt công chưa."""
+    return attendance_service.get_monthly_attendance_lock_status(db, thang, nam)
+
+
+@router.post(
+    "/toggle-lock",
+    summary="[Quản lý] Chốt hoặc Mở khóa bảng công tháng",
+)
+def toggle_attendance_lock_endpoint(
+    data: dict[str, Any],
+    db: DbSession = None,
+):
+    """Quản lý thực hiện Chốt hoặc Mở khóa bảng công tháng."""
+    thang = int(data.get("thang") or 10)
+    nam = int(data.get("nam") or 2026)
+    khoa = bool(data.get("khoa", True))
+    ghi_chu = str(data.get("ghi_chu") or "")
+    nguoi_chot = str(data.get("nguoi_chot") or "Quản lý nhân sự")
+    return attendance_service.toggle_monthly_attendance_lock(
+        db=db, thang=thang, nam=nam, is_locked=khoa, nguoi_chot=nguoi_chot, ghi_chu=ghi_chu
+    )
+

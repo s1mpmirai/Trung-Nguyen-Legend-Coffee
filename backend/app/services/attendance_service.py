@@ -92,6 +92,16 @@ def get_attendance_dashboard(db: Session, ma_nv: str) -> dict[str, Any]:
         ghi_chu_val = r.get("ghi_chu") or ""
         is_penalized = bool(so_gio_lam_val == 7.0 or "trừ 1 tiếng" in ghi_chu_val)
 
+        ca_name = r.get("ca_lam_viec") or "Hành chính"
+        ca_gio_vao = format_time_str(r.get("ca_gio_vao"))
+        ca_gio_ra = format_time_str(r.get("ca_gio_ra"))
+        if ca_gio_vao != "--:--" and ca_gio_ra != "--:--" and ("(" not in ca_name):
+            ca_display = f"{ca_name} ({ca_gio_vao} - {ca_gio_ra})"
+        elif "(" in ca_name:
+            ca_display = ca_name
+        else:
+            ca_display = f"{ca_name} (08:00 - 17:00)"
+
         recent_records.append({
             "ma_cc": r["ma_cc"],
             "thu": thu_str,
@@ -103,7 +113,7 @@ def get_attendance_dashboard(db: Session, ma_nv: str) -> dict[str, Any]:
             "ngay_day_du": ngay_full,
             "gio_vao": format_time_str(r.get("gio_vao")),
             "gio_ra": format_time_str(r.get("gio_ra")),
-            "ca_lam_viec": r.get("ca_lam_viec") or "Hành chính (08:00 - 17:00)",
+            "ca_lam_viec": ca_display,
             "dia_diem_cham": branch_name,
             "dia_diem_chi_nhanh": branch_name,
             "hinh_thuc": "GPS",
@@ -111,7 +121,7 @@ def get_attendance_dashboard(db: Session, ma_nv: str) -> dict[str, Any]:
             "ghi_chu": ghi_chu_val,
             "loai_cong": loai,
             "so_gio_lam": so_gio_lam_val,
-            "so_cong": float(r.get("so_cong") or 1.0),
+            "so_cong": float(r["so_cong"]) if r.get("so_cong") is not None else 1.0,
             "is_penalized": is_penalized,
         })
 
@@ -159,9 +169,121 @@ def get_attendance_dashboard(db: Session, ma_nv: str) -> dict[str, Any]:
     }
 
 
+def parse_time_to_minutes(val: Any) -> int:
+    """Chuyển đổi time/timedelta/str sang số phút trong ngày (0 - 1439)."""
+    if val is None:
+        return 0
+    if isinstance(val, timedelta):
+        return int(val.total_seconds() // 60)
+    if hasattr(val, "hour") and hasattr(val, "minute"):
+        return val.hour * 60 + val.minute
+    s = str(val).strip()
+    parts = s.split(":")
+    if len(parts) >= 2:
+        try:
+            return int(parts[0]) * 60 + int(parts[1])
+        except ValueError:
+            return 0
+    return 0
+
+
+def is_office_staff(db: Session, ma_nv: str) -> bool:
+    """
+    Kiểm tra xem nhân viên có thuộc Khối Văn phòng (Hành chính) hay không.
+    - Khối Văn phòng: PB01 (Ban Giám đốc), PB02 (Nhân sự), PB03 (Kế toán), PB04 (Marketing), PB05 (Kinh doanh), PB06 (IT), PB08...
+    - Khối Cửa hàng / Sản xuất: PB07 (Xưởng Sản xuất), cửa hàng, quán cà phê...
+    """
+    try:
+        clean_id = ma_nv.strip().upper().replace("-", "")
+        emp = repo.get_employee_attendance_info(db, clean_id)
+        if not emp:
+            return True  # Mặc định là nhân viên văn phòng
+
+        ma_pb = (emp.get("ma_pb") or "").upper()
+        ten_pb = (emp.get("ten_pb") or "").lower()
+        ten_cn = (emp.get("ten_cn") or "").lower()
+
+        # Nếu thuộc xưởng sản xuất hoặc cửa hàng bán lẻ/quán -> Xoay ca
+        if "xưởng" in ten_pb or "sản xuất" in ten_pb or "cửa hàng" in ten_cn or "quán" in ten_cn:
+            return False
+
+        # Các phòng ban Trụ sở chính và khối hành chính
+        if ma_pb in ["PB01", "PB02", "PB03", "PB04", "PB05", "PB06", "PB08"]:
+            return True
+
+        return True
+    except Exception:
+        return True
+
+
 CA_GIO_BAT_DAU = "08:00:00"
 CA_GIO_KET_THUC = "17:00:00"
-MOC_TRE_CHO_PHEP = "08:15:00"  # Cho phép đi trễ 15 phút (check-in <= 08:15:00 tính Đúng giờ)
+
+
+def detect_shift_and_status(
+    db: Session, now: datetime, ma_nv: Optional[str] = None
+) -> dict[str, Any]:
+    """
+    Tự động nhận diện ca làm việc KẾT HỢP:
+    1. Nhận diện theo Loại nhân viên (Khối Văn phòng vs Khối Vận hành quán/nhà máy).
+       - Khối Văn phòng: Luôn cố định là CA01 (Hành chính 08:00 - 17:00).
+         Dù check-in 07:00 hay 08:15 vẫn luôn là Ca hành chính.
+         Check-in <= 08:15: Đúng giờ. Check-in > 08:15: Đi muộn.
+       - Khối Cửa hàng / Xưởng sản xuất (xoay ca):
+         * 05:00 - 11:15: CA02 (Ca sáng 06:00 - 14:00)
+         * 11:15 - 18:00: CA03 (Ca chiều 14:00 - 22:00)
+         * 18:00 - 05:00 hôm sau: CA04 (Ca đêm 22:00 - 06:00)
+    """
+    mins = now.hour * 60 + now.minute
+    is_van_phong = is_office_staff(db, ma_nv) if ma_nv else False
+
+    # 1. Nếu chấm công ban đêm (từ 18:00 tối đến 05:30 sáng hôm sau):
+    # Luôn là Ca 4 (CA04: Ca đêm 22:00 - 06:00) cho mọi nhân viên (kể cả văn phòng trực đêm/OT hay khối quán/xưởng)
+    if mins >= 1080 or mins < 330:
+        target_ma_ca = "CA04"
+    else:
+        # Chấm công ban ngày (05:30 - 18:00):
+        if is_van_phong:
+            target_ma_ca = "CA01"  # Khối văn phòng cố định Ca hành chính 08:00 - 17:00
+        else:
+            if 330 <= mins < 690:       # 05:30 - 11:30 -> Ca sáng 06:00
+                target_ma_ca = "CA02"
+            else:                       # 11:30 - 18:00 -> Ca chiều 14:00
+                target_ma_ca = "CA03"
+
+    shift = None
+    try:
+        if db:
+            shift = repo.get_shift_by_code(db, target_ma_ca)
+    except Exception:
+        shift = None
+
+    if not shift:
+        SHIFTS_FALLBACK = {
+            "CA01": {"ma_ca": "CA01", "ten_ca": "Hành chính", "gio_vao_str": "08:00:00", "gio_ra_str": "17:00:00", "so_gio_chuan": 8.0, "he_so": 1.0},
+            "CA02": {"ma_ca": "CA02", "ten_ca": "Ca sáng", "gio_vao_str": "06:00:00", "gio_ra_str": "14:00:00", "so_gio_chuan": 8.0, "he_so": 1.0},
+            "CA03": {"ma_ca": "CA03", "ten_ca": "Ca chiều", "gio_vao_str": "14:00:00", "gio_ra_str": "22:00:00", "so_gio_chuan": 8.0, "he_so": 1.0},
+            "CA04": {"ma_ca": "CA04", "ten_ca": "Ca đêm", "gio_vao_str": "22:00:00", "gio_ra_str": "06:00:00", "so_gio_chuan": 8.0, "he_so": 1.3},
+        }
+        shift = SHIFTS_FALLBACK.get(target_ma_ca, SHIFTS_FALLBACK["CA01"])
+
+    parts = shift["gio_vao_str"].split(":")
+    shift_start_mins = int(parts[0]) * 60 + int(parts[1])
+    diff_mins = mins - shift_start_mins
+    if target_ma_ca == "CA04" and mins < 300:  # 00:00 - 05:00 sáng hôm sau
+        diff_mins = (mins + 24 * 60) - shift_start_mins
+
+    # Cho phép trễ tối đa 15 phút so với giờ bắt đầu ca
+    # Nếu đến sớm (diff_mins <= 0): Không tính trễ (diff_mins âm)
+    is_late = diff_mins > 15
+    late_minutes = max(0, diff_mins)
+
+    return {
+        "shift": shift,
+        "is_late": is_late,
+        "late_minutes": late_minutes,
+        "is_office": is_van_phong,
+    }
 
 
 def employee_check_in(
@@ -169,14 +291,13 @@ def employee_check_in(
 ) -> dict[str, Any]:
     """
     Xử lý nhân viên chấm công vào ca.
-    Quy định nghiệp vụ:
+    Hệ thống TỰ ĐỘNG NHẬN DIỆN CA LÀM VIỆC:
     1. Check-in 1 ngày 1 lần, những lần sau coi như không tính.
-    2. Giờ làm việc: 08:00 đến 17:00, được phép đi trễ 15 phút (check-in <= 08:15 tính Đúng giờ).
-    3. Check-in sau 08:15:
-       - Vẫn cho check-in bình thường, tính là Đi muộn (DI_TRE).
-       - Báo cho Quản lý biết để sửa lại giờ check-in (tối đa 3 lần/tháng).
-       - Sau 3 lần: Từ lần thứ 4 đi trễ sau 8h15 trở đi trong tháng (hoặc đã hết 3 lần sửa)
-         thì bị phạt trừ lương 1 tiếng (so_gio_lam = 7.0, so_cong = 0.88).
+    2. Tự động nhận diện ca phù hợp nhất (Sáng, Hành chính, Chiều, Đêm).
+    3. Kiểm tra giờ đến so với mốc bắt đầu ca (cho phép trễ 15p):
+       - Check-in <= gio_vao + 15p: Tính Đúng giờ (CONG_DU).
+       - Check-in > gio_vao + 15p: Tính Đi muộn (DI_TRE).
+       - Hỗ trợ sửa giờ tối đa 3 lần/tháng. Sau 3 lần phạt trừ 1 tiếng công (so_gio_lam=7.0).
     """
     clean_id = ma_nv.strip().upper().replace("-", "")
     now = get_vietnam_now()
@@ -184,7 +305,7 @@ def employee_check_in(
     time_str = now.strftime("%H:%M:%S")
     display_time = now.strftime("%H:%M")
 
-    # 1. Check-in 1 ngày 1 lần, những lần sau coi như không tính
+    # 1. Check-in 1 ngày 1 lần
     existing = repo.get_today_attendance(db, clean_id, today)
     if existing and existing.get("gio_vao"):
         existing_time = format_time_str(existing["gio_vao"])
@@ -194,41 +315,43 @@ def employee_check_in(
             "message": f"Hôm nay bạn đã chấm công vào ca lúc {existing_time}. Mỗi ngày chỉ check-in 1 lần, những lần sau không tính!",
         }
 
-    # 2. Kiểm tra giờ check-in so với mốc 08:15 (cho phép đi trễ 15p)
-    is_late = time_str > MOC_TRE_CHO_PHEP
+    # 2. Tự động nhận diện ca làm việc và tính trễ (kết hợp phân loại văn phòng)
+    detected = detect_shift_and_status(db, now, ma_nv=clean_id)
+    shift = detected["shift"]
+    is_late = detected["is_late"]
+    late_minutes = detected["late_minutes"]
+
+    ma_ca = shift["ma_ca"]
+    ten_ca = shift["ten_ca"]
+    so_gio_chuan = float(shift.get("so_gio_chuan") or 8.0)
+
     loai_cong = "CONG_DU"
     so_cong = 1.0
-    so_gio_lam = 8.0
-    ghi_chu = "Đúng giờ"
-    message = f"Chấm công VÀO CA thành công lúc {display_time} (Đúng giờ)"
+    so_gio_lam = so_gio_chuan
+    ghi_chu = f"Đúng giờ ({ten_ca})"
+    message = f"Chấm công VÀO CA thành công lúc {display_time} ({ten_ca} - Đúng giờ)"
 
     if is_late:
         loai_cong = "DI_TRE"
-        minutes_late = max(1, (now.hour * 60 + now.minute) - (8 * 60))
-
-        # Đếm tổng số lần đã vi phạm đi trễ / đã nhờ Quản lý sửa trong tháng
         so_lan_ql_sua = repo.count_checkin_adjustments_in_month(db, clean_id, today.month, today.year)
         so_lan_di_tre_cu = repo.count_late_checkins_in_month(db, clean_id, today.month, today.year, exclude_date=today)
         tong_so_lan_tre = so_lan_ql_sua + so_lan_di_tre_cu
         lan_hien_tai = tong_so_lan_tre + 1
 
         if tong_so_lan_tre < 3:
-            # Trong hạn mức 3 lần được hỗ trợ báo Quản lý sửa giờ
-            con_lai = 3 - so_lan_ql_sua
-            ghi_chu = f"Đi muộn {minutes_late}p (Lần {lan_hien_tai}/3 trong tháng - Báo QL sửa giờ)"
+            ghi_chu = f"Đi muộn {late_minutes}p ({ten_ca} - Lần {lan_hien_tai}/3 trong tháng)"
             message = (
-                f"Vào ca lúc {display_time} (Trễ {minutes_late} phút so với 08:15). "
+                f"Vào ca lúc {display_time} ({ten_ca}, trễ {late_minutes} phút so với giờ bắt đầu ca). "
                 f"Đây là lần đi trễ thứ {lan_hien_tai}/3 trong tháng. "
                 f"Vui lòng báo Quản lý nếu cần hỗ trợ sửa lại giờ check-in."
             )
         else:
-            # Sau 3 lần thì đi trễ sau 8h15 bị trừ lương 1 tiếng
-            so_gio_lam = 7.0
-            so_cong = 0.88  # 7h / 8h = 0.875 công
-            ghi_chu = f"Đi trễ sau 08:15 ({minutes_late}p, lần {lan_hien_tai} trong tháng) - Phạt trừ 1 tiếng lương"
+            so_gio_lam = max(0.0, so_gio_chuan - 1.0)
+            so_cong = round(so_gio_lam / so_gio_chuan, 2)
+            ghi_chu = f"Đi trễ {late_minutes}p ({ten_ca}, lần {lan_hien_tai} trong tháng) - Phạt trừ 1 tiếng lương"
             message = (
-                f"Vào ca lúc {display_time} (Trễ {minutes_late} phút). "
-                f"Bạn đã vượt quá 3 lần đi trễ trong tháng, do đó bị trừ 1 tiếng công/lương."
+                f"Vào ca lúc {display_time} ({ten_ca}, trễ {late_minutes} phút). "
+                f"Bạn đã vượt quá 3 lần đi trễ trong tháng, do đó bị phạt trừ 1 tiếng công/lương."
             )
 
     try:
@@ -237,6 +360,7 @@ def employee_check_in(
             ma_nv=clean_id,
             today=today,
             gio_vao=time_str,
+            ma_ca=ma_ca,
             loai_cong=loai_cong,
             so_cong=so_cong,
             so_gio_lam=so_gio_lam,
@@ -267,11 +391,24 @@ def employee_check_in(
 def employee_check_out(
     db: Session, ma_nv: str, location: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
-    """Xử lý nhân viên chấm công ra ca."""
+    """
+    Xử lý nhân viên chấm công ra ca:
+    TÍNH NĂNG SMART CHECK-OUT MATCHING & AUTO OVERTIME:
+    1. Kiểm tra bản ghi vào ca hôm nay.
+    2. Tính tổng thời gian làm việc thực tế từ gio_vao đến gio_ra.
+    3. Tự động đối soát ca thông minh (Smart Shift Matching):
+       - Nếu check-in buổi sáng (~06:30 - 09:00) và check-out buổi chiều (~16:30 - 18:30)
+         -> Tự động xác lập chính xác là Ca hành chính (CA01), xóa bỏ nhầm lẫn ca sáng quán.
+    4. Tự động tính số giờ làm chuẩn và số giờ tăng ca (OT):
+       - Nếu làm việc >= 8.5 giờ: Đủ 8.0h công chuẩn, phần dư tính vào so_gio_tang_ca (tối đa 4h OT).
+       - Nếu bị phạt trừ 1 tiếng (vượt 3 lần đi muộn): so_gio_lam giữ nguyên 7.0h.
+       - Nếu làm việc dưới 5 tiếng: Tính nửa công (so_cong = 0.5, NUA_CONG).
+    """
     clean_id = ma_nv.strip().upper().replace("-", "")
     now = get_vietnam_now()
     today = get_vietnam_today()
     time_str = now.strftime("%H:%M:%S")
+    display_time = now.strftime("%H:%M")
 
     existing = repo.get_today_attendance(db, clean_id, today)
     if not existing or not existing.get("gio_vao"):
@@ -281,12 +418,94 @@ def employee_check_out(
             "message": "Bạn chưa chấm công vào ca hôm nay!",
         }
 
-    # Nếu ngày này bị phạt trừ 1 tiếng, giữ nguyên mức 7.0h
-    is_penalized = float(existing.get("so_gio_lam") or 8.0) == 7.0
-    so_gio = 7.0 if is_penalized else 8.0
+    # Mỗi ca / ngày chỉ được check-out 1 lần duy nhất
+    if existing.get("gio_ra"):
+        out_time = format_time_str(existing["gio_ra"])
+        return {
+            "success": False,
+            "gio_ra": out_time,
+            "message": f"Hôm nay bạn đã hoàn thành ra ca lúc {out_time}. Mỗi ca chỉ được check-out 1 lần!",
+        }
+
+    # 1. Tính số phút làm việc thực tế
+    in_mins = parse_time_to_minutes(existing.get("gio_vao"))
+    out_mins = now.hour * 60 + now.minute
+    if out_mins < in_mins:  # Ca đêm vắt qua ngày hôm sau
+        work_mins = (out_mins + 24 * 60) - in_mins
+    else:
+        work_mins = out_mins - in_mins
+
+    # 2. Smart Shift Matching (Đối soát ca thông minh 2 đầu)
+    current_ma_ca = existing.get("ma_ca") or "CA01"
+    final_ma_ca = current_ma_ca
+
+    # Nếu không phải ca đêm CA04 và (là nhân viên văn phòng HOẶC vào từ sáng trước 09:30 và ra sau 16:30):
+    is_van_phong = is_office_staff(db, clean_id)
+    if current_ma_ca != "CA04" and (is_van_phong or (in_mins < 570 and out_mins >= 990)):
+        final_ma_ca = "CA01"  # Ca hành chính (08:00 - 17:00)
+
+    # 3. Tính giờ làm thực tế (trừ 1h nghỉ trưa nếu là ca hành chính làm trên 5 tiếng)
+    if final_ma_ca == "CA01" and work_mins > 300:
+        actual_work_hours = max(0.0, (work_mins - 60) / 60.0)
+    else:
+        actual_work_hours = max(0.0, work_mins / 60.0)
+
+    # 4. Kiểm tra xem ngày này có bị phạt trừ 1 tiếng do vượt 3 lần đi muộn không
+    is_penalized = float(existing.get("so_gio_lam") or 8.0) == 7.0 or "trừ 1 tiếng" in (existing.get("ghi_chu") or "")
+
+    # 5. Phân bổ công chuẩn (so_gio_lam) và tăng ca (so_gio_tang_ca)
+    so_cong = 1.0
+    loai_cong = existing.get("loai_cong") or "CONG_DU"
+    ghi_chu = existing.get("ghi_chu") or ""
+    so_gio_tang_ca = 0.0
+
+    so_gio_thuc_te = round(actual_work_hours, 1)
+
+    if actual_work_hours >= 8.5:
+        # Vượt quá 30 phút so với ca chuẩn 8 tiếng -> Tự động tính OT
+        so_gio_lam = 7.0 if is_penalized else 8.0
+        so_gio_tang_ca = round(min(actual_work_hours - 8.0, 4.0), 1)
+        so_cong = 1.0
+        if so_gio_tang_ca > 0:
+            ghi_chu = f"{ghi_chu} | Tăng ca {so_gio_tang_ca}h".strip(" |")
+    elif actual_work_hours >= 7.0:
+        # Đủ ca tiêu chuẩn (từ 7 tiếng trở lên)
+        so_gio_lam = 7.0 if is_penalized else 8.0
+        so_gio_tang_ca = 0.0
+        so_cong = 1.0
+    elif actual_work_hours >= 4.0:
+        # Làm từ 4.0 tiếng đến dưới 7.0 tiếng -> Đủ điều kiện tính Nửa ngày công (0.5 công)
+        so_gio_lam = so_gio_thuc_te
+        so_gio_tang_ca = 0.0
+        so_cong = 0.5
+        if loai_cong != "DI_TRE":
+            loai_cong = "NUA_CONG"
+        ghi_chu = f"{ghi_chu} | Làm nửa ngày ({so_gio_thuc_te}h)".strip(" |")
+    else:
+        # Làm dưới 4 tiếng -> Chưa đủ điều kiện tính nửa công (0 công - Về sớm)
+        so_gio_lam = so_gio_thuc_te
+        so_gio_tang_ca = 0.0
+        so_cong = 0.0
+        loai_cong = "VE_SOM"
+        ghi_chu = f"{ghi_chu} | Chưa đủ 4 tiếng ({so_gio_thuc_te}h - Về sớm)".strip(" |")
+
+    # Lấy tên ca làm việc để hiển thị
+    shift_info = repo.get_shift_by_code(db, final_ma_ca)
+    ten_ca = shift_info.get("ten_ca") if shift_info else "Hành chính"
 
     try:
-        repo.record_check_out(db, clean_id, today, time_str, so_gio_lam=so_gio)
+        repo.record_check_out(
+            db=db,
+            ma_nv=clean_id,
+            today=today,
+            gio_ra=time_str,
+            so_gio_lam=so_gio_lam,
+            so_gio_tang_ca=so_gio_tang_ca,
+            ma_ca=final_ma_ca,
+            so_cong=so_cong,
+            loai_cong=loai_cong,
+            ghi_chu=ghi_chu,
+        )
     except Exception as e:
         db.rollback()
         return {
@@ -295,11 +514,23 @@ def employee_check_out(
             "message": f"Lỗi chấm công ra ca: {str(e)}",
         }
 
-    display_time = now.strftime("%H:%M")
+    # Xây dựng thông điệp thông báo chi tiết
+    msg_parts = [f"Chấm công RA CA thành công lúc {display_time} ({ten_ca})"]
+    if so_gio_tang_ca > 0:
+        msg_parts.append(f"ghi nhận {so_gio_lam}h công + {so_gio_tang_ca}h OT")
+    elif so_cong == 1.0:
+        msg_parts.append(f"đủ {so_gio_lam}h công ({so_cong} công)")
+    elif so_cong == 0.5:
+        msg_parts.append(f"ghi nhận nửa công ({so_gio_lam}h làm việc)")
+    else:
+        msg_parts.append(f"thực tế {so_gio_lam}h làm việc (chưa đủ 4h tính công - Về sớm)")
+
+    final_msg = " - ".join(msg_parts)
+
     return {
         "success": True,
         "gio_ra": display_time,
-        "message": f"Chấm công RA CA thành công lúc {display_time}",
+        "message": final_msg,
     }
 
 
@@ -384,7 +615,7 @@ def get_daily_attendance_for_manager(
             "gio_ra": format_time_str(r.get("gio_ra")),
             "so_gio_lam": float(r.get("so_gio_lam") or 0.0),
             "so_gio_tang_ca": float(r.get("so_gio_tang_ca") or 0.0),
-            "so_cong": float(r.get("so_cong") or (1.0 if r.get("gio_vao") else 0.0)),
+            "so_cong": float(r["so_cong"]) if r.get("so_cong") is not None else (1.0 if r.get("gio_vao") else 0.0),
             "loai_cong": loai,
             "trang_thai": trang_thai,
             "ghi_chu": r.get("ghi_chu") or "",
@@ -437,6 +668,13 @@ def adjust_attendance_by_manager(
     thang = ngay_cong.month if hasattr(ngay_cong, "month") else get_vietnam_now().month
     nam = ngay_cong.year if hasattr(ngay_cong, "year") else get_vietnam_now().year
 
+    # 0. Kiểm tra nếu tháng đã bị Chốt/Khóa công
+    lock_info = repo.get_monthly_attendance_lock(db, thang, nam)
+    if lock_info.get("is_locked"):
+        raise ValueError(
+            f"Bảng chấm công tháng {thang}/{nam} đã được Chốt và Khóa! Vui lòng mở khóa trước khi điều chỉnh."
+        )
+
     # Kiểm tra nếu Quản lý điều chỉnh giờ vào (gio_vao)
     is_modifying_gio_vao = False
     gio_vao_cu = format_time_str(record.get("gio_vao"))
@@ -450,7 +688,7 @@ def adjust_attendance_by_manager(
                 f"Nhân viên {ma_nv} đã được sửa giờ check-in {adjusted_count}/3 lần trong tháng {thang}/{nam}. Đã đạt giới hạn tối đa cho phép!"
             )
 
-        # Nếu sửa về giờ vào ca hợp lệ (<= 08:15:00) thì tự động chuyển thành Đúng giờ và phục hồi đủ công
+        # Nếu sửa về giờ vào ca hợp lệ (<= 08:15:00 hoặc đúng giờ theo ca)
         formatted_new_time = format_time_str(gio_vao_moi)
         if formatted_new_time <= "08:15":
             if "loai_cong" not in fields or not fields["loai_cong"]:
@@ -482,3 +720,21 @@ def adjust_attendance_by_manager(
         db.commit()
 
     return updated
+
+
+def get_all_shifts(db: Session) -> list[dict[str, Any]]:
+    """Lấy danh mục các ca làm việc."""
+    return repo.get_all_shifts(db)
+
+
+def get_monthly_attendance_lock_status(db: Session, thang: int, nam: int) -> dict[str, Any]:
+    """Lấy trạng thái chốt công tháng."""
+    return repo.get_monthly_attendance_lock(db, thang, nam)
+
+
+def toggle_monthly_attendance_lock(
+    db: Session, thang: int, nam: int, is_locked: bool, nguoi_chot: str = "Quản lý", ghi_chu: str = ""
+) -> dict[str, Any]:
+    """Chốt / Khóa hoặc Mở khóa bảng công tháng."""
+    return repo.set_monthly_attendance_lock(db, thang, nam, is_locked, nguoi_chot, ghi_chu)
+

@@ -49,8 +49,11 @@ def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
             nv.ho_ten, pb.ten_pb, cv.ten_cv,
-            bl.so_cong_thuc_te, bl.luong_gross, bl.tong_khau_tru, bl.luong_net,
-            bl.trang_thai
+            bl.luong_co_ban, bl.he_so_luong, bl.so_cong_chuan,
+            bl.so_cong_thuc_te, bl.so_gio_tang_ca,
+            bl.luong_theo_cong, bl.tien_tang_ca, bl.tong_phu_cap, bl.tien_thuong,
+            bl.luong_gross, bl.bhxh, bl.bhyt, bl.bhtn, bl.thue_tncn, bl.tong_khau_tru,
+            bl.luong_net, bl.trang_thai, bl.ghi_chu
         FROM bang_luong bl
         JOIN nhan_vien nv ON bl.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
@@ -79,6 +82,7 @@ def update_payroll_status(db: Session, ma_bl: int, trang_thai: str) -> dict | No
 def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int:
     """
     Tự động tính lương tháng cho toàn bộ nhân viên đang làm việc và lưu vào bảng bang_luong.
+    Áp dụng hệ số ca đêm (ca.he_so = 1.30 cho ca đêm) và phụ cấp làm việc.
     Trả về số lượng bản ghi bảng lương đã được tính/cập nhật.
     """
     # 1. Lấy danh sách nhân viên đang làm việc kèm thông tin lương
@@ -104,15 +108,22 @@ def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int
         he_so = float(emp["he_so_luong"])
         phu_cap = float(emp["phu_cap"])
 
-        # 2. Tổng hợp công từ bảng chấm công
+        # 2. Tổng hợp công từ bảng chấm công kèm phụ cấp ca đêm (nếu ca.he_so > 1.0)
         cc_query = """
             SELECT
-                COALESCE(SUM(so_cong), 0)          AS so_cong_thuc_te,
-                COALESCE(SUM(so_gio_tang_ca), 0)   AS so_gio_tang_ca
-            FROM bang_cham_cong
-            WHERE ma_nv = :ma_nv
-              AND MONTH(ngay_cong) = :thang
-              AND YEAR(ngay_cong)  = :nam
+                COALESCE(SUM(bcc.so_cong), 0)          AS so_cong_thuc_te,
+                COALESCE(SUM(bcc.so_gio_tang_ca), 0)   AS so_gio_tang_ca,
+                COALESCE(SUM(
+                    CASE 
+                        WHEN ca.he_so > 1.0 THEN bcc.so_gio_lam * (ca.he_so - 1.0)
+                        ELSE 0 
+                    END
+                ), 0) AS gio_phu_cap_ca_dem
+            FROM bang_cham_cong bcc
+            LEFT JOIN ca_lam_viec ca ON bcc.ma_ca = ca.ma_ca
+            WHERE bcc.ma_nv = :ma_nv
+              AND MONTH(bcc.ngay_cong) = :thang
+              AND YEAR(bcc.ngay_cong)  = :nam
         """
         cc = db.execute(
             text(cc_query), {"ma_nv": ma_nv, "thang": thang, "nam": nam}
@@ -120,12 +131,16 @@ def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int
 
         so_cong_thuc_te = float(cc["so_cong_thuc_te"]) if cc else 0.0
         so_gio_tang_ca = float(cc["so_gio_tang_ca"]) if cc else 0.0
+        gio_phu_cap_ca_dem = float(cc["gio_phu_cap_ca_dem"]) if cc else 0.0
 
         # 3. Tính toán các khoản lương
         luong_theo_cong = round((luong_co_ban * he_so / so_cong_chuan) * so_cong_thuc_te)
         tien_tang_ca = round((luong_co_ban * he_so / so_cong_chuan / 8) * 1.5 * so_gio_tang_ca)
+        tien_ca_dem = round((luong_co_ban * he_so / so_cong_chuan / 8) * gio_phu_cap_ca_dem)
+        tong_tien_tang_ca = tien_tang_ca + tien_ca_dem
         tien_thuong = 0
-        luong_gross = luong_theo_cong + tien_tang_ca + int(phu_cap) + tien_thuong
+        luong_gross = luong_theo_cong + tong_tien_tang_ca + int(phu_cap) + tien_thuong
+
 
         # Các khoản bảo hiểm bắt buộc theo luật lao động VN
         bhxh = round(luong_gross * 0.08)

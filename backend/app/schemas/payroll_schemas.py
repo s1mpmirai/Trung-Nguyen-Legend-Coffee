@@ -70,14 +70,28 @@ class payroll_summary_item(BaseModel):
     ho_ten: Optional[str] = None
     ten_pb: Optional[str] = None
     ten_cv: Optional[str] = None
+    luong_co_ban: Optional[float] = 0
+    he_so_luong: Optional[float] = 1.0
+    so_cong_chuan: Optional[float] = 26.0
     so_cong_thuc_te: float = 0
+    so_gio_tang_ca: float = 0
+    luong_theo_cong: Optional[float] = 0
+    tien_tang_ca: Optional[float] = 0
+    tong_phu_cap: Optional[float] = 0
+    tien_thuong: Optional[float] = 0
     luong_gross: float = 0
+    bhxh: Optional[float] = 0
+    bhyt: Optional[float] = 0
+    bhtn: Optional[float] = 0
+    thue_tncn: Optional[float] = 0
     tong_khau_tru: float = 0
     luong_net: float = 0
     trang_thai: str = "NHAP"
+    ghi_chu: Optional[str] = None
 
     class Config:
         from_attributes = True
+
 
 
 class payroll_company_summary_response(BaseModel):
