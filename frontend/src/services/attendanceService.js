@@ -133,3 +133,63 @@ export async function getAttendanceHistory(ma_nv = 'NV10', month = null, year = 
   }
   return { month: month || 10, year: year || 2026, summary: {}, records: [] };
 }
+
+/**
+ * [Quản lý] Bảng chấm công theo ngày của toàn công ty/phòng ban
+ * GET /api/v1/attendance/daily?ngay=...&ma_pb=...
+ */
+export async function getDailyAttendanceForManager(ngay = null, ma_pb = null) {
+  try {
+    const params = new URLSearchParams();
+    if (ngay) params.append('ngay', ngay);
+    if (ma_pb && ma_pb !== 'all') params.append('ma_pb', ma_pb);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`/api/v1/attendance/daily${qs}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.error('Error fetching daily attendance for manager:', e);
+  }
+  return [];
+}
+
+/**
+ * [Quản lý] Bảng tổng hợp công tháng của tất cả nhân viên
+ * GET /api/v1/attendance/summary?thang=...&nam=...&ma_pb=...
+ */
+export async function getMonthlyAttendanceSummaryForManager(thang = null, nam = null, ma_pb = null) {
+  try {
+    const params = new URLSearchParams();
+    if (thang) params.append('thang', thang);
+    if (nam) params.append('nam', nam);
+    if (ma_pb && ma_pb !== 'all') params.append('ma_pb', ma_pb);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`/api/v1/attendance/summary${qs}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.error('Error fetching monthly attendance summary for manager:', e);
+  }
+  return [];
+}
+
+/**
+ * [Quản lý] Điều chỉnh thông tin chấm công / duyệt giải trình
+ * PUT /api/v1/attendance/{ma_cc}/adjust
+ */
+export async function adjustAttendanceRecord(ma_cc, data) {
+  const res = await fetch(`/api/v1/attendance/${ma_cc}/adjust`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    const msg = errData?.detail || errData?.message || `Lỗi điều chỉnh chấm công (${res.status})`;
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+

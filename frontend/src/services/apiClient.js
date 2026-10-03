@@ -23,7 +23,17 @@ export async function request(endpoint, options = {}) {
     headers,
   };
 
-  const url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  let url = `${BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  if (options.params && Object.keys(options.params).length > 0) {
+    const searchParams = new URLSearchParams();
+    Object.entries(options.params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null) searchParams.append(key, val);
+    });
+    const qs = searchParams.toString();
+    if (qs) {
+      url += (url.includes("?") ? "&" : "?") + qs;
+    }
+  }
 
   try {
     const response = await fetch(url, config);

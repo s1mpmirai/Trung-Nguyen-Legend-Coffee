@@ -1,195 +1,221 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  GraduationCap,
   History,
   TrendingUp,
   Download,
   FileSpreadsheet,
   Search,
-  Filter,
   Building2,
   Calendar,
   Award,
-  ChevronDown,
   X,
-  Sparkles,
-  BadgePercent,
   CheckCircle2,
   Eye,
   Briefcase,
-  Layers
+  Users,
+  Loader2,
+  ShieldCheck,
+  Phone,
+  Mail,
+  MapPin,
+  CreditCard,
+  FileText,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
+import apiClient from "../../services/apiClient";
+import { formatDate, calculateSeniority } from "../../services/employeeService";
+
+const DEPARTMENT_MAP = {
+  PB01: "Ban Giám đốc",
+  PB02: "Phòng Nhân sự",
+  PB03: "Phòng Kế toán – Tài chính",
+  PB04: "Phòng Marketing",
+  PB05: "Phòng Kinh doanh",
+  PB06: "Phòng IT",
+  PB07: "Xưởng Sản xuất",
+  PB08: "Phòng Kinh doanh Hà Nội",
+};
+
+const POSITION_MAP = {
+  CV01: "Nhân viên",
+  CV02: "Nhân viên chính",
+  CV03: "Tổ trưởng / Trưởng nhóm",
+  CV04: "Phó phòng",
+  CV05: "Trưởng phòng",
+  CV06: "Phó Giám đốc",
+  CV07: "Giám đốc Khối",
+  CV08: "Tổng Giám đốc",
+};
+
+const BRANCH_MAP = {
+  CN01: "Trụ sở chính TP.HCM",
+  CN02: "Nhà máy Buôn Ma Thuột",
+  CN03: "Chi nhánh Hà Nội",
+};
+
+const getInitials = (name) => {
+  if (!name) return "NV";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const calculateTenureData = (startDateStr) => {
+  if (!startDateStr) return { years: 0, label: "Mới vào làm", isCore: false };
+  const start = new Date(startDateStr);
+  const now = new Date();
+  if (isNaN(start.getTime())) return { years: 0, label: "Chưa cập nhật", isCore: false };
+
+  let years = now.getFullYear() - start.getFullYear();
+  let months = now.getMonth() - start.getMonth();
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+  const totalYears = Number((years + months / 12).toFixed(1));
+  let label = "";
+  if (years > 0 && months > 0) label = `${years} năm ${months} tháng`;
+  else if (years > 0) label = `${years} năm`;
+  else if (months > 0) label = `${months} tháng`;
+  else label = "Dưới 1 tháng";
+
+  return {
+    years: totalYears,
+    label,
+    isCore: totalYears >= 3,
+  };
+};
 
 export default function PersonnelReport() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDegree, setSelectedDegree] = useState("all");
   const [selectedTenure, setSelectedTenure] = useState("all");
-  const [selectedSalaryRange, setSelectedSalaryRange] = useState("all");
   const [selectedDept, setSelectedDept] = useState("all");
+  const [selectedWorkingType, setSelectedWorkingType] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
   const [toastMessage, setToastMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Danh sách nhân sự thực tế từ API
+  const [employees, setEmployees] = useState([]);
 
   // Modals
   const [selectedProfileModal, setSelectedProfileModal] = useState(null);
-  const [selectedHistoryModal, setSelectedHistoryModal] = useState(null);
-
-  // Danh sách nhân sự mẫu trong báo cáo chi tiết
-  const [reportEmployees] = useState([
-    {
-      id: "NV-1281",
-      name: "Lê Hoàng Nam",
-      initials: "HN",
-      role: "Chuyên viên Trưởng R&D Hương vị",
-      dept: "Viện Nghiên cứu Cà phê TN",
-      location: "Khu Công nghệ Cao TP.HCM",
-      degree: "postgrad",
-      degreeLabel: "Thạc sĩ Hóa Thực phẩm",
-      school: "ĐH Bách Khoa TP.HCM (2018)",
-      joinDate: "15/06/2018",
-      tenureYears: 5.7,
-      tenureLabel: "5 năm 8 tháng",
-      isCore: true,
-      currentSalary: 42500000,
-      salaryTier: "above30",
-      salaryNote: "+15% so với sàn R&D",
-      history: [
-        { date: "06/2018", title: "Thử việc R&D", salary: "18.000.000 đ", reason: "Gia nhập tập đoàn" },
-        { date: "06/2020", title: "Chuyên viên R&D bậc 2", salary: "26.500.000 đ", reason: "Tăng định kỳ & KPI xuất sắc" },
-        { date: "10/2022", title: "Chuyên viên Chính", salary: "34.000.000 đ", reason: "Đột phá công thức pha chế Legend" },
-        { date: "01/2025", title: "Chuyên viên Trưởng", salary: "42.500.000 đ", reason: "Bổ nhiệm phụ trách nhóm sáng tạo" }
-      ]
-    },
-    {
-      id: "NV-0842",
-      name: "Trần Quốc Quân",
-      initials: "TQ",
-      role: "Kỹ sư Vận hành Rang Xay",
-      dept: "Nhà máy Buôn Ma Thuột",
-      location: "KCN Tân An, Buôn Ma Thuột",
-      degree: "engineer",
-      degreeLabel: "Kỹ sư Cơ khí Chế tạo máy",
-      school: "ĐH Bách Khoa Đà Nẵng (2020)",
-      joinDate: "01/09/2020",
-      tenureYears: 3.5,
-      tenureLabel: "3 năm 6 tháng",
-      isCore: true,
-      currentSalary: 24000000,
-      salaryTier: "20to30",
-      salaryNote: "Chuẩn bậc kỹ sư cấp 3",
-      history: [
-        { date: "09/2020", title: "Kỹ sư tập sự", salary: "14.000.000 đ", reason: "Gia nhập nhà máy" },
-        { date: "03/2022", title: "Kỹ sư vận hành", salary: "19.000.000 đ", reason: "Hoàn thành quy trình tự động hóa" },
-        { date: "08/2024", title: "Kỹ sư bậc 3", salary: "24.000.000 đ", reason: "Nâng bậc tay nghề kỹ thuật" }
-      ]
-    },
-    {
-      id: "NV-2204",
-      name: "Lê Thị Mai",
-      initials: "LM",
-      role: "Trưởng ca Barista",
-      dept: "Chuỗi Legend F&B",
-      location: "Cửa Hàng Legend Đồng Khởi",
-      degree: "college",
-      degreeLabel: "Cao đẳng Quản trị Khách sạn",
-      school: "CĐ Du lịch Sài Gòn (2021)",
-      joinDate: "10/02/2022",
-      tenureYears: 2.7,
-      tenureLabel: "2 năm 8 tháng",
-      isCore: false,
-      currentSalary: 14500000,
-      salaryTier: "10to20",
-      salaryNote: "+ Phụ cấp ca trưởng",
-      history: [
-        { date: "02/2022", title: "Barista tập sự", salary: "8.500.000 đ", reason: "Gia nhập cửa hàng" },
-        { date: "11/2022", title: "Barista chính thức", salary: "10.500.000 đ", reason: "Đạt chuẩn tay nghề pha chế" },
-        { date: "04/2024", title: "Trưởng ca Barista", salary: "14.500.000 đ", reason: "Thăng cấp quản lý ca làm việc" }
-      ]
-    },
-    {
-      id: "NV-3091",
-      name: "Phạm Hải Đăng",
-      initials: "HD",
-      role: "Giám đốc Chiến lược Thương hiệu",
-      dept: "Khối Văn phòng Điều hành",
-      location: "Trụ sở chính, TP.HCM",
-      degree: "postgrad",
-      degreeLabel: "Thạc sĩ Quản trị Marketing (MBA)",
-      school: "RMIT University (2016)",
-      joinDate: "01/03/2019",
-      tenureYears: 5.1,
-      tenureLabel: "5 năm 1 tháng",
-      isCore: true,
-      currentSalary: 45000000,
-      salaryTier: "above30",
-      salaryNote: "Mức trần cấp lãnh đạo",
-      history: [
-        { date: "03/2019", title: "Trưởng phòng Tiếp thị", salary: "28.000.000 đ", reason: "Tuyển dụng nhân tài cấp cao" },
-        { date: "06/2021", title: "Phó GĐ Thương hiệu", salary: "36.000.000 đ", reason: "Mở rộng hệ thống chuỗi" },
-        { date: "12/2023", title: "Giám đốc Chiến lược", salary: "45.000.000 đ", reason: "Bổ nhiệm Ban điều hành" }
-      ]
-    },
-    {
-      id: "NV-4412",
-      name: "Ngô Quốc Thịnh",
-      initials: "QT",
-      role: "Nhân viên Barista",
-      dept: "Chuỗi Legend F&B",
-      location: "Cửa Hàng Diamond Plaza",
-      degree: "college",
-      degreeLabel: "Trung cấp Nghề Pha Chế",
-      school: "Trường CĐ Kinh tế Kỹ thuật (2023)",
-      joinDate: "15/01/2024",
-      tenureYears: 0.8,
-      tenureLabel: "9 tháng",
-      isCore: false,
-      currentSalary: 9500000,
-      salaryTier: "under10",
-      salaryNote: "Khởi điểm Barista",
-      history: [
-        { date: "01/2024", title: "Nhân viên pha chế", salary: "9.500.000 đ", reason: "Tiếp nhận nhân sự mới" }
-      ]
-    },
-    {
-      id: "NV-1903",
-      name: "Đỗ Bích Ngân",
-      initials: "BN",
-      role: "Chuyên viên Phân tích Dữ liệu Chuỗi cung ứng",
-      dept: "Khối Văn phòng Điều hành",
-      location: "Trụ sở chính, TP.HCM",
-      degree: "university",
-      degreeLabel: "Cử nhân Hệ thống Thông tin Quản lý",
-      school: "ĐH Kinh Tế TP.HCM (2021)",
-      joinDate: "12/07/2021",
-      tenureYears: 3.2,
-      tenureLabel: "3 năm 3 tháng",
-      isCore: true,
-      currentSalary: 26000000,
-      salaryTier: "20to30",
-      salaryNote: "Bậc phân tích dữ liệu chuyên sâu",
-      history: [
-        { date: "07/2021", title: "Chuyên viên phân tích tập sự", salary: "13.000.000 đ", reason: "Gia nhập tập đoàn" },
-        { date: "01/2023", title: "Chuyên viên chính thức", salary: "19.500.000 đ", reason: "Đạt thành tích tự động hóa tồn kho" },
-        { date: "06/2024", title: "Chuyên viên Data bậc 2", salary: "26.000.000 đ", reason: "Điều chỉnh lương thu hút nhân tài" }
-      ]
-    }
-  ]);
+  const [detailedProfile, setDetailedProfile] = useState(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(""), 3500);
   };
 
-  const filteredEmployees = reportEmployees.filter((emp) => {
+  // Tải danh sách nhân sự thực tế từ API
+  useEffect(() => {
+    let isMounted = true;
+    const loadEmployees = async () => {
+      setIsLoading(true);
+      try {
+        const res = await apiClient.get("/employees/get_employee_list", {
+          params: { page: 1, limit: 100 },
+        });
+        if (isMounted && res) {
+          const rawItems = res.items || res.employees || [];
+          const mapped = rawItems.map((emp) => {
+            const tenure = calculateTenureData(emp.ngay_vao_lam);
+            const deptName = DEPARTMENT_MAP[emp.ma_pb] || emp.ma_pb || "Chưa phân bổ";
+            const roleName = POSITION_MAP[emp.ma_cv] || emp.ma_cv || "Nhân viên";
+            const locationName = BRANCH_MAP[emp.ma_cn] || emp.dia_chi || "Trụ sở chính";
+
+            return {
+              id: emp.ma_nv,
+              name: emp.ho_ten,
+              initials: getInitials(emp.ho_ten),
+              role: roleName,
+              dept: deptName,
+              ma_pb: emp.ma_pb,
+              location: locationName,
+              joinDate: formatDate(emp.ngay_vao_lam),
+              rawJoinDate: emp.ngay_vao_lam,
+              tenureYears: tenure.years,
+              tenureLabel: tenure.label,
+              isCore: tenure.isCore,
+              workingType: emp.hinh_thuc_lam_viec || "FULL_TIME",
+              status: emp.trang_thai || "DANG_LAM",
+              email: emp.email,
+              phone: emp.sdt,
+              cccd: emp.cccd,
+              bankAccount: emp.so_tai_khoan,
+              bankName: emp.ngan_hang,
+              taxCode: emp.ma_so_thue,
+              insuranceCode: emp.so_bhxh,
+            };
+          });
+          setEmployees(mapped);
+        }
+      } catch (err) {
+        console.error("Lỗi khi tải dữ liệu báo cáo nhân sự:", err);
+        showToast("Lỗi khi kết nối API nhân sự!");
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    };
+
+    loadEmployees();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Mở modal chi tiết hồ sơ nhân sự (gọi API /profile/{ma_nv})
+  const handleOpenProfileModal = async (emp) => {
+    setSelectedProfileModal(emp);
+    setIsLoadingProfile(true);
+    setDetailedProfile(null);
+    try {
+      const res = await apiClient.get(`/employees/profile/${emp.id}`);
+      setDetailedProfile(res);
+    } catch (err) {
+      console.warn("Không thể tải hồ sơ chi tiết:", err.message);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
+  // Tính toán các chỉ số thống kê thực tế từ API
+  const totalEmployees = employees.length;
+  const fullTimeCount = employees.filter((e) => e.workingType === "FULL_TIME").length;
+  const partTimeCount = totalEmployees - fullTimeCount;
+  const fullTimeRate = totalEmployees > 0 ? ((fullTimeCount / totalEmployees) * 100).toFixed(1) : 0;
+
+  // Thống kê thâm niên thực tế
+  const avgTenureYears =
+    totalEmployees > 0
+      ? (employees.reduce((acc, e) => acc + (e.tenureYears || 0), 0) / totalEmployees).toFixed(1)
+      : 0;
+
+  const coreCount = employees.filter((e) => e.tenureYears >= 3).length;
+  const midCount = employees.filter((e) => e.tenureYears >= 1 && e.tenureYears < 3).length;
+  const newCount = employees.filter((e) => e.tenureYears < 1).length;
+
+  const coreRate = totalEmployees > 0 ? Math.round((coreCount / totalEmployees) * 100) : 0;
+  const midRate = totalEmployees > 0 ? Math.round((midCount / totalEmployees) * 100) : 0;
+  const newRate = totalEmployees > 0 ? Math.max(0, 100 - coreRate - midRate) : 0;
+
+  // Thống kê phòng ban thực tế
+  const deptCountMap = {};
+  employees.forEach((e) => {
+    deptCountMap[e.dept] = (deptCountMap[e.dept] || 0) + 1;
+  });
+  const activeDepts = Object.keys(deptCountMap).length;
+
+  // Bộ lọc danh sách nhân viên
+  const filteredEmployees = employees.filter((emp) => {
     const matchSearch =
       emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       emp.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.role.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchDegree =
-      selectedDegree === "all" ||
-      (selectedDegree === "postgrad" && emp.degree === "postgrad") ||
-      (selectedDegree === "university" && emp.degree === "university") ||
-      (selectedDegree === "college" && emp.degree === "college") ||
-      (selectedDegree === "engineer" && emp.degree === "engineer");
+      emp.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      emp.dept.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchTenure =
       selectedTenure === "all" ||
@@ -198,13 +224,43 @@ export default function PersonnelReport() {
       (selectedTenure === "3to5" && emp.tenureYears >= 3 && emp.tenureYears <= 5) ||
       (selectedTenure === "above5" && emp.tenureYears > 5);
 
-    const matchSalary =
-      selectedSalaryRange === "all" || emp.salaryTier === selectedSalaryRange;
+    const matchDept = selectedDept === "all" || emp.ma_pb === selectedDept || emp.dept === selectedDept;
 
-    const matchDept = selectedDept === "all" || emp.dept === selectedDept;
+    const matchWorkingType =
+      selectedWorkingType === "all" || emp.workingType === selectedWorkingType;
 
-    return matchSearch && matchDegree && matchTenure && matchSalary && matchDept;
+    return matchSearch && matchTenure && matchDept && matchWorkingType;
   });
+
+  // Phân trang (mặc định 5 người / trang)
+  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filteredEmployees.length);
+  const paginatedEmployees = filteredEmployees.slice(startIndex, endIndex);
+
+  // Tự động quay về trang 1 khi thay đổi điều kiện lọc
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedTenure, selectedDept, selectedWorkingType, pageSize]);
+
+  // Xuất file CSV từ dữ liệu thực tế
+  const handleExportCSV = () => {
+    let csv = "\uFEFF"; // UTF-8 BOM
+    csv += "Mã NV,Họ tên,Phòng ban,Chức vụ,Nơi làm việc,Hình thức làm việc,Ngày vào làm,Thâm niên,Email,SĐT,Trạng thái\n";
+    filteredEmployees.forEach((e) => {
+      csv += `"${e.id}","${e.name}","${e.dept}","${e.role}","${e.location}","${e.workingType === 'FULL_TIME' ? 'Toàn thời gian' : 'Bán thời gian'}","${e.joinDate}","${e.tenureLabel}","${e.email || ''}","${e.phone || ''}","${e.status}"\n`;
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Bao_Cao_Nhan_Su_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("Đã tải xuống file Báo cáo Thông tin Nhân sự (CSV) thực tế!");
+  };
 
   return (
     <div className="flex flex-col gap-6 w-full animate-in fade-in duration-300">
@@ -213,22 +269,22 @@ export default function PersonnelReport() {
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 font-semibold text-[11px] uppercase tracking-wider border border-sky-200/50">
-              Phân hệ Báo cáo Chuyên sâu
+              Phân hệ Báo cáo Nhân sự Thực tế
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-            <span className="text-xs text-slate-500">Cập nhật lúc 08:30 hôm nay</span>
+            <span className="text-xs text-slate-500">Dữ liệu kết nối trực tiếp từ Cơ sở dữ liệu</span>
           </div>
           <h1 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight mt-1">
             Báo cáo Thông tin Nhân sự
           </h1>
           <p className="text-xs text-slate-500 max-w-2xl">
-            Phân tích 3 chiều cốt lõi: Trình độ học vấn & Chuyên môn, Thâm niên công tác và Mặt bằng đãi ngộ tiền lương trên toàn bộ 1,280 nhân sự.
+            Tổng hợp thông tin hồ sơ, thâm niên công tác, cơ cấu phòng ban và phân loại nhân sự từ CSDL toàn hệ thống Trung Nguyên Legend.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={() => showToast("Đã tải xuống file Báo cáo Thông tin Nhân sự (Excel) đầy đủ!")}
+            onClick={handleExportCSV}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 transition-all shadow-xs text-xs font-semibold active:scale-95"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
@@ -252,53 +308,57 @@ export default function PersonnelReport() {
         </div>
       )}
 
-      {/* ──────────────── 3-AXIS EXECUTIVE SUMMARY CARDS ──────────────── */}
+      {/* ──────────────── 3 EXECUTIVE SUMMARY CARDS (Tính từ API thực tế) ──────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Card 1: Trình độ học vấn */}
+        {/* Card 1: Hình thức & Trạng thái làm việc */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between gap-4">
           <div className="flex items-start justify-between">
             <div className="flex flex-col">
               <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
-                Khối Trí Thức & Chuyên Môn
+                Hình thức Làm việc
               </span>
               <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg mt-0.5">
-                Trình độ Học vấn
+                Cơ cấu Hợp đồng
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600">
-              <GraduationCap className="w-5 h-5" />
+              <Briefcase className="w-5 h-5" />
             </div>
           </div>
 
           <div className="flex items-baseline gap-2">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] text-3xl font-extrabold text-slate-900">
-              68%
+              {fullTimeRate}%
             </span>
-            <span className="text-xs text-slate-500 font-medium">Đại học chính quy</span>
+            <span className="text-xs text-slate-500 font-medium">Toàn thời gian (Full-time)</span>
           </div>
 
           {/* Inline Ratio Bar */}
           <div className="flex flex-col gap-2">
             <div className="w-full h-2 rounded-full bg-slate-100 flex overflow-hidden">
-              <div className="h-full bg-sky-600" style={{ width: "68%" }} title="Đại học: 68%"></div>
-              <div className="h-full bg-emerald-500" style={{ width: "24%" }} title="Cao đẳng/Nghề: 24%"></div>
-              <div className="h-full bg-amber-500" style={{ width: "8%" }} title="Sau Đại học: 8%"></div>
+              <div
+                className="h-full bg-sky-600"
+                style={{ width: `${fullTimeRate}%` }}
+                title={`Full-time: ${fullTimeCount} NV`}
+              ></div>
+              <div
+                className="h-full bg-emerald-500"
+                style={{ width: `${100 - fullTimeRate}%` }}
+                title={`Part-time: ${partTimeCount} NV`}
+              ></div>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-sky-600"></span> ĐH: 870 NV
+                <span className="w-2 h-2 rounded-full bg-sky-600"></span> Full-time: {fullTimeCount} NV
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> CĐ: 308 NV
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500"></span> Sau ĐH: 102 NV
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Part-time: {partTimeCount} NV
               </span>
             </div>
           </div>
         </div>
 
-        {/* Card 2: Thâm niên công tác */}
+        {/* Card 2: Thâm niên công tác thực tế */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between gap-4">
           <div className="flex items-start justify-between">
             <div className="flex flex-col">
@@ -316,127 +376,125 @@ export default function PersonnelReport() {
 
           <div className="flex items-baseline gap-2">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] text-3xl font-extrabold text-slate-900">
-              3.4
+              {avgTenureYears}
             </span>
-            <span className="text-xs text-slate-500 font-medium">năm bình quân / người</span>
+            <span className="text-xs text-slate-500 font-medium">năm bình quân / nhân sự</span>
           </div>
 
           {/* Inline Ratio Bar */}
           <div className="flex flex-col gap-2">
             <div className="w-full h-2 rounded-full bg-slate-100 flex overflow-hidden">
-              <div className="h-full bg-emerald-600" style={{ width: "33%" }} title=">3 năm Nòng cốt: 33%"></div>
-              <div className="h-full bg-sky-500" style={{ width: "45%" }} title="1-3 năm: 45%"></div>
-              <div className="h-full bg-slate-300" style={{ width: "22%" }} title="<1 năm: 22%"></div>
+              <div
+                className="h-full bg-emerald-600"
+                style={{ width: `${coreRate}%` }}
+                title={`>3 năm: ${coreCount} NV`}
+              ></div>
+              <div
+                className="h-full bg-sky-500"
+                style={{ width: `${midRate}%` }}
+                title={`1-3 năm: ${midCount} NV`}
+              ></div>
+              <div
+                className="h-full bg-slate-300"
+                style={{ width: `${newRate}%` }}
+                title={`<1 năm: ${newCount} NV`}
+              ></div>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-600"></span> &gt;3 năm (Nòng cốt): 33%
+                <span className="w-2 h-2 rounded-full bg-emerald-600"></span> &gt;3 năm (Nòng cốt): {coreCount} NV
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-sky-500"></span> 1-3 năm: 45%
+                <span className="w-2 h-2 rounded-full bg-sky-500"></span> 1-3 năm: {midCount} NV
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-slate-300"></span> &lt;1 năm: 22%
+                <span className="w-2 h-2 rounded-full bg-slate-300"></span> &lt;1 năm: {newCount} NV
               </span>
             </div>
           </div>
         </div>
 
-        {/* Card 3: Mặt bằng đãi ngộ */}
+        {/* Card 3: Quy mô phòng ban */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between gap-4">
           <div className="flex items-start justify-between">
             <div className="flex flex-col">
               <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400">
-                Mặt Bằng Đãi Ngộ
+                Quy Mô Nhân Sự
               </span>
               <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg mt-0.5">
-                Mức lương Hiện tại
+                Cơ cấu Phòng ban
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-              <TrendingUp className="w-5 h-5" />
+              <Users className="w-5 h-5" />
             </div>
           </div>
 
           <div className="flex items-baseline gap-2">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] text-3xl font-extrabold text-slate-900">
-              16.280.000
+              {totalEmployees}
             </span>
-            <span className="text-xs font-bold text-sky-600">VNĐ / người</span>
+            <span className="text-xs font-bold text-sky-600">nhân sự chính thức</span>
           </div>
 
           <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-            <span className="text-slate-500">Khoảng dao động lương:</span>
-            <span className="font-bold text-slate-800">9.5tr - 45.0tr VNĐ</span>
+            <span className="text-slate-500">Phân bổ qua các phòng ban:</span>
+            <span className="font-bold text-slate-800">{activeDepts} phòng ban hoạt động</span>
           </div>
         </div>
       </div>
 
       {/* ──────────────── SMART FILTERS TOOLBAR ──────────────── */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col gap-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
-          <div className="lg:col-span-1 relative flex items-center">
+          <div className="relative flex items-center">
             <Search className="w-4 h-4 absolute left-3.5 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm tên, mã NV, chức danh..."
+              placeholder="Tìm theo tên, mã NV, chức danh..."
               className="w-full pl-10 pr-3.5 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
             />
           </div>
 
-          {/* Trình độ */}
+          {/* Phòng ban filter */}
           <select
-            value={selectedDegree}
-            onChange={(e) => setSelectedDegree(e.target.value)}
+            value={selectedDept}
+            onChange={(e) => setSelectedDept(e.target.value)}
             className="px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
           >
-            <option value="all">Tất cả Trình độ</option>
-            <option value="postgrad">Thạc sĩ / Sau ĐH</option>
-            <option value="university">Đại học chính quy</option>
-            <option value="college">Cao đẳng / Nghề</option>
-            <option value="engineer">Kỹ sư công nghệ</option>
+            <option value="all">Tất cả Phòng ban / Khối</option>
+            {Object.entries(DEPARTMENT_MAP).map(([code, name]) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
           </select>
 
-          {/* Thâm niên */}
+          {/* Thâm niên filter */}
           <select
             value={selectedTenure}
             onChange={(e) => setSelectedTenure(e.target.value)}
             className="px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
           >
             <option value="all">Tất cả Thâm niên</option>
-            <option value="under1">Dưới 1 năm (Mới)</option>
+            <option value="under1">Dưới 1 năm (Mới vào)</option>
             <option value="1to3">1 - 3 năm</option>
             <option value="3to5">3 - 5 năm</option>
             <option value="above5">Trên 5 năm (Nòng cốt)</option>
           </select>
 
-          {/* Dải lương */}
+          {/* Hình thức làm việc filter */}
           <select
-            value={selectedSalaryRange}
-            onChange={(e) => setSelectedSalaryRange(e.target.value)}
+            value={selectedWorkingType}
+            onChange={(e) => setSelectedWorkingType(e.target.value)}
             className="px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
           >
-            <option value="all">Tất cả Dải lương</option>
-            <option value="under10">Dưới 10 triệu</option>
-            <option value="10to20">10 - 20 triệu</option>
-            <option value="20to30">20 - 30 triệu</option>
-            <option value="above30">Trên 30 triệu</option>
-          </select>
-
-          {/* Khối bộ phận */}
-          <select
-            value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
-          >
-            <option value="all">Tất cả Khối / Bộ phận</option>
-            <option value="Viện Nghiên cứu Cà phê TN">Viện Nghiên cứu R&D</option>
-            <option value="Chuỗi Legend F&B">Chuỗi Legend F&B</option>
-            <option value="Nhà máy Buôn Ma Thuột">Nhà máy Buôn Ma Thuột</option>
-            <option value="Khối Văn phòng Điều hành">Khối Văn phòng Điều hành</option>
+            <option value="all">Tất cả Hình thức làm việc</option>
+            <option value="FULL_TIME">Toàn thời gian (Full-time)</option>
+            <option value="PART_TIME">Bán thời gian (Part-time)</option>
           </select>
         </div>
 
@@ -445,10 +503,9 @@ export default function PersonnelReport() {
           <button
             onClick={() => {
               setSearchQuery("");
-              setSelectedDegree("all");
               setSelectedTenure("all");
-              setSelectedSalaryRange("all");
               setSelectedDept("all");
+              setSelectedWorkingType("all");
             }}
             className="text-sky-600 font-semibold hover:underline"
           >
@@ -459,253 +516,316 @@ export default function PersonnelReport() {
 
       {/* ──────────────── DETAILED HR TABLE ──────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
-            <thead>
-              <tr className="bg-slate-50/80 text-slate-500 font-semibold text-[11px] uppercase tracking-wider border-b border-slate-200/80">
-                <th className="py-3.5 px-5">Mã & Họ tên Nhân sự</th>
-                <th className="py-3.5 px-4">Phòng ban / Chi nhánh</th>
-                <th className="py-3.5 px-4">Trình độ & Chuyên môn</th>
-                <th className="py-3.5 px-4">Thâm niên & Ngày vào</th>
-                <th className="py-3.5 px-5 text-right">Mức lương Hiện tại</th>
-                <th className="py-3.5 px-4 text-center w-24">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs text-slate-800">
-              {filteredEmployees.map((emp) => (
-                <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors">
-                  {/* Tên & Mã */}
-                  <td className="py-3.5 px-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-700 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
-                        {emp.initials}
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-slate-900">{emp.name}</span>
-                          <span className="font-mono text-[10px] text-sky-700 bg-sky-50 px-1 py-0.2 rounded font-semibold">
-                            {emp.id}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-slate-400 mt-0.5">{emp.role}</span>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Dept */}
-                  <td className="py-3.5 px-4">
-                    <div className="flex flex-col">
-                      <span className="font-medium text-slate-800">{emp.dept}</span>
-                      <span className="text-[11px] text-slate-400">{emp.location}</span>
-                    </div>
-                  </td>
-
-                  {/* Trình độ */}
-                  <td className="py-3.5 px-4">
-                    <div className="flex flex-col gap-0.5 items-start">
-                      <span className="px-2 py-0.5 rounded-lg bg-sky-50 text-sky-700 font-semibold text-[11px]">
-                        {emp.degreeLabel}
-                      </span>
-                      <span className="text-slate-400 text-[10px]">{emp.school}</span>
-                    </div>
-                  </td>
-
-                  {/* Thâm niên */}
-                  <td className="py-3.5 px-4">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-emerald-700">{emp.tenureLabel}</span>
-                        {emp.isCore && (
-                          <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase">
-                            Nòng cốt
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-slate-400 text-[10px]">Vào làm: {emp.joinDate}</span>
-                    </div>
-                  </td>
-
-                  {/* Mức lương */}
-                  <td className="py-3.5 px-5 text-right">
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-sm">
-                        {emp.currentSalary.toLocaleString("vi-VN")} đ
-                      </span>
-                      <span className="text-emerald-600 text-[10px] font-semibold">
-                        {emp.salaryNote}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Actions */}
-                  <td className="py-3.5 px-4 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => setSelectedProfileModal(emp)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
-                        title="Xem hồ sơ học vấn & chuyên môn"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setSelectedHistoryModal(emp)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                        title="Xem lịch sử tăng lương"
-                      >
-                        <TrendingUp className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+        {isLoading ? (
+          <div className="p-12 flex flex-col items-center justify-center gap-3 text-slate-400">
+            <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
+            <span className="text-xs font-medium">Đang tải báo cáo nhân sự từ CSDL...</span>
+          </div>
+        ) : (
+          <>
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-left border-collapse min-w-[1000px]">
+              <thead>
+                <tr className="bg-slate-50/80 text-slate-500 font-semibold text-[11px] uppercase tracking-wider border-b border-slate-200/80">
+                  <th className="py-3.5 px-5">Mã & Họ tên Nhân sự</th>
+                  <th className="py-3.5 px-4">Phòng ban</th>
+                  <th className="py-3.5 px-4">Chức vụ & Vị trí</th>
+                  <th className="py-3.5 px-4">Thâm niên công tác</th>
+                  <th className="py-3.5 px-4">Hình thức làm việc</th>
+                  <th className="py-3.5 px-4 text-center w-24">Chi tiết</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs text-slate-800">
+                {filteredEmployees.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      Không có nhân sự nào phù hợp với bộ lọc hiện tại.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedEmployees.map((emp) => (
+                    <tr key={emp.id} className="hover:bg-slate-50/80 transition-colors">
+                      {/* Tên & Mã */}
+                      <td className="py-3.5 px-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-700 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
+                            {emp.initials}
+                          </div>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-slate-900">{emp.name}</span>
+                              <span className="font-mono text-[10px] text-sky-700 bg-sky-50 px-1 py-0.2 rounded font-semibold">
+                                {emp.id}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-400 mt-0.5">{emp.email || emp.phone}</span>
+                          </div>
+                        </div>
+                      </td>
 
-      {/* ──────────────── MODAL HỒ SƠ CHUYÊN MÔN ──────────────── */}
-      {selectedProfileModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="w-5 h-5 text-sky-600" />
-                <h3 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-base">
-                  Hồ sơ Học vấn & Năng lực
-                </h3>
+                      {/* Dept */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-slate-800">{emp.dept}</span>
+                          <span className="text-[11px] text-slate-400">{emp.location}</span>
+                        </div>
+                      </td>
+
+                      {/* Role */}
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                          {emp.role}
+                        </span>
+                      </td>
+
+                      {/* Thâm niên */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-emerald-700">{emp.tenureLabel}</span>
+                            {emp.isCore && (
+                              <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase">
+                                Nòng cốt
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-slate-400 text-[10px]">Vào làm: {emp.joinDate}</span>
+                        </div>
+                      </td>
+
+                      {/* Working Type */}
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${emp.workingType === "FULL_TIME"
+                              ? "bg-sky-50 text-sky-700"
+                              : "bg-amber-50 text-amber-700"
+                            }`}
+                        >
+                          {emp.workingType === "FULL_TIME" ? "Toàn thời gian" : "Bán thời gian"}
+                        </span>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          onClick={() => handleOpenProfileModal(emp)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                          title="Xem hồ sơ chi tiết kết nối từ CSDL"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ──────────────── BỘ CHUYỂN PHÂN TRANG ──────────────── */}
+        {filteredEmployees.length > 0 && (
+          <div className="px-5 py-3.5 bg-slate-50/70 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <div className="flex items-center gap-3">
+              <span>
+                Đang hiển thị{" "}
+                <span className="font-semibold text-slate-800">{startIndex + 1}</span> -{" "}
+                <span className="font-semibold text-slate-800">{endIndex}</span> trong tổng số{" "}
+                <span className="font-semibold text-slate-800">{filteredEmployees.length}</span> nhân sự
+              </span>
+              <span className="text-slate-300">|</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-500">Hiển thị</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="px-2 py-1 bg-white border border-slate-200/80 rounded-lg text-xs text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                </select>
+                <span className="text-slate-500">người/trang</span>
               </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setSelectedProfileModal(null)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1 shadow-2xs"
               >
-                <X className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Trước</span>
               </button>
-            </div>
 
-            <div className="mt-4 flex flex-col gap-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-sky-600 text-white font-bold text-sm flex items-center justify-center">
-                  {selectedProfileModal.initials}
-                </div>
-                <div>
-                  <span className="font-bold text-slate-900 text-sm block">
-                    {selectedProfileModal.name}
-                  </span>
-                  <span className="text-slate-500">
-                    {selectedProfileModal.id} • {selectedProfileModal.role}
-                  </span>
-                </div>
-              </div>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-8 h-8 rounded-lg font-semibold transition-all text-xs ${page === safePage
+                      ? "bg-sky-600 text-white shadow-xs"
+                      : "bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50"
+                    }`}
+                >
+                  {page}
+                </button>
+              ))}
 
-              <div className="p-3 rounded-xl bg-sky-50/60 border border-sky-100 flex flex-col gap-1">
-                <span className="text-sky-800 font-semibold text-xs">Bằng cấp & Học hàm cao nhất:</span>
-                <span className="font-bold text-slate-900 text-sm">{selectedProfileModal.degreeLabel}</span>
-                <span className="text-slate-500">{selectedProfileModal.school}</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <span className="text-slate-400 block">Thâm niên công tác:</span>
-                  <span className="font-bold text-emerald-700 text-sm mt-0.5 block">
-                    {selectedProfileModal.tenureLabel}
-                  </span>
-                  <span className="text-[11px] text-slate-500">Từ {selectedProfileModal.joinDate}</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                  <span className="text-slate-400 block">Mức lương hiện tại:</span>
-                  <span className="font-bold text-slate-900 text-sm mt-0.5 block">
-                    {selectedProfileModal.currentSalary.toLocaleString("vi-VN")} đ
-                  </span>
-                  <span className="text-[11px] text-emerald-600 font-semibold">
-                    {selectedProfileModal.salaryNote}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="font-semibold text-slate-700 block mb-1">
-                  Đánh giá phân loại nhân sự:
-                </span>
-                <p className="text-slate-600 leading-relaxed">
-                  Nhân sự thuộc nhóm {selectedProfileModal.isCore ? "Nhân sự Nòng cốt chiến lược" : "Đội ngũ vận hành kế thừa"}, đạt chuẩn năng lực chuyên môn và lộ trình thăng tiến của Trung Nguyên Legend.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end pt-3 border-t border-slate-100">
               <button
-                onClick={() => setSelectedProfileModal(null)}
-                className="px-4 py-2 rounded-xl bg-sky-600 text-white font-semibold text-xs"
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage >= totalPages}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1 shadow-2xs"
               >
-                Đóng
+                <span>Sau</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+          </>
+        )}
+      </div>
 
-      {/* ──────────────── MODAL LỊCH SỬ TĂNG LƯƠNG ──────────────── */}
-      {selectedHistoryModal && (
+      {/* ──────────────── MODAL HỒ SƠ CHI TIẾT (LINK TRỰC TIẾP API PROFILE) ──────────────── */}
+      {selectedProfileModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
+                <ShieldCheck className="w-5 h-5 text-sky-600" />
                 <h3 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-base">
-                  Lịch sử Điều chỉnh Lương & Chức vụ
+                  Hồ sơ Nhân sự Chi tiết
                 </h3>
               </div>
               <button
-                onClick={() => setSelectedHistoryModal(null)}
+                onClick={() => setSelectedProfileModal(null)}
                 className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 text-xs">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div>
-                  <span className="font-bold text-slate-900 text-sm block">
-                    {selectedHistoryModal.name}
-                  </span>
-                  <span className="text-slate-400 text-[11px]">
-                    {selectedHistoryModal.id} • {selectedHistoryModal.dept}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[11px] text-slate-400 block">Hiện tại:</span>
-                  <span className="font-bold text-sky-700 font-mono text-sm">
-                    {selectedHistoryModal.currentSalary.toLocaleString("vi-VN")} đ
-                  </span>
-                </div>
+            {isLoadingProfile ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
+                <Loader2 className="w-6 h-6 animate-spin text-sky-600" />
+                <span className="text-xs">Đang tải chi tiết hồ sơ từ API...</span>
               </div>
-
-              {/* Timeline of salary increases */}
-              <div className="flex flex-col gap-3 mt-2">
-                <span className="font-semibold text-slate-700">Các mốc điều chỉnh lương:</span>
-                <div className="flex flex-col gap-2.5 pl-2 border-l-2 border-sky-200">
-                  {selectedHistoryModal.history.map((item, idx) => (
-                    <div key={idx} className="relative pl-4 flex flex-col gap-0.5">
-                      <span className="absolute -left-[17px] top-1 w-2.5 h-2.5 rounded-full bg-sky-600 ring-2 ring-white"></span>
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-slate-900">{item.title}</span>
-                        <span className="font-mono font-bold text-emerald-700">{item.salary}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
-                        <span>{item.reason}</span>
-                        <span>Mốc: {item.date}</span>
-                      </div>
+            ) : (
+              <div className="mt-4 flex flex-col gap-4 text-xs">
+                {/* Header Profile Box */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-sky-600 text-white font-bold text-base flex items-center justify-center shadow-xs">
+                    {selectedProfileModal.initials}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 text-base">
+                        {detailedProfile?.ho_ten || selectedProfileModal.name}
+                      </span>
+                      <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-sky-100 text-sky-800">
+                        {selectedProfileModal.id}
+                      </span>
                     </div>
-                  ))}
+                    <span className="text-slate-500 text-xs block mt-0.5">
+                      {detailedProfile?.ten_cv || selectedProfileModal.role} • {detailedProfile?.ten_pb || selectedProfileModal.dept}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Thông tin thâm niên & làm việc */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-slate-400 text-[11px] block">Thâm niên công tác:</span>
+                    <span className="font-bold text-emerald-700 text-sm mt-0.5 block">
+                      {selectedProfileModal.tenureLabel}
+                    </span>
+                    <span className="text-[10px] text-slate-500">Từ {selectedProfileModal.joinDate}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-slate-400 text-[11px] block">Hình thức làm việc:</span>
+                    <span className="font-bold text-slate-900 text-sm mt-0.5 block">
+                      {selectedProfileModal.workingType === "FULL_TIME" ? "Toàn thời gian" : "Bán thời gian"}
+                    </span>
+                    <span className="text-[10px] text-sky-600 font-semibold">
+                      Trạng thái: {selectedProfileModal.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Thông tin liên hệ & Căn cước */}
+                <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 flex flex-col gap-2">
+                  <span className="font-semibold text-slate-700 text-xs mb-1 block">
+                    Thông tin liên hệ & Pháp lý:
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block">Số điện thoại:</span>
+                      <span className="font-medium text-slate-800">
+                        {detailedProfile?.sdt || selectedProfileModal.phone || "Chưa cập nhật"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Email công việc:</span>
+                      <span className="font-medium text-slate-800">
+                        {detailedProfile?.email || selectedProfileModal.email || "Chưa cập nhật"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Số CCCD:</span>
+                      <span className="font-medium text-slate-800 font-mono">
+                        {detailedProfile?.cccd || selectedProfileModal.cccd || "Chưa cập nhật"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Địa chỉ thường trú:</span>
+                      <span className="font-medium text-slate-800">
+                        {detailedProfile?.dia_chi || "Chưa cập nhật"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Thông tin tài chính & bảo hiểm */}
+                <div className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-100 flex flex-col gap-2">
+                  <span className="font-semibold text-slate-700 text-xs mb-1 block">
+                    Thông tin Ngân hàng & BHXH:
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block">Tài khoản ngân hàng:</span>
+                      <span className="font-mono font-medium text-slate-800">
+                        {detailedProfile?.so_tai_khoan || selectedProfileModal.bankAccount || "Chưa cập nhật"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Ngân hàng:</span>
+                      <span className="font-medium text-slate-800">
+                        {detailedProfile?.ngan_hang || selectedProfileModal.bankName || "Chưa cập nhật"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Mã số thuế:</span>
+                      <span className="font-mono font-medium text-slate-800">
+                        {detailedProfile?.ma_so_thue || selectedProfileModal.taxCode || "Chưa cập nhật"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Số sổ BHXH:</span>
+                      <span className="font-mono font-medium text-slate-800">
+                        {detailedProfile?.so_bhxh || selectedProfileModal.insuranceCode || "Chưa cập nhật"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="mt-5 flex justify-end pt-3 border-t border-slate-100">
               <button
-                onClick={() => setSelectedHistoryModal(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors"
+                onClick={() => setSelectedProfileModal(null)}
+                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs transition-colors"
               >
                 Đóng
               </button>
