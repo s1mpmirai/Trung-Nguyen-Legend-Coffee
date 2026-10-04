@@ -1,24 +1,24 @@
 import React, { useRef, useEffect } from "react";
 import {
   LayoutDashboard,
-  Users,
-  ClipboardCheck,
-  Clock,
-  CreditCard,
+  KeyRound,
   Shield,
+  Building2,
+  Briefcase,
+  FileText,
+  Users,
+  Package,
   ArrowLeftRight,
-  FileBarChart2,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
-import logoImg from "../../../assets/logo/Logo Trung Nguyên_black.png";
-import { navigateClean } from "../../../utils/navigation";
+import logoImg from "../../assets/logo/Logo Trung Nguyên_black.png";
 
-export default function ManagerSidebar({
+export default function AdminSidebar({
   activeTab = "dashboard",
   onTabChange,
+  onSwitchToManager,
   onSwitchToEmployee,
-  onSwitchToAdmin,
   collapsed = false,
   onToggleCollapse,
   onClose,
@@ -46,12 +46,14 @@ export default function ManagerSidebar({
   }, [collapsed, onToggleCollapse, onClose]);
 
   const navItems = [
-    { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
-    { id: "reports", label: "Báo cáo nhân sự", icon: FileBarChart2 },
+    { id: "dashboard", label: "Tổng quan hệ thống", icon: LayoutDashboard },
+    { id: "accounts", label: "Quản lý tài khoản", icon: KeyRound, badge: "Admin" },
+    { id: "permissions", label: "Phân quyền & RBAC", icon: Shield, badge: "Admin" },
+    { id: "departments", label: "Cơ cấu phòng ban", icon: Building2 },
+    { id: "positions", label: "Chức vụ & Bậc lương", icon: Briefcase },
+    { id: "contracts", label: "Hợp đồng lao động", icon: FileText },
     { id: "employees", label: "Quản lý nhân sự", icon: Users },
-    { id: "leaves", label: "Duyệt đơn", icon: ClipboardCheck },
-    { id: "attendance", label: "Chấm công & Ca làm", icon: Clock },
-    { id: "payroll", label: "Bảng tính lương", icon: CreditCard },
+    { id: "warehouse", label: "Kho & Nhà cung cấp", icon: Package },
   ];
 
   return (
@@ -62,15 +64,20 @@ export default function ManagerSidebar({
           onToggleCollapse && onToggleCollapse();
         }
       }}
-      className={`fixed left-0 top-0 h-full ${collapsed
+      className={`fixed left-0 top-0 h-full ${
+        collapsed
           ? "w-20 cursor-pointer hover:border-sky-300 hover:shadow-md"
           : "w-64"
-        } bg-white border-r border-slate-200/80 z-50 flex flex-col justify-between py-6 select-none transition-all duration-300`}
+      } bg-white border-r border-slate-200/80 z-50 flex flex-col justify-between py-6 select-none transition-all duration-300`}
       title={collapsed ? "Bấm vào bất kỳ đâu để mở rộng menu" : undefined}
     >
       <div className="flex flex-col gap-6">
         {/* Logo Branding Trung Nguyên & Nút Thu Gọn Menu Bên Phải Logo */}
-        <div className={`px-4 flex items-center ${collapsed ? "justify-center flex-col gap-2" : "justify-between"}`}>
+        <div
+          className={`px-4 flex items-center ${
+            collapsed ? "justify-center flex-col gap-2" : "justify-between"
+          }`}
+        >
           <div
             onClick={(e) => {
               e.stopPropagation();
@@ -89,10 +96,10 @@ export default function ManagerSidebar({
             {!collapsed && (
               <div className="flex flex-col min-w-0">
                 <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg tracking-tight leading-tight group-hover:text-sky-600 transition-colors truncate">
-                  TrungNguyen<span className="text-sky-600">HR</span>
+                  TrungNguyen<span className="text-sky-600">Admin</span>
                 </span>
                 <span className="font-['Plus_Jakarta_Sans',sans-serif] font-semibold text-[10px] text-slate-400 tracking-wider uppercase mt-0.5 truncate">
-                  HR Legend Portal
+                  Admin Master Portal
                 </span>
               </div>
             )}
@@ -132,16 +139,31 @@ export default function ManagerSidebar({
                   }
                 }}
                 title={item.label}
-                className={`flex items-center ${collapsed ? "justify-center px-0 py-3" : "gap-3 px-3.5 py-2.5"
-                  } rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${isActive
+                className={`flex items-center ${
+                  collapsed ? "justify-center px-0 py-3" : "gap-3 px-3.5 py-2.5"
+                } rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+                  isActive
                     ? collapsed
                       ? "bg-sky-50 text-sky-600 shadow-xs"
                       : "bg-sky-50 text-sky-600 border-l-[3px] border-sky-600 pl-3 shadow-xs"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-                  }`}
+                }`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-sky-600" : "text-slate-400"}`} />
-                {!collapsed && <span className="truncate">{item.label}</span>}
+                <Icon
+                  className={`w-4 h-4 shrink-0 ${
+                    isActive ? "text-sky-600" : "text-slate-400"
+                  }`}
+                />
+                {!collapsed && (
+                  <span className="truncate flex-1 flex items-center justify-between">
+                    <span>{item.label}</span>
+                    {item.badge && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-sky-100 text-sky-700 border border-sky-200">
+                        {item.badge}
+                      </span>
+                    )}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -149,47 +171,51 @@ export default function ManagerSidebar({
       </div>
 
       {/* Bottom Actions & System Status */}
-      <div className={collapsed ? "px-2 flex flex-col items-center gap-2" : "px-4 flex flex-col gap-2"}>
-        {onSwitchToAdmin && (
+      <div
+        className={
+          collapsed
+            ? "px-2 flex flex-col items-center gap-2"
+            : "px-4 flex flex-col gap-2"
+        }
+      >
+        {onSwitchToManager && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onSwitchToAdmin();
+              onSwitchToManager();
             }}
             className={`${
               collapsed ? "w-10 h-10 p-0" : "w-full py-2.5 px-3"
-            } flex items-center justify-center gap-2 rounded-xl text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all cursor-pointer shadow-xs`}
-            title="Chuyển sang Cổng Quản Trị Viên (Admin)"
+            } flex items-center justify-center gap-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-sky-600 hover:bg-sky-50 border border-slate-200/80 transition-all cursor-pointer`}
+            title="Chuyển sang Cổng Quản lý (Manager)"
           >
-            <Shield className="w-3.5 h-3.5 text-amber-600" />
-            {!collapsed && <span>Cổng Admin Tối Cao</span>}
+            <ArrowLeftRight className="w-3.5 h-3.5 text-slate-500" />
+            {!collapsed && <span>Cổng Quản lý (Manager)</span>}
           </button>
         )}
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onSwitchToEmployee) {
+        {onSwitchToEmployee && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
               onSwitchToEmployee();
-            } else {
-              navigateClean("attendance");
-            }
-          }}
-          className={`${
-            collapsed ? "w-10 h-10 p-0" : "w-full py-2.5 px-3"
-          } flex items-center justify-center gap-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-sky-600 hover:bg-sky-50 border border-slate-200/80 transition-all cursor-pointer`}
-          title="Chuyển sang giao diện Nhân viên"
-        >
-          <ArrowLeftRight className="w-3.5 h-3.5" />
-          {!collapsed && <span>Giao diện Nhân viên</span>}
-        </button>
+            }}
+            className={`${
+              collapsed ? "w-10 h-10 p-0" : "w-full py-2.5 px-3"
+            } flex items-center justify-center gap-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-sky-600 hover:bg-sky-50 border border-slate-200/80 transition-all cursor-pointer`}
+            title="Chuyển sang Giao diện Nhân viên"
+          >
+            <Users className="w-3.5 h-3.5 text-slate-500" />
+            {!collapsed && <span>Giao diện Nhân viên</span>}
+          </button>
+        )}
 
         {collapsed ? (
           <div
             className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center cursor-default"
-            title="Máy chủ ổn định (v2.4)"
+            title="Hệ thống Quản trị (v2.4)"
           >
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -203,9 +229,9 @@ export default function ManagerSidebar({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="text-[11px] font-medium text-slate-600">Máy chủ ổn định</span>
+              <span className="text-[11px] font-medium text-slate-600">Hệ thống Quản trị</span>
             </div>
-            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">v2.4</span>
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">ADMIN v2.4</span>
           </div>
         )}
       </div>

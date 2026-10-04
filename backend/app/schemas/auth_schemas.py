@@ -33,9 +33,16 @@ class change_password_request(BaseModel):
 class employee_without_account_response(BaseModel):
     ma_nv: str = Field(..., description="Mã nhân viên")
     ho_ten: str = Field(..., description="Họ tên")
-    email: str = Field(..., description="Email")
+    email: str | None = None
+    sdt: str | None = None
     ten_pb: str | None = None
     ten_cv: str | None = None
 
     class Config:
         from_attributes = True
+
+
+class account_admin_update(BaseModel):
+    mat_khau_moi: str | None = Field(None, description="Mật khẩu mới nếu muốn đổi (bỏ trống nếu giữ nguyên)")
+    ma_vai_tro: str | None = Field(None, description="Vai trò mới (ADMIN, QUAN_LY, TRUONG_NHOM, NHAN_VIEN)")
+    trang_thai: str | None = Field(None, description="Trạng thái tài khoản (HOAT_DONG, KHOA)")

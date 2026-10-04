@@ -16,9 +16,11 @@
 [ACCOUNTS - QUẢN LÝ TÀI KHOẢN NGƯỜI DÙNG]
 - GET  /api/v1/accounts                     | [Admin] Lấy danh sách toàn bộ tài khoản (phân trang, tìm kiếm, lọc vai trò, trạng thái)
 - POST /api/v1/accounts/create_account      | [Admin] Tạo tài khoản người dùng mới (Mật khẩu mặc định là 1)
+- PUT  /api/v1/accounts/{ma_nv}             | [Admin] Cập nhật tài khoản (Đổi mật khẩu mới, đổi vai trò, đổi trạng thái)
 - PUT  /api/v1/accounts/{ma_nv}/status      | [Admin] Cập nhật trạng thái tài khoản (Kích hoạt / Khóa)
-- POST /api/v1/accounts/change-password     | [Cá nhân] Đổi mật khẩu tài khoản
+- POST /api/v1/accounts/change-password     | [Cá nhân] Đổi mật khẩu tài khoản (yêu cầu mật khẩu cũ)
 - GET  /api/v1/accounts/without_account     | [Admin] Danh sách mã nhân viên chưa được cấp tài khoản để chọn cấp tài khoản
+- GET  /api/v1/accounts/without_account_details | [Admin] Danh sách chi tiết nhân sự chưa có tài khoản (họ tên, PB, CV, email, SĐT) theo thứ tự
 
 [PERMISSIONS - PHÂN QUYỀN RBAC]
 - GET  /api/v1/permissions/roles            | [Admin/QL] Danh sách các vai trò hệ thống kèm quyền mặc định

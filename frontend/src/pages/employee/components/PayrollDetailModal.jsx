@@ -36,7 +36,6 @@ function PayrollDetailModal({
     { label: "Lương cơ bản", value: payroll.luong_co_ban },
     { label: "Hệ số lương", value: payroll.he_so_luong, isRaw: true },
     { label: "Lương theo công", value: payroll.luong_theo_cong },
-    { label: "Tiền tăng ca", value: payroll.tien_tang_ca },
     { label: "Tổng phụ cấp", value: payroll.tong_phu_cap },
     { label: "Tiền thưởng", value: payroll.tien_thuong },
     { label: "Tổng thu nhập (Gross)", value: payroll.luong_gross, isTotal: true },
@@ -125,10 +124,6 @@ function PayrollDetailModal({
             <div className="pr-modal__row">
               <span>Số công thực tế</span>
               <strong>{payroll.so_cong_thuc_te} ngày</strong>
-            </div>
-            <div className="pr-modal__row">
-              <span>Giờ tăng ca</span>
-              <strong>{payroll.so_gio_tang_ca} giờ</strong>
             </div>
           </div>
 

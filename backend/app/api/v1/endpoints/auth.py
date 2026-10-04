@@ -1,5 +1,5 @@
 from typing import Annotated
-
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -62,3 +62,20 @@ def employee_login(
     if result is None:
         raise HTTPException(status_code=401, detail="Thông tin đăng nhập không hợp lệ")
     return result
+
+
+class FirstTimePasswordRequest(BaseModel):
+    ma_nv: str
+    mat_khau_moi: str
+
+
+@router.post("/first-time-change-password")
+def api_first_time_change_password(
+    request: FirstTimePasswordRequest,
+    db: DbSession,
+):
+    try:
+        from app.services.auth_service import first_time_change_password
+        return first_time_change_password(db, request.ma_nv, request.mat_khau_moi)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

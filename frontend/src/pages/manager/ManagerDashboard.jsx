@@ -8,13 +8,12 @@ import AttendanceTrendCard from "./components/AttendanceTrendCard";
 import ExpiringContractsCard from "./components/ExpiringContractsCard";
 import EmployeeManagement from "./EmployeeManagement";
 import LeaveApprovals from "./LeaveApprovals";
-import RolePermissions from "./RolePermissions";
 import AttendanceManagement from "./AttendanceManagement";
 import PayrollManagement from "./PayrollManagement";
 import PersonnelReport from "./PersonnelReport";
 import { getManagerDashboardStats } from "../../services/managerService";
 
-export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmployee }) {
+export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmployee, onSwitchToAdmin }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
@@ -49,6 +48,7 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onSwitchToEmployee={onSwitchToEmployee}
+        onSwitchToAdmin={onSwitchToAdmin}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         onClose={() => setSidebarCollapsed(true)}
@@ -80,8 +80,7 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
             {/* 5. TAB: Báo cáo Thông tin Nhân sự Chuyên sâu */}
             {activeTab === "reports" && <PersonnelReport />}
 
-            {/* 6. TAB: Phân quyền & Vai trò */}
-            {activeTab === "roles" && <RolePermissions />}
+
 
             {/* 7. TAB: Tổng quan (Default) */}
             {activeTab === "dashboard" && (

@@ -103,6 +103,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
           ma_nv: data.ma_nv,
           token: data.access_token,
           role: role,
+          must_change_password: Boolean(data.must_change_password),
         });
       }
     } catch (err) {

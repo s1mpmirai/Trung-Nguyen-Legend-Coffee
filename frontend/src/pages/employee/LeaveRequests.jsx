@@ -518,8 +518,14 @@ export default function LeaveRequests({ userSession, onLogout }) {
 
       {/* ───────────────── MODAL XEM CHI TIẾT ĐƠN ───────────────── */}
       {selectedLeave && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
+        <div
+          onClick={() => setSelectedLeave(null)}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-black text-slate-900">Chi tiết đơn #{selectedLeave.ma_don}</h3>
               <button
@@ -596,8 +602,14 @@ export default function LeaveRequests({ userSession, onLogout }) {
 
       {/* ───────────────── MODAL TẠO ĐƠN MỚI ───────────────── */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl border border-slate-100">
+        <div
+          onClick={() => setShowCreateModal(false)}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl border border-slate-100 cursor-default"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-black text-slate-900">Tạo đơn nghỉ phép mới</h3>
               <button
