@@ -1,7 +1,7 @@
 # ==============================================================================
 # TRUNG NGUYEN LEGEND COFFEE - DANH MỤC API BACKEND (API LINKS)
 # Tự động cập nhật mỗi khi có API mới hoặc thay đổi endpoint
-# Cập nhật lần cuối: 2026-10-02 17:15:00 (UTC+7)
+# Cập nhật lần cuối: 2026-10-04 10:25:00 (UTC+7)
 # ==============================================================================
 
 [AUTH - XÁC THỰC & ĐĂNG NHẬP]
@@ -31,12 +31,15 @@
 [ATTENDANCE - CHẤM CÔNG & CA LÀM VIỆC]
 - GET  /api/v1/attendance/dashboard/{ma_nv} | [Nhân viên] Dashboard chấm công, GPS, thống kê tháng, lịch sử gần đây
 - POST /api/v1/attendance/check-in          | [Nhân viên] Vào ca (1 lần/ngày, chuẩn 8h-17h, grace 15p, sau 8h15 báo QL sửa <= 3 lần, quá 3 lần trừ 1h lương)
-- POST /api/v1/attendance/check-out         | [Nhân viên] Ra ca (kết thúc ca làm việc)
+- POST /api/v1/attendance/check-out         | [Nhân viên] Ra ca (kết thúc ca làm việc, tính giờ làm thực tế & OT tự động)
 - GET  /api/v1/attendance/history/{ma_nv}   | [Nhân viên] Nhật ký chấm công chi tiết theo tháng/năm
 - GET  /api/v1/attendance/daily             | [Quản lý] Bảng chấm công theo ngày của toàn công ty/phòng ban
 - GET  /api/v1/attendance/summary           | [Quản lý] Bảng tổng hợp công tháng của tất cả nhân viên
 - PUT  /api/v1/attendance/{ma_cc}/adjust    | [Quản lý] Điều chỉnh thông tin chấm công (Sửa giờ check-in tối đa 3 lần/tháng)
 - PUT  /api/v1/attendance/manager/{ma_cc}/adjust | [Quản lý] Alias điều chỉnh thông tin chấm công
+- GET  /api/v1/attendance/manager/shifts    | [Quản lý] Danh sách danh mục các ca làm việc
+- GET  /api/v1/attendance/manager/lock-status | [Quản lý] Kiểm tra trạng thái Chốt/Khóa bảng công tháng
+- POST /api/v1/attendance/manager/toggle-lock | [Quản lý] Chốt hoặc Mở khóa bảng công tháng
 
 [LEAVES - NGHỈ PHÉP & ĐƠN TỪ]
 - POST /api/v1/leaves/request               | [Nhân viên] Gửi đơn xin nghỉ phép/nghỉ việc

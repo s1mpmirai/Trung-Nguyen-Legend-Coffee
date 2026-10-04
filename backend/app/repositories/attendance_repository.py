@@ -287,6 +287,7 @@ def get_attendance_history_by_employee(
     db: Session, ma_nv: str, month: Optional[int] = None, year: Optional[int] = None
 ) -> list[dict[str, Any]]:
     """Lấy danh sách các ngày công chi tiết của một nhân viên."""
+    ensure_attendance_columns(db)
     params: dict[str, Any] = {"ma_nv": ma_nv}
     where_parts = [
         "bcc.ma_nv = :ma_nv",
@@ -324,6 +325,7 @@ def get_daily_attendance_all(
     db: Session, target_date: date, ma_pb: Optional[str] = None
 ) -> list[dict[str, Any]]:
     """Dành cho Quản lý: Lấy danh sách chấm công toàn công ty trong 1 ngày."""
+    ensure_attendance_columns(db)
     params: dict[str, Any] = {"target_date": target_date}
     where_pb = ""
     if ma_pb:
@@ -511,8 +513,30 @@ def get_shift_by_code(db: Session, ma_ca: str) -> Optional[dict[str, Any]]:
     return d
 
 
+def ensure_attendance_columns(db: Session):
+    """Đảm bảo bảng chấm công có cột trang_thai_duyet nếu chạy trên DB hiện hữu."""
+    try:
+        check_col = text("""
+            SELECT COUNT(*) FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = DATABASE() 
+              AND TABLE_NAME = 'bang_cham_cong' 
+              AND COLUMN_NAME = 'trang_thai_duyet'
+        """)
+        exists = db.execute(check_col).scalar()
+        if not exists:
+            db.execute(text("""
+                ALTER TABLE bang_cham_cong 
+                ADD COLUMN trang_thai_duyet ENUM('CHO_DUYET', 'DA_DUYET', 'TU_CHOI') DEFAULT 'CHO_DUYET'
+                AFTER so_cong
+            """))
+            db.commit()
+    except Exception:
+        db.rollback()
+
+
 def ensure_attendance_lock_table(db: Session):
-    """Tạo bảng chốt công tháng nếu chưa tồn tại."""
+    """Tạo bảng chốt công tháng nếu chưa tồn tại và đảm bảo cấu trúc bảng chấm công."""
+    ensure_attendance_columns(db)
     create_sql = text("""
         CREATE TABLE IF NOT EXISTS chot_cong_thang (
             id INT AUTO_INCREMENT PRIMARY KEY,

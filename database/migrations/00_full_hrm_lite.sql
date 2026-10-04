@@ -1,7 +1,7 @@
 -- =================================================================================
 -- HỆ THỐNG QUẢN LÝ NHÂN SỰ TRUNG NGUYÊN COFFEE (HRM LITE - CHUẨN HÓA 3NF)
 -- HQTCSDL: MySQL 8.0+ / MariaDB 10.6+
--- ĐÃ ĐỒNG BỘ ĐẦY ĐỦ ngay_tao & ngay_cap_nhat TRÊN TẤT CẢ 18 BẢNG
+-- ĐÃ ĐỒNG BỘ ĐẦY ĐỦ ngay_tao & ngay_cap_nhat TRÊN TẤT CẢ 19 BẢNG
 -- =================================================================================
 
 SET NAMES utf8mb4;
@@ -12,7 +12,7 @@ CREATE DATABASE trungnguyen_hrm_lite CHARACTER SET utf8mb4 COLLATE utf8mb4_unico
 USE trungnguyen_hrm_lite;
 
 -- =====================================================================
--- PHẦN 1: CẤU TRÚC CƠ SỞ DỮ LIỆU (DDL - 18 BẢNG)
+-- PHẦN 1: CẤU TRÚC CƠ SỞ DỮ LIỆU (DDL - 19 BẢNG)
 -- =====================================================================
 
 -- 1. Chi nhánh
@@ -185,6 +185,7 @@ CREATE TABLE bang_cham_cong (
     so_gio_tang_ca DECIMAL(4,2) DEFAULT 0,
     loai_cong ENUM('CONG_DU', 'DI_TRE', 'VE_SOM', 'NUA_CONG', 'NGHI_PHEP', 'NGHI_OM', 'NGHI_THAI_SAN', 'NGHI_KHONG_PHEP', 'NGHI_LE', 'CUOI_TUAN') DEFAULT 'CONG_DU',
     so_cong DECIMAL(3,2) DEFAULT 1.00,
+    trang_thai_duyet ENUM('CHO_DUYET', 'DA_DUYET', 'TU_CHOI') DEFAULT 'CHO_DUYET',
     ma_don VARCHAR(15) NULL,
     ghi_chu VARCHAR(255),
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -228,6 +229,18 @@ CREATE TABLE IF NOT EXISTS yeu_cau_cap_nhat_ho_so (
     CONSTRAINT fk_yc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON DELETE CASCADE,
     CONSTRAINT fk_yc_nguoiduyet FOREIGN KEY (nguoi_duyet) REFERENCES nhan_vien(ma_nv) ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Yêu cầu cập nhật hồ sơ cá nhân nhân viên';
+
+-- 10.3. Chốt/Khóa bảng công tháng
+CREATE TABLE IF NOT EXISTS chot_cong_thang (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    thang TINYINT NOT NULL,
+    nam SMALLINT NOT NULL,
+    trang_thai VARCHAR(20) DEFAULT 'DA_CHOT',
+    nguoi_chot VARCHAR(50) NULL,
+    ngay_chot DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ghi_chu VARCHAR(255) NULL,
+    UNIQUE (thang, nam)
+) ENGINE=InnoDB COMMENT='Chốt và khóa bảng chấm công tháng';
 
 
 

@@ -75,13 +75,14 @@ def review_leave_by_manager(db: Session, ma_don: str, data: leave_review_request
                 if curr_date.weekday() < 6:
                     sync_query = """
                         INSERT INTO bang_cham_cong (
-                            ma_nv, ngay_cong, loai_cong, so_cong, ma_don, ghi_chu
+                            ma_nv, ngay_cong, loai_cong, so_cong, trang_thai_duyet, ma_don, ghi_chu
                         ) VALUES (
-                            :ma_nv, :ngay_cong, 'NGHI_PHEP', 1.0, :ma_don, 'Nghỉ phép có duyệt'
+                            :ma_nv, :ngay_cong, 'NGHI_PHEP', 1.0, 'DA_DUYET', :ma_don, 'Nghỉ phép có duyệt'
                         )
                         ON DUPLICATE KEY UPDATE
                             loai_cong = 'NGHI_PHEP',
                             so_cong   = 1.0,
+                            trang_thai_duyet = 'DA_DUYET',
                             ma_don    = :ma_don,
                             ghi_chu   = 'Nghỉ phép có duyệt'
                     """
