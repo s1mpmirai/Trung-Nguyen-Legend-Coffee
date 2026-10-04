@@ -1,5 +1,6 @@
 import json
 from datetime import date, datetime
+from typing import Any, Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -418,9 +419,9 @@ def update_employee_status(
     db: Session,
     ma_nv: str,
     trang_thai: str,
-    ngay_nghi_viec: Optional[date] = None,
+    ngay_nghi_viec: date | None = None,
     khoa_tai_khoan: bool = True,
-    ly_do: Optional[str] = None,
+    ly_do: str | None = None,
 ) -> dict | None:
     """Cập nhật trạng thái nhân viên (khóa / thôi việc / tạm hoãn / đi làm lại)."""
     now_vn = get_vietnam_now()
