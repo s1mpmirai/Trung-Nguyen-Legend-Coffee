@@ -27,6 +27,7 @@ import {
   Unlock,
   Layers,
   Eye,
+  Save,
 } from "lucide-react";
 import {
   getDailyAttendanceForManager,
@@ -96,7 +97,6 @@ export default function AttendanceManagement() {
     { ma_ca: "CA01", ten_ca: "Hành chính", gio_vao: "08:00", gio_ra: "17:00", he_so: 1.0 },
     { ma_ca: "CA02", ten_ca: "Ca sáng", gio_vao: "06:00", gio_ra: "14:00", he_so: 1.0 },
     { ma_ca: "CA03", ten_ca: "Ca chiều", gio_vao: "14:00", gio_ra: "22:00", he_so: 1.0 },
-    { ma_ca: "CA04", ten_ca: "Ca đêm", gio_vao: "22:00", gio_ra: "06:00", he_so: 1.3 },
   ]);
   const [adjustedShift, setAdjustedShift] = useState("CA01");
   const [isMonthLocked, setIsMonthLocked] = useState(false);
@@ -112,18 +112,29 @@ export default function AttendanceManagement() {
   const [isAdjusting, setIsAdjusting] = useState(false);
   const [adjustError, setAdjustError] = useState("");
 
+  // Modal từ chối duyệt công riêng biệt (Icon X)
+  const [rejectModalData, setRejectModalData] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectError, setRejectError] = useState("");
+  const [isRejecting, setIsRejecting] = useState(false);
+
   // Modal xem chi tiết lịch sử chấm công tháng của nhân viên
   const [selectedEmployeeDetail, setSelectedEmployeeDetail] = useState(null);
   const [employeeDetailHistory, setEmployeeDetailHistory] = useState(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
+  // Checkbox tick chọn & Phê duyệt hàng loạt
+  const [selectedRowIds, setSelectedRowIds] = useState([]);
+  const [isBulkApproving, setIsBulkApproving] = useState(false);
+
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(20);
 
   // Tải dữ liệu chấm công theo ngày
   const loadDailyData = async (date = selectedDate, dept = selectedDept) => {
     setIsLoading(true);
+    setSelectedRowIds([]);
     try {
       const data = await getDailyAttendanceForManager(date, dept);
       setDailyAttendance(Array.isArray(data) ? data : []);
@@ -235,6 +246,32 @@ export default function AttendanceManagement() {
     }
   };
 
+  // Tự động tính toán loại công hợp lý dựa trên ca làm việc và giờ vào / ra
+  const computeWorkType = (shiftCode, inTime, outTime) => {
+    if (!inTime || inTime === "--:--") return "CONG_DU";
+    const [h, m] = inTime.split(":").map(Number);
+    const inMins = (h || 0) * 60 + (m || 0);
+    let shiftStart = 8 * 60; // mặc định CA01 08:00
+    if (shiftCode === "CA02") shiftStart = 6 * 60;
+    else if (shiftCode === "CA03") shiftStart = 14 * 60;
+
+    let diff = inMins - shiftStart;
+    const isLate = diff > 15;
+
+    if (outTime && outTime !== "--:--" && outTime !== "Đang làm việc") {
+      const [oh, om] = outTime.split(":").map(Number);
+      let outMins = (oh || 0) * 60 + (om || 0);
+      if (outMins < inMins) outMins += 24 * 60;
+      let dur = (outMins - inMins) / 60;
+      if (shiftCode === "CA01" && dur >= 5) dur -= 1; // 1h nghỉ trưa
+      if (dur < 4) return "VE_SOM";
+      if (dur < 7.5 && isLate) return "DI_TRE";
+      if (dur < 7.5) return "NUA_CONG";
+    }
+
+    return isLate ? "DI_TRE" : "CONG_DU";
+  };
+
   // Chốt duyệt công đủ nhanh cho bản ghi
   const handleApprove = async (row) => {
     if (!row.ma_cc) {
@@ -246,6 +283,7 @@ export default function AttendanceManagement() {
       await adjustAttendanceRecord(row.ma_cc, {
         loai_cong: "CONG_DU",
         so_cong: 1.0,
+        trang_thai_duyet: "DA_DUYET",
         ghi_chu: "Quản lý chốt công đủ",
       });
       setSyncToast(`Đã chốt duyệt công đủ cho ${row.ho_ten}!`);
@@ -264,16 +302,21 @@ export default function AttendanceManagement() {
       setTimeout(() => setSyncToast(""), 4000);
       return;
     }
+    const initIn = row.gio_vao && row.gio_vao !== "--:--" ? row.gio_vao : "08:00";
+    const initOut = row.gio_ra && row.gio_ra !== "--:--" && row.gio_ra !== "Đang làm việc" ? row.gio_ra : "17:00";
+    const initShift = row.ma_ca || "CA01";
+
     setAdjustModalData(row);
-    setAdjustReason(row.ghi_chu || "");
-    setAdjustedTime(row.gio_vao && row.gio_vao !== "--:--" ? row.gio_vao : "08:00");
-    setAdjustedCheckOutTime(row.gio_ra && row.gio_ra !== "--:--" && row.gio_ra !== "Đang làm việc" ? row.gio_ra : "17:00");
-    setAdjustedShift(row.ma_ca || "CA01");
-    setAdjustedWorkType(row.loai_cong || "CONG_DU");
+    // Không tự động điền ghi chú vi phạm cũ của hệ thống
+    setAdjustReason("");
+    setAdjustedTime(initIn);
+    setAdjustedCheckOutTime(initOut);
+    setAdjustedShift(initShift);
+    setAdjustedWorkType(computeWorkType(initShift, initIn, initOut));
     setAdjustError("");
   };
 
-  // Lưu điều chỉnh từ modal
+  // Lưu điều chỉnh từ modal (chỉ lưu giờ/ca, KHÔNG tự động duyệt công)
   const handleSaveAdjust = async () => {
     if (!adjustModalData) return;
     if (!adjustModalData.ma_cc) {
@@ -307,10 +350,11 @@ export default function AttendanceManagement() {
         gio_ra: formattedOutTime || undefined,
         loai_cong: adjustedWorkType,
         so_cong: soCongValue,
-        ghi_chu: adjustReason || "Quản lý điều chỉnh ca & giờ công",
+        trang_thai_duyet: "CHO_DUYET", // Lưu điều chỉnh giữ trạng thái Chờ duyệt, không tự động xác nhận tick
+        ghi_chu: adjustReason || "Quản lý điều chỉnh giờ vào/ra hợp lệ",
       });
       setAdjustModalData(null);
-      setSyncToast(`Đã duyệt điều chỉnh ca & giờ chấm công cho ${adjustModalData.ho_ten}!`);
+      setSyncToast(`Đã lưu điều chỉnh giờ chấm công cho ${adjustModalData.ho_ten}!`);
       setTimeout(() => setSyncToast(""), 3500);
       loadDailyData(selectedDate, selectedDept);
     } catch (err) {
@@ -320,46 +364,49 @@ export default function AttendanceManagement() {
     }
   };
 
-  // Mở modal từ chối duyệt công
+  // Mở Popup Từ chối duyệt công riêng biệt (Icon X)
   const handleOpenReject = (row) => {
     if (isMonthLocked) {
       setSyncToast(`Bảng công tháng ${selectedMonth}/${selectedYear} đã được Chốt và Khóa! Vui lòng mở khóa trước.`);
       setTimeout(() => setSyncToast(""), 4000);
       return;
     }
-    setAdjustModalData(row);
-    setAdjustReason(row.ghi_chu ? `Bác bỏ giải trình: "${row.ghi_chu}" - Từ chối duyệt công` : "Quản lý từ chối duyệt công ngày này (0 công / Vi phạm)");
-    setAdjustedTime(row.gio_vao && row.gio_vao !== "--:--" ? row.gio_vao : "08:00");
-    setAdjustedCheckOutTime(row.gio_ra && row.gio_ra !== "--:--" && row.gio_ra !== "Đang làm việc" ? row.gio_ra : "17:00");
-    setAdjustedShift(row.ma_ca || "CA01");
-    setAdjustedWorkType("NGHI_KHONG_PHEP");
-    setAdjustError("");
+    setAdjustModalData(null);
+    setRejectModalData(row);
+    setRejectionReason(row.ghi_chu && !row.ghi_chu.includes("Đi muộn") ? `Bác bỏ giải trình: "${row.ghi_chu}"` : "");
+    setRejectError("");
   };
 
-  // Xác nhận từ chối duyệt công (0 công, phạt vi phạm/nghỉ không phép)
-  const handleRejectAttendance = async () => {
-    if (!adjustModalData) return;
-    if (!adjustModalData.ma_cc) {
-      setAdjustError("Nhân viên này chưa có bản ghi chấm công để từ chối.");
+  // Xác nhận từ chối duyệt công từ Popup X (0 công, chuyển thành nghỉ không phép / vi phạm)
+  const handleConfirmReject = async () => {
+    if (!rejectModalData) return;
+    if (!rejectionReason.trim()) {
+      setRejectError("Vui lòng nhập lý do từ chối công trước khi xác nhận.");
       return;
     }
-    setIsAdjusting(true);
-    setAdjustError("");
+    if (!rejectModalData.ma_cc) {
+      setRejectError("Nhân viên này chưa có bản ghi chấm công để từ chối.");
+      return;
+    }
+    setIsRejecting(true);
+    setRejectError("");
     try {
-      await adjustAttendanceRecord(adjustModalData.ma_cc, {
+      await adjustAttendanceRecord(rejectModalData.ma_cc, {
         loai_cong: "NGHI_KHONG_PHEP",
         so_cong: 0.0,
         so_gio_lam: 0.0,
-        ghi_chu: adjustReason || "Quản lý từ chối duyệt công (0 công - Nghỉ không phép/Vi phạm)",
+        trang_thai_duyet: "TU_CHOI",
+        ghi_chu: rejectionReason.trim(),
       });
-      setAdjustModalData(null);
-      setSyncToast(`Đã TỪ CHỐI duyệt công cho ${adjustModalData.ho_ten} (0 công)!`);
+      const name = rejectModalData.ho_ten;
+      setRejectModalData(null);
+      setSyncToast(`Đã TỪ CHỐI duyệt công cho ${name} (0 công)!`);
       setTimeout(() => setSyncToast(""), 3500);
       loadDailyData(selectedDate, selectedDept);
     } catch (err) {
-      setAdjustError(err.message || "Lỗi khi từ chối duyệt công.");
+      setRejectError(err.message || "Lỗi khi từ chối duyệt công.");
     } finally {
-      setIsAdjusting(false);
+      setIsRejecting(false);
     }
   };
 
@@ -411,7 +458,7 @@ export default function AttendanceManagement() {
   const totalEmployees = dailyAttendance.length;
   const checkedInCount = dailyAttendance.filter((r) => r.gio_vao && r.gio_vao !== "--:--" && r.gio_vao !== "-").length;
   const onTimeCount = dailyAttendance.filter((r) => r.loai_cong === "CONG_DU" && r.gio_vao && r.gio_vao !== "--:--").length;
-  const lateCount = dailyAttendance.filter((r) => r.loai_cong === "DI_TRE" || (r.gio_vao && r.gio_vao > "08:15:00")).length;
+  const lateCount = dailyAttendance.filter((r) => r.loai_cong === "DI_TRE" || r.loai_cong === "VE_SOM").length;
   const absentCount = dailyAttendance.filter((r) => !r.gio_vao || r.gio_vao === "--:--" || r.gio_vao === "-").length;
   const leaveCount = dailyAttendance.filter((r) => r.loai_cong === "NGHI_PHEP").length;
   const unauthorizedCount = Math.max(0, absentCount - leaveCount);
@@ -431,13 +478,18 @@ export default function AttendanceManagement() {
       (item.ma_nv || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.ten_pb || "").toLowerCase().includes(searchQuery.toLowerCase());
 
-    const isLate = item.loai_cong === "DI_TRE" || (item.gio_vao && item.gio_vao > "08:15:00");
+    const isLate = item.loai_cong === "DI_TRE";
     const isOntime = item.loai_cong === "CONG_DU" && item.gio_vao && item.gio_vao !== "--:--";
     const isWorking = item.gio_vao && item.gio_vao !== "--:--" && (item.gio_ra === "--:--" || !item.gio_ra);
     const isAbsent = !item.gio_vao || item.gio_vao === "--:--" || item.gio_vao === "-";
 
+    const isApproved = item.trang_thai_duyet === "DA_DUYET";
+    const isPending = (!item.trang_thai_duyet || item.trang_thai_duyet === "CHO_DUYET") && item.ma_cc;
+
     const matchStatus =
       selectedStatus === "all" ||
+      (selectedStatus === "approved" && isApproved) ||
+      (selectedStatus === "pending" && isPending) ||
       (selectedStatus === "ontime" && isOntime) ||
       (selectedStatus === "late" && isLate) ||
       (selectedStatus === "working" && isWorking) ||
@@ -473,14 +525,111 @@ export default function AttendanceManagement() {
   filteredDaily.sort(sortByDeptThenName);
   filteredMonthly.sort(sortByDeptThenName);
 
+  // Tiêu chí kiểm tra trạng thái dòng công:
+  const isLateRow = (r) =>
+    r.loai_cong === "DI_TRE" ||
+    r.loai_cong === "VE_SOM";
+
+  const isRejectedRow = (r) => r.trang_thai_duyet === "TU_CHOI" || r.loai_cong === "NGHI_KHONG_PHEP";
+
+  const isApprovedRow = (r) => r.trang_thai_duyet === "DA_DUYET";
+
+  // Tiêu chí ĐƯỢC DUYỆT CÔNG ĐỦ tự động:
+  // - Đã có chấm công (ma_cc)
+  // - Chưa duyệt đủ công
+  // - KHÔNG bị từ chối
+  // - KHÔNG đi muộn
+  const isEligibleToApprove = (r) =>
+    Boolean(r.ma_cc) && !isApprovedRow(r) && !isRejectedRow(r) && !isLateRow(r);
+
+  // Danh sách các dòng được tick chọn và THỰC SỰ ĐỦ ĐIỀU KIỆN PHÊ DUYỆT (bỏ qua đi muộn / bị từ chối)
+  const selectedEligibleDailyRows = dailyAttendance.filter(
+    (r) => r.ma_cc && selectedRowIds.includes(r.ma_cc) && isEligibleToApprove(r)
+  );
+
+  // Danh sách các dòng có thể tick chọn trên bảng (các dòng có ma_cc và chưa duyệt công đủ)
+  const selectableDailyRows = filteredDaily.filter(
+    (r) => r.ma_cc && !isApprovedRow(r)
+  );
+
+  const isAllDailySelected =
+    selectableDailyRows.length > 0 &&
+    selectableDailyRows.every((r) => selectedRowIds.includes(r.ma_cc));
+
+  const handleToggleSelectAllDaily = () => {
+    if (isAllDailySelected) {
+      setSelectedRowIds([]);
+    } else {
+      setSelectedRowIds(selectableDailyRows.map((r) => r.ma_cc));
+    }
+  };
+
+  const handleToggleSelectRow = (maCc) => {
+    if (!maCc) return;
+    setSelectedRowIds((prev) =>
+      prev.includes(maCc) ? prev.filter((id) => id !== maCc) : [...prev, maCc]
+    );
+  };
+
+  // Phê duyệt phụ thuộc vào số lượng người dùng tick vào (chỉ duyệt người hợp lệ, bỏ qua đi muộn / bị từ chối)
+  const handleBulkApprove = async () => {
+    if (isMonthLocked) {
+      setSyncToast(`Bảng công tháng ${selectedMonth}/${selectedYear} đã được Chốt và Khóa! Vui lòng mở khóa trước.`);
+      setTimeout(() => setSyncToast(""), 4000);
+      return;
+    }
+
+    if (selectedEligibleDailyRows.length === 0) {
+      if (selectedRowIds.length > 0) {
+        setSyncToast("Các nhân sự bạn đã tick chọn đều đang có trạng thái Đi muộn hoặc Bị từ chối nên không thể duyệt hàng loạt.");
+      } else {
+        setSyncToast("Vui lòng tick chọn ít nhất 1 nhân sự hợp lệ (không đi muộn, không bị từ chối) để phê duyệt.");
+      }
+      setTimeout(() => setSyncToast(""), 4000);
+      return;
+    }
+
+    setIsBulkApproving(true);
+    try {
+      await Promise.all(
+        selectedEligibleDailyRows.map((r) =>
+          adjustAttendanceRecord(r.ma_cc, {
+            loai_cong: "CONG_DU",
+            so_cong: 1.0,
+            trang_thai_duyet: "DA_DUYET",
+            ghi_chu: "Quản lý phê duyệt công đủ hàng loạt",
+          })
+        )
+      );
+
+      const skippedCount = selectedRowIds.length - selectedEligibleDailyRows.length;
+      if (skippedCount > 0) {
+        setSyncToast(`Đã phê duyệt công đủ cho ${selectedEligibleDailyRows.length} người (đã bỏ qua ${skippedCount} người đi muộn / bị từ chối)!`);
+      } else {
+        setSyncToast(`Đã phê duyệt công đủ thành công cho ${selectedEligibleDailyRows.length} người!`);
+      }
+
+      setSelectedRowIds([]);
+      setTimeout(() => setSyncToast(""), 4000);
+      await loadDailyData(selectedDate, selectedDept);
+    } catch (err) {
+      setSyncToast(`Lỗi khi phê duyệt hàng loạt: ${err.message}`);
+      setTimeout(() => setSyncToast(""), 4500);
+    } finally {
+      setIsBulkApproving(false);
+    }
+  };
+
   // Phân trang cho cả daily và monthly
   const activeFiltered = viewMode === "daily" ? filteredDaily : filteredMonthly;
-  const totalPages = Math.max(1, Math.ceil(activeFiltered.length / pageSize));
+  const isPageSizeAll = pageSize === "all" || Number(pageSize) >= 9999;
+  const effectivePageSize = isPageSizeAll ? Math.max(1, activeFiltered.length) : Number(pageSize);
+  const totalPages = isPageSizeAll ? 1 : Math.max(1, Math.ceil(activeFiltered.length / effectivePageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const startIdx = (safePage - 1) * pageSize;
-  const endIdx = Math.min(startIdx + pageSize, activeFiltered.length);
-  const paginatedDaily = filteredDaily.slice(startIdx, endIdx);
-  const paginatedMonthly = filteredMonthly.slice(startIdx, endIdx);
+  const startIdx = isPageSizeAll ? 0 : (safePage - 1) * effectivePageSize;
+  const endIdx = isPageSizeAll ? activeFiltered.length : Math.min(startIdx + effectivePageSize, activeFiltered.length);
+  const paginatedDaily = isPageSizeAll ? filteredDaily : filteredDaily.slice(startIdx, endIdx);
+  const paginatedMonthly = isPageSizeAll ? filteredMonthly : filteredMonthly.slice(startIdx, endIdx);
 
   // Reset page khi đổi bộ lọc hoặc chế độ xem
   useEffect(() => {
@@ -543,7 +692,7 @@ export default function AttendanceManagement() {
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white rounded-xl text-xs font-semibold shadow-sm shadow-sky-600/20 transition-all active:scale-95"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Xuất file Excel</span>
+            <span>Xuất CSV</span>
           </button>
         </div>
       </div>
@@ -641,7 +790,7 @@ export default function AttendanceManagement() {
           {/* Card 3: Đi muộn */}
           <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-amber-300 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Đi muộn sau 08:15</span>
+              <span className="text-xs font-medium text-slate-500">Đi muộn / Vi phạm</span>
               <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
                 <AlertTriangle className="w-4 h-4" />
               </div>
@@ -877,14 +1026,78 @@ export default function AttendanceManagement() {
                 className="px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
               >
                 <option value="all">Tất cả trạng thái</option>
+                <option value="approved">Đã duyệt công</option>
+                <option value="pending">Chờ duyệt công</option>
                 <option value="ontime">Đúng giờ</option>
                 <option value="late">Đi muộn</option>
                 <option value="working">Đang làm việc</option>
                 <option value="absent">Vắng mặt / Chưa chấm</option>
               </select>
             )}
+
+            {/* Nút Phê duyệt phụ thuộc vào số lượng tick chọn và hợp lệ (Daily view) */}
+            {viewMode === "daily" && (
+              <button
+                type="button"
+                onClick={handleBulkApprove}
+                disabled={isBulkApproving || isMonthLocked || selectedEligibleDailyRows.length === 0}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  selectedEligibleDailyRows.length > 0
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200"
+                    : "bg-slate-100 text-slate-400 border border-slate-200"
+                }`}
+                title={
+                  selectedEligibleDailyRows.length > 0
+                    ? `Phê duyệt công đủ cho ${selectedEligibleDailyRows.length} người hợp lệ (loại trừ đi muộn & từ chối)`
+                    : "Vui lòng chọn nhân sự hợp lệ (không đi muộn, không bị từ chối) để phê duyệt"
+                }
+              >
+                {isBulkApproving ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.2]" />
+                )}
+                <span>Phê duyệt ({selectedEligibleDailyRows.length} người)</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Thanh tác vụ nhanh khi có tick chọn nhân sự */}
+        {!isLoading && viewMode === "daily" && selectedRowIds.length > 0 && (
+          <div className="mx-4 my-2.5 p-3 bg-sky-50 border border-sky-200/90 rounded-xl flex items-center justify-between gap-3 text-xs text-sky-900 animate-in fade-in duration-150">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-sky-600 animate-ping"></span>
+              <span>
+                Đang tick chọn: <strong className="text-sky-800 font-bold">{selectedRowIds.length}</strong> nhân sự
+                {selectedRowIds.length > selectedEligibleDailyRows.length && (
+                  <span className="ml-1.5 text-amber-700 font-medium">
+                    (Có {selectedRowIds.length - selectedEligibleDailyRows.length} người đi muộn hoặc bị từ chối sẽ không được duyệt)
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedRowIds([])}
+                className="px-2.5 py-1 text-slate-600 hover:text-slate-800 hover:bg-white/80 rounded-lg font-medium transition-colors cursor-pointer"
+              >
+                Bỏ chọn tất cả
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkApprove}
+                disabled={isBulkApproving || selectedEligibleDailyRows.length === 0}
+                className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={`Phê duyệt ${selectedEligibleDailyRows.length} nhân sự hợp lệ`}
+              >
+                {isBulkApproving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                <span>Phê duyệt ({selectedEligibleDailyRows.length} người)</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* LOADING INDICATOR */}
         {isLoading && (
@@ -898,9 +1111,19 @@ export default function AttendanceManagement() {
         {!isLoading && viewMode === "daily" && (
           <>
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse min-w-[980px]">
+            <table className="w-full text-left border-collapse min-w-[1150px]">
               <thead>
                 <tr className="bg-slate-50/80 text-slate-500 font-semibold text-[11px] uppercase tracking-wider border-b border-slate-200/80">
+                  <th className="py-3 px-3 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={isAllDailySelected}
+                      onChange={handleToggleSelectAllDaily}
+                      disabled={isMonthLocked || selectableDailyRows.length === 0}
+                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                      title={isAllDailySelected ? "Bỏ chọn tất cả" : "Chọn tất cả nhân sự chưa duyệt"}
+                    />
+                  </th>
                   <th className="py-3 px-4">Nhân viên</th>
                   <th className="py-3 px-4">Phòng ban</th>
                   <th className="py-3 px-4">Ca làm việc</th>
@@ -908,28 +1131,44 @@ export default function AttendanceManagement() {
                   <th className="py-3 px-4">Check-out</th>
                   <th className="py-3 px-4 text-center">Đi muộn</th>
                   <th className="py-3 px-4 text-center">Số giờ làm</th>
+                  <th className="py-3 px-4 text-center">Số công</th>
+                  <th className="py-3 px-4 text-center">OT</th>
                   <th className="py-3 px-4">Tình trạng</th>
+                  <th className="py-3 px-4 text-center">Phê duyệt</th>
                   <th className="py-3 px-4 text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs text-slate-800">
                 {filteredDaily.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-400">
+                    <td colSpan={13} className="py-8 text-center text-slate-400">
                       Không có bản ghi chấm công nào phù hợp với bộ lọc.
                     </td>
                   </tr>
                 ) : (
                   paginatedDaily.map((row) => {
                     const initials = getInitials(row.ho_ten);
-                    const isLate = row.loai_cong === "DI_TRE" || (row.gio_vao && row.gio_vao > "08:15:00");
+                    const isLate = row.loai_cong === "DI_TRE";
                     const lateMins = getLateMinutes(row.gio_vao, row.loai_cong);
                     const isCheckedIn = row.gio_vao && row.gio_vao !== "--:--" && row.gio_vao !== "-";
-                    const isApproved = row.so_cong >= 1.0 && row.loai_cong === "CONG_DU";
+                    const isApproved = row.trang_thai_duyet === "DA_DUYET";
+                    const isRejected = row.trang_thai_duyet === "TU_CHOI" || row.loai_cong === "NGHI_KHONG_PHEP";
                     const hasExplanation = isLate || Boolean(row.ghi_chu && row.ghi_chu.length > 0);
 
                     return (
-                      <tr key={row.ma_nv} className="hover:bg-slate-50/80 transition-colors">
+                      <tr key={row.ma_nv} className={`hover:bg-slate-50/80 transition-colors ${selectedRowIds.includes(row.ma_cc) ? "bg-sky-50/50" : ""}`}>
+                        {/* Checkbox chọn */}
+                        <td className="py-3 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(row.ma_cc && selectedRowIds.includes(row.ma_cc))}
+                            onChange={() => handleToggleSelectRow(row.ma_cc)}
+                            disabled={!row.ma_cc || isApproved || isMonthLocked}
+                            className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            title={!row.ma_cc ? "Chưa có công để chọn" : isApproved ? "Đã duyệt công đủ" : "Chọn để duyệt công"}
+                          />
+                        </td>
+
                         {/* NV */}
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
@@ -1004,6 +1243,28 @@ export default function AttendanceManagement() {
                           {row.so_gio_lam > 0 ? `${row.so_gio_lam}h` : "-"}
                         </td>
 
+                        {/* Số công */}
+                        <td className="py-3 px-4 text-center">
+                          <span className={`inline-flex px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                            (row.so_cong >= 1) ? "bg-emerald-50 text-emerald-700" :
+                            (row.so_cong >= 0.5) ? "bg-blue-50 text-blue-700" :
+                            row.ma_cc ? "bg-slate-100 text-slate-500" : ""
+                          }`}>
+                            {row.so_cong != null && row.ma_cc ? Number(row.so_cong).toFixed(1) : "-"}
+                          </span>
+                        </td>
+
+                        {/* OT */}
+                        <td className="py-3 px-4 text-center">
+                          {row.so_gio_tang_ca > 0 ? (
+                            <span className="inline-flex px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px]">
+                              +{Number(row.so_gio_tang_ca).toFixed(1)}h
+                            </span>
+                          ) : (
+                            <span className="text-slate-300">-</span>
+                          )}
+                        </td>
+
                         {/* Status */}
                         <td className="py-3 px-4">
                           <span
@@ -1042,90 +1303,132 @@ export default function AttendanceManagement() {
                           </span>
                         </td>
 
+                        {/* Phê duyệt */}
+                        <td className="py-3 px-4 text-center">
+                          {isApproved ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-2xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 stroke-[2.4]" />
+                              <span>Đã duyệt</span>
+                            </span>
+                          ) : isRejected ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/90 shadow-2xs">
+                              <XCircle className="w-3.5 h-3.5 text-rose-600 stroke-[2.4]" />
+                              <span>Từ chối</span>
+                            </span>
+                          ) : row.ma_cc ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200/80">
+                              <Clock className="w-3.5 h-3.5 text-amber-500 stroke-[2.2]" />
+                              <span>Chờ duyệt</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 text-[11px] italic">-</span>
+                          )}
+                        </td>
+
                         {/* Actions */}
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             {isMonthLocked ? (
                               <span
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 bg-slate-100 cursor-not-allowed"
+                                className="w-8 h-8 rounded-lg text-slate-400 bg-slate-100 flex items-center justify-center cursor-not-allowed"
                                 title="Bảng công tháng đã khóa, không thể điều chỉnh"
                               >
-                                <Lock className="w-3.5 h-3.5" />
-                                <span>Đã khóa</span>
+                                <Lock className="w-4 h-4" />
                               </span>
                             ) : !row.ma_cc ? (
                               <span className="text-slate-300 text-xs italic px-2">Chưa có công</span>
                             ) : isApproved ? (
-                              <div className="inline-flex items-center gap-1">
-                                <span
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200"
-                                  title="Đã chốt duyệt công đủ"
-                                >
-                                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>Đã duyệt</span>
-                                </span>
+                              <>
+                                {/* 1. Cây bút: Chỉnh sửa bổ sung (Nằm bên trái ngoài cùng) */}
                                 <button
+                                  type="button"
                                   onClick={() => handleOpenAdjust(row)}
-                                  className="p-1 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-slate-100 transition-colors"
+                                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
                                   title="Chỉnh sửa bổ sung"
                                 >
-                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <Edit3 className="w-4 h-4" />
                                 </button>
-                              </div>
-                            ) : row.loai_cong === "NGHI_KHONG_PHEP" ? (
-                              <div className="inline-flex items-center gap-1">
-                                <span
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200"
-                                  title="Đã từ chối duyệt công ngày này"
-                                >
-                                  <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                                  <span>Đã từ chối</span>
-                                </span>
+
+                                {/* 2. Nút X: Hủy duyệt / Từ chối (Nằm ở giữa) */}
                                 <button
+                                  type="button"
+                                  onClick={() => handleOpenReject(row)}
+                                  className="w-8 h-8 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                                  title="Từ chối / Hủy duyệt công ngày này"
+                                >
+                                  <X className="w-4 h-4 stroke-[2.5]" />
+                                </button>
+
+                                {/* 3. Tick xanh: Đã duyệt (Nằm bên phải ngoài cùng) */}
+                                <span
+                                  className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"
+                                  title="Đã chốt duyệt công đủ"
+                                >
+                                  <Check className="w-4 h-4 stroke-[2.5]" />
+                                </span>
+                              </>
+                            ) : isRejected ? (
+                              <>
+                                {/* 1. Cây bút: Xem lại / Sửa (Nằm bên trái ngoài cùng) */}
+                                <button
+                                  type="button"
                                   onClick={() => handleOpenAdjust(row)}
-                                  className="p-1 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-slate-100 transition-colors"
+                                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
                                   title="Xem lại / Chỉnh sửa bổ sung"
                                 >
-                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <Edit3 className="w-4 h-4" />
                                 </button>
-                              </div>
-                            ) : isLate || hasExplanation || row.loai_cong === "VE_SOM" ? (
-                              <div className="flex items-center gap-1.5">
+
+                                {/* 2. Nút X: Đã từ chối (Nằm ở giữa) */}
+                                <span
+                                  className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center"
+                                  title="Đã từ chối duyệt công ngày này (0 công)"
+                                >
+                                  <X className="w-4 h-4 stroke-[2.5]" />
+                                </span>
+
+                                {/* 3. Tick xanh: Phê duyệt lại công (Nằm bên phải ngoài cùng) */}
                                 <button
+                                  type="button"
+                                  onClick={() => handleApprove(row)}
+                                  className="w-8 h-8 rounded-lg text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                                  title="Phê duyệt lại công đủ (1.0 ngày công)"
+                                >
+                                  <Check className="w-4 h-4 stroke-[2.5]" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {/* 1. Nút cây bút: Nằm bên trái ngoài cùng */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAdjust(row)}
+                                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
+                                  title={row.ghi_chu ? `Giải trình: "${row.ghi_chu}" - Bấm để điều chỉnh giờ` : "Điều chỉnh giờ chấm công"}
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </button>
+
+                                {/* 2. Nút X (Từ chối): Nằm ở giữa */}
+                                <button
+                                  type="button"
                                   onClick={() => handleOpenReject(row)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-colors"
+                                  className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all shadow-2xs flex items-center justify-center cursor-pointer active:scale-95"
                                   title="Từ chối duyệt công ngày này (0 công - Vi phạm / Nghỉ không phép)"
                                 >
-                                  <XCircle className="w-3.5 h-3.5" />
-                                  <span>Từ chối</span>
+                                  <X className="w-4 h-4 stroke-[2.5]" />
                                 </button>
+
+                                {/* 3. Nút Tick xanh (Phê duyệt): Nằm bên phải ngoài cùng */}
                                 <button
-                                  onClick={() => handleOpenAdjust(row)}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-colors"
-                                  title={row.ghi_chu ? `Lý do: ${row.ghi_chu} - Bấm để duyệt/sửa` : "Bấm để duyệt công hoặc điều chỉnh ca/giờ"}
+                                  type="button"
+                                  onClick={() => handleApprove(row)}
+                                  className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-2xs flex items-center justify-center cursor-pointer active:scale-95"
+                                  title="Chốt duyệt công đủ (1.0 ngày công)"
                                 >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Duyệt / Sửa</span>
+                                  <Check className="w-4 h-4 stroke-[2.5]" />
                                 </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => handleOpenReject(row)}
-                                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                  title="Từ chối duyệt công ngày này"
-                                >
-                                  <XCircle className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => handleOpenAdjust(row)}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 hover:text-sky-700 hover:bg-sky-50 border border-slate-200 hover:border-sky-300 transition-colors"
-                                  title="Điều chỉnh giờ chấm công hoặc đổi ca (Tối đa 3 lần/tháng)"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Điều chỉnh</span>
-                                </button>
-                              </div>
+                              </>
                             )}
                           </div>
                         </td>
@@ -1152,11 +1455,17 @@ export default function AttendanceManagement() {
                   <span className="text-slate-500">Hiển thị</span>
                   <select
                     value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    onChange={(e) => {
+                      setPageSize(e.target.value === "all" ? "all" : Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
                     className="px-2 py-1 bg-white border border-slate-200/80 rounded-lg text-xs text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
                   >
                     <option value={5}>5</option>
                     <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value="all">Tất cả</option>
                   </select>
                   <span className="text-slate-500">người/trang</span>
                 </div>
@@ -1348,11 +1657,17 @@ export default function AttendanceManagement() {
                   <span className="text-slate-500">Hiển thị</span>
                   <select
                     value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    onChange={(e) => {
+                      setPageSize(e.target.value === "all" ? "all" : Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
                     className="px-2 py-1 bg-white border border-slate-200/80 rounded-lg text-xs text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
                   >
                     <option value={5}>5</option>
                     <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value="all">Tất cả</option>
                   </select>
                   <span className="text-slate-500">người/trang</span>
                 </div>
@@ -1404,7 +1719,7 @@ export default function AttendanceManagement() {
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-sky-600" />
                 <h3 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-base">
-                  Điều chỉnh giờ & Duyệt giải trình
+                  Điều chỉnh giờ chấm công
                 </h3>
               </div>
               <button
@@ -1454,7 +1769,11 @@ export default function AttendanceManagement() {
                 </label>
                 <select
                   value={adjustedShift}
-                  onChange={(e) => setAdjustedShift(e.target.value)}
+                  onChange={(e) => {
+                    const newShift = e.target.value;
+                    setAdjustedShift(newShift);
+                    setAdjustedWorkType(computeWorkType(newShift, adjustedTime, adjustedCheckOutTime));
+                  }}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:border-sky-500 focus:outline-none bg-white text-xs text-slate-800"
                 >
                   {availableShifts.map((s) => (
@@ -1476,7 +1795,13 @@ export default function AttendanceManagement() {
                   <input
                     type="text"
                     value={adjustedTime}
-                    onChange={(e) => setAdjustedTime(e.target.value)}
+                    onChange={(e) => {
+                      const newIn = e.target.value;
+                      setAdjustedTime(newIn);
+                      if (newIn.length >= 4) {
+                        setAdjustedWorkType(computeWorkType(adjustedShift, newIn, adjustedCheckOutTime));
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:border-sky-500 focus:outline-none text-xs"
                     placeholder="08:00:00"
                   />
@@ -1488,7 +1813,13 @@ export default function AttendanceManagement() {
                   <input
                     type="text"
                     value={adjustedCheckOutTime}
-                    onChange={(e) => setAdjustedCheckOutTime(e.target.value)}
+                    onChange={(e) => {
+                      const newOut = e.target.value;
+                      setAdjustedCheckOutTime(newOut);
+                      if (newOut.length >= 4) {
+                        setAdjustedWorkType(computeWorkType(adjustedShift, adjustedTime, newOut));
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:border-sky-500 focus:outline-none text-xs"
                     placeholder="17:00:00"
                   />
@@ -1518,48 +1849,153 @@ export default function AttendanceManagement() {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Lý do điều chỉnh / Phê duyệt của Quản lý:
+                  Lý do điều chỉnh của Quản lý:
                 </label>
                 <textarea
                   value={adjustReason}
                   onChange={(e) => setAdjustReason(e.target.value)}
                   rows={2}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:border-sky-500 focus:outline-none text-xs"
-                  placeholder="Xác nhận lý do chính đáng, duyệt công đủ..."
+                  placeholder="Nhập lý do điều chỉnh giờ / ca làm việc..."
                 />
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5 pt-3 border-t border-slate-100">
+            <div className="mt-6 flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
               <button
                 type="button"
-                onClick={handleRejectAttendance}
-                disabled={isAdjusting}
-                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs transition-colors disabled:opacity-50"
-                title="Bác bỏ giải trình, chuyển thành 0 ngày công (Nghỉ không phép / Vi phạm)"
+                onClick={() => setAdjustModalData(null)}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold text-xs transition-colors cursor-pointer"
               >
-                <XCircle className="w-4 h-4" />
-                <span>Từ chối duyệt công</span>
+                Hủy bỏ
               </button>
+              <button
+                type="button"
+                onClick={handleSaveAdjust}
+                disabled={isAdjusting}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white rounded-xl shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+              >
+                {isAdjusting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 stroke-[2.2]" />}
+                <span>{isAdjusting ? "Đang lưu..." : "Lưu"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button
-                  type="button"
-                  onClick={() => setAdjustModalData(null)}
-                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold text-xs"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveAdjust}
-                  disabled={isAdjusting}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold text-xs shadow-xs disabled:opacity-50"
-                >
-                  {isAdjusting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{isAdjusting ? "Đang lưu..." : "Xác nhận & Duyệt công"}</span>
-                </button>
+      {/* ──────────────── POPUP TỪ CHỐI DUYỆT CÔNG (NÚT X) ──────────────── */}
+      {rejectModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
+            {/* Header Popup */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                  <X className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Từ chối duyệt công</h3>
+                  <p className="text-[11px] text-slate-500">Chuyển thành 0 ngày công (Nghỉ không phép / Vi phạm)</p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setRejectModalData(null)}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Thông tin nhân viên & ca công */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-slate-800">{rejectModalData.ho_ten}</span>
+                <span className="font-mono text-[11px] text-slate-500">{rejectModalData.ma_nv} • {rejectModalData.ten_pb || "Văn phòng"}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                <span>Ca: {rejectModalData.ca_lam_viec || "Hành chính"}</span>
+                <span>Vào: <strong className="text-slate-800">{rejectModalData.gio_vao || "--:--"}</strong> — Ra: <strong className="text-slate-800">{rejectModalData.gio_ra || "--:--"}</strong></span>
+              </div>
+              {rejectModalData.ghi_chu && (
+                <div className="pt-1.5 mt-0.5 border-t border-slate-200 text-[11px] text-amber-700 italic">
+                  Giải trình: "{rejectModalData.ghi_chu}"
+                </div>
+              )}
+            </div>
+
+            {/* Form nhập lý do từ chối */}
+            <div className="flex flex-col gap-2 text-xs">
+              <label className="font-bold text-slate-700 flex items-center justify-between">
+                <span>Lý do từ chối (Bắt buộc)*:</span>
+                <span className="text-[10px] text-slate-400 font-normal">Gửi phản hồi cho nhân viên</span>
+              </label>
+              <textarea
+                rows={3}
+                value={rejectionReason}
+                onChange={(e) => {
+                  setRejectionReason(e.target.value);
+                  if (rejectError) setRejectError("");
+                }}
+                placeholder="Nhập lý do từ chối duyệt công cụ thể (ví dụ: Nghỉ không phép, đi muộn quá quy định không có giải trình chính đáng, v.v.)..."
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-rose-500 focus:ring-1 focus:ring-rose-500 focus:outline-none transition-all leading-relaxed"
+                autoFocus
+              />
+
+              {rejectError && (
+                <span className="text-rose-600 text-[11px] font-semibold flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  {rejectError}
+                </span>
+              )}
+
+              {/* Gợi ý lý do nhanh */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[10px] text-slate-400">Gợi ý nhanh:</span>
+                {[
+                  "Đi muộn không có lý do",
+                  "Nghỉ không phép / Bỏ ca",
+                  "Chưa đủ giờ làm tối thiểu",
+                  "Sai lệch dữ liệu chấm công",
+                ].map((tag, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setRejectionReason(tag);
+                      if (rejectError) setRejectError("");
+                    }}
+                    className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions Popup */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setRejectModalData(null)}
+                disabled={isRejecting}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReject}
+                disabled={isRejecting}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                {isRejecting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <X className="w-4 h-4 stroke-[2.5]" />
+                )}
+                <span>Xác nhận từ chối</span>
+              </button>
             </div>
           </div>
         </div>
@@ -1644,6 +2080,7 @@ export default function AttendanceManagement() {
                       <th className="py-2.5 px-3 text-center">Giờ ra</th>
                       <th className="py-2.5 px-3 text-center">Thời gian làm</th>
                       <th className="py-2.5 px-3 text-center">Trạng thái</th>
+                      <th className="py-2.5 px-3 text-center">Phê duyệt</th>
                       <th className="py-2.5 px-3">Ghi chú</th>
                     </tr>
                   </thead>
@@ -1683,6 +2120,25 @@ export default function AttendanceManagement() {
                           }`}>
                             {rec.trang_thai || (rec.loai_cong === "CONG_DU" ? "Đúng giờ" : rec.loai_cong)}
                           </span>
+                        </td>
+                        {/* Phê duyệt */}
+                        <td className="py-2.5 px-3 text-center">
+                          {rec.trang_thai_duyet === "DA_DUYET" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Đã duyệt
+                            </span>
+                          ) : rec.trang_thai_duyet === "TU_CHOI" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                              <XCircle className="w-3 h-3" />
+                              Từ chối
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                              <Clock className="w-3 h-3" />
+                              Chờ duyệt
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-slate-500 italic max-w-[200px] truncate" title={rec.ghi_chu || ""}>
                           {rec.ghi_chu || "-"}

@@ -223,7 +223,7 @@ export default function PayrollManagement() {
           </h1>
           <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
             <span className={`w-2 h-2 rounded-full ${attendanceLock.is_locked ? "bg-emerald-500" : "bg-amber-500"}`}></span>
-            Dữ liệu tổng hợp từ Bảng chấm công, ca làm việc (phụ cấp ca đêm x1.3), ngày công thực tế và KPI
+            Dữ liệu tổng hợp từ Bảng chấm công, làm thêm ngoài giờ (OT x1.5), ngày công thực tế và KPI
           </p>
         </div>
 
@@ -368,7 +368,7 @@ export default function PayrollManagement() {
             </div>
           </div>
           <div className="mt-3 flex items-center text-[11px] text-slate-500">
-            <span>Bao gồm lương ngày công, phụ cấp ca đêm (x1.3), tiền OT & thưởng</span>
+            <span>Bao gồm lương ngày công, làm thêm ngoài giờ (OT x1.5) & thưởng</span>
           </div>
         </div>
 
@@ -703,7 +703,7 @@ export default function PayrollManagement() {
                 </span>
               </div>
               <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-600">Làm thêm giờ & Phụ cấp ca đêm (OT x1.5 / Đêm x1.3):</span>
+                <span className="text-slate-600">Làm thêm ngoài giờ (OT x1.5):</span>
                 <span className="font-mono text-emerald-600">
                   +{selectedPayslip.otPay.toLocaleString("vi-VN")} đ
                 </span>

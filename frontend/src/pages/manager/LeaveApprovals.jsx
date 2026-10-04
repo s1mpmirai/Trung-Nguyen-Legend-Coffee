@@ -26,7 +26,7 @@ export default function LeaveApprovals() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 5;
+  const [pageSize, setPageSize] = useState(10);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [toast, setToast] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -340,10 +340,16 @@ export default function LeaveApprovals() {
     return matchTab && matchSearch;
   });
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const validCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
-  const startIndex = (validCurrentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedRequests = filtered.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const startIndex = (validCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filtered.length);
+  const paginatedRequests = filtered.slice(startIndex, endIndex);
+
+  // Tự động quay về trang 1 khi đổi tab, tìm kiếm hoặc đổi số lượng hiển thị
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, searchQuery, pageSize]);
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
   const approvedCount = requests.filter((r) => r.status === "approved").length;
@@ -658,32 +664,46 @@ export default function LeaveApprovals() {
           </table>
         </div>
 
-        {/* Footer phân trang (Tối đa 5 đơn / trang) */}
-        <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-          <span>
-            {filtered.length > 0 ? (
-              <>
-                Hiển thị <span className="font-semibold text-slate-800">{startIndex + 1}</span> -{" "}
-                <span className="font-semibold text-slate-800">
-                  {Math.min(startIndex + ITEMS_PER_PAGE, filtered.length)}
-                </span>{" "}
-                trong tổng số <span className="font-semibold text-slate-800">{filtered.length}</span> đơn
-              </>
-            ) : (
-              "Không có đơn từ nào"
-            )}
-          </span>
+        {/* Footer phân trang */}
+        {filtered.length > 0 && (
+          <div className="px-5 py-3.5 bg-slate-50/70 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <div className="flex items-center gap-3">
+              <span>
+                Đang hiển thị{" "}
+                <span className="font-semibold text-slate-800">{startIndex + 1}</span> -{" "}
+                <span className="font-semibold text-slate-800">{endIndex}</span> trong tổng số{" "}
+                <span className="font-semibold text-slate-800">{filtered.length}</span> đơn
+              </span>
+              <span className="text-slate-300">|</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-500">Hiển thị</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 bg-white border border-slate-200/80 rounded-lg text-xs text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+                <span className="text-slate-500">đơn/trang</span>
+              </div>
+            </div>
 
-          {totalPages > 1 && (
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={validCurrentPage === 1}
-                className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                disabled={validCurrentPage <= 1}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1 shadow-2xs cursor-pointer"
                 title="Trang trước"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Trước</span>
               </button>
 
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
@@ -691,10 +711,11 @@ export default function LeaveApprovals() {
                   key={pageNum}
                   type="button"
                   onClick={() => setCurrentPage(pageNum)}
-                  className={`w-8 h-8 rounded-lg text-xs font-semibold flex items-center justify-center transition-colors cursor-pointer ${validCurrentPage === pageNum
-                    ? "bg-sky-600 text-white shadow-2xs font-bold"
-                    : "border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
-                    }`}
+                  className={`w-8 h-8 rounded-lg font-semibold transition-all text-xs cursor-pointer ${
+                    validCurrentPage === pageNum
+                      ? "bg-sky-600 text-white shadow-xs font-bold"
+                      : "bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50"
+                  }`}
                 >
                   {pageNum}
                 </button>
@@ -703,15 +724,16 @@ export default function LeaveApprovals() {
               <button
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={validCurrentPage === totalPages}
-                className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                disabled={validCurrentPage >= totalPages}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1 shadow-2xs cursor-pointer"
                 title="Trang sau"
               >
-                <ChevronRight className="w-4 h-4" />
+                <span>Sau</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* ──────────────── POPUP XÁC NHẬN TỪ CHỐI & NÊU LÝ DO ──────────────── */}

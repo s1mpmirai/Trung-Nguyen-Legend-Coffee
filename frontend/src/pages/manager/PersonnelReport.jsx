@@ -232,12 +232,14 @@ export default function PersonnelReport() {
     return matchSearch && matchTenure && matchDept && matchWorkingType;
   });
 
-  // Phân trang (mặc định 5 người / trang)
-  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / pageSize));
+  // Phân trang (hỗ trợ hiển thị Tất cả)
+  const isPageSizeAll = pageSize === "all" || Number(pageSize) >= 9999;
+  const effectivePageSize = isPageSizeAll ? Math.max(1, filteredEmployees.length) : Number(pageSize);
+  const totalPages = isPageSizeAll ? 1 : Math.max(1, Math.ceil(filteredEmployees.length / effectivePageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, filteredEmployees.length);
-  const paginatedEmployees = filteredEmployees.slice(startIndex, endIndex);
+  const startIndex = isPageSizeAll ? 0 : (safePage - 1) * effectivePageSize;
+  const endIndex = isPageSizeAll ? filteredEmployees.length : Math.min(startIndex + effectivePageSize, filteredEmployees.length);
+  const paginatedEmployees = isPageSizeAll ? filteredEmployees : filteredEmployees.slice(startIndex, endIndex);
 
   // Tự động quay về trang 1 khi thay đổi điều kiện lọc
   useEffect(() => {
@@ -637,11 +639,16 @@ export default function PersonnelReport() {
                 <span className="text-slate-500">Hiển thị</span>
                 <select
                   value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  onChange={(e) => {
+                    setPageSize(e.target.value === "all" ? "all" : Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
                   className="px-2 py-1 bg-white border border-slate-200/80 rounded-lg text-xs text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
                 >
                   <option value={5}>5</option>
                   <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value="all">Tất cả</option>
                 </select>
                 <span className="text-slate-500">người/trang</span>
               </div>

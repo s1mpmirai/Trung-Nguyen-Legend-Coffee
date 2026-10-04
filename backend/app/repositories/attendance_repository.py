@@ -305,6 +305,7 @@ def get_attendance_history_by_employee(
         SELECT 
             bcc.ma_cc, bcc.ngay_cong, bcc.gio_vao, bcc.gio_ra, 
             bcc.so_gio_lam, bcc.so_gio_tang_ca, bcc.loai_cong, bcc.ghi_chu,
+            COALESCE(bcc.trang_thai_duyet, 'CHO_DUYET') as trang_thai_duyet,
             COALESCE(ca.ten_ca, 'Hành chính') as ca_lam_viec,
             COALESCE(cn.ten_cn, 'Trụ sở chính Trung Nguyên') as ten_cn,
             cn.dia_chi as dia_chi_cn
@@ -334,6 +335,7 @@ def get_daily_attendance_all(
             nv.ma_nv, nv.ho_ten, pb.ten_pb, cv.ten_cv,
             bcc.ma_cc, bcc.ngay_cong, bcc.gio_vao, bcc.gio_ra,
             bcc.so_gio_lam, bcc.so_gio_tang_ca, bcc.loai_cong, bcc.so_cong, bcc.ghi_chu,
+            COALESCE(bcc.trang_thai_duyet, 'CHO_DUYET') as trang_thai_duyet,
             COALESCE(bcc.ma_ca, ca.ma_ca, 'CA01') as ma_ca,
             COALESCE(ca.ten_ca, 'Hành chính') as ten_ca,
             ca.gio_vao as ca_gio_vao,

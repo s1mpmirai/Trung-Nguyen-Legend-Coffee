@@ -82,7 +82,7 @@ def update_payroll_status(db: Session, ma_bl: int, trang_thai: str) -> dict | No
 def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int:
     """
     Tự động tính lương tháng cho toàn bộ nhân viên đang làm việc và lưu vào bảng bang_luong.
-    Áp dụng hệ số ca đêm (ca.he_so = 1.30 cho ca đêm) và phụ cấp làm việc.
+    Tính lương công nhật, làm thêm ngoài giờ (OT x1.5) và phụ cấp làm việc.
     Trả về số lượng bản ghi bảng lương đã được tính/cập nhật.
     """
     # 1. Lấy danh sách nhân viên đang làm việc kèm thông tin lương
@@ -108,7 +108,7 @@ def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int
         he_so = float(emp["he_so_luong"])
         phu_cap = float(emp["phu_cap"])
 
-        # 2. Tổng hợp công từ bảng chấm công kèm phụ cấp ca đêm (nếu ca.he_so > 1.0)
+        # 2. Tổng hợp công từ bảng chấm công và giờ làm thêm ngoài giờ (OT x1.5)
         cc_query = """
             SELECT
                 COALESCE(SUM(bcc.so_cong), 0)          AS so_cong_thuc_te,

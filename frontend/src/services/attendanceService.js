@@ -212,7 +212,6 @@ export async function getShifts() {
     { ma_ca: 'CA01', ten_ca: 'Hành chính', gio_vao: '08:00', gio_ra: '17:00', he_so: 1.0 },
     { ma_ca: 'CA02', ten_ca: 'Ca sáng', gio_vao: '06:00', gio_ra: '14:00', he_so: 1.0 },
     { ma_ca: 'CA03', ten_ca: 'Ca chiều', gio_vao: '14:00', gio_ra: '22:00', he_so: 1.0 },
-    { ma_ca: 'CA04', ten_ca: 'Ca đêm', gio_vao: '22:00', gio_ra: '06:00', he_so: 1.3 },
   ];
 }
 

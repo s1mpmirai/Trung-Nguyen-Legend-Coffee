@@ -41,6 +41,7 @@ class AttendanceRecord(BaseModel):
     so_gio_lam: Optional[float] = 0.0
     so_gio_tang_ca: Optional[float] = 0.0
     so_cong: Optional[float] = 1.0
+    trang_thai_duyet: Optional[str] = "CHO_DUYET"
     ghi_chu: Optional[str] = ""
 
     class Config:
@@ -72,13 +73,14 @@ class AttendanceHistoryResponse(BaseModel):
 
 class AttendanceAdjustRequest(BaseModel):
     """Schema dành cho Quản lý điều chỉnh/chốt công thủ công."""
-    ma_ca: Optional[str] = Field(None, description="Mã ca làm việc (CA01, CA02, CA03, CA04)")
+    ma_ca: Optional[str] = Field(None, description="Mã ca làm việc (CA01, CA02, CA03)")
     gio_vao: Optional[str] = Field(None, description="Giờ vào ca định dạng HH:MM:SS hoặc HH:MM")
     gio_ra: Optional[str] = Field(None, description="Giờ ra ca định dạng HH:MM:SS hoặc HH:MM")
     loai_cong: Optional[str] = Field(None, description="CONG_DU, DI_TRE, VE_SOM, NUA_CONG, NGHI_PHEP...")
     so_cong: Optional[float] = Field(None, description="Hệ số công (1.0, 0.5, 0.0)")
     so_gio_lam: Optional[float] = Field(None, description="Số giờ làm việc")
     so_gio_tang_ca: Optional[float] = Field(None, description="Số giờ làm thêm OT")
+    trang_thai_duyet: Optional[str] = Field(None, description="Trạng thái phê duyệt: CHO_DUYET, DA_DUYET, TU_CHOI")
     ghi_chu: Optional[str] = Field(None, description="Lý do điều chỉnh của quản lý")
 
 

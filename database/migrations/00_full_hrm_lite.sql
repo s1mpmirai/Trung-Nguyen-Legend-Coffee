@@ -515,8 +515,7 @@ INSERT INTO don_tu (ma_don, ma_nv, loai_don, ngay_bat_dau, ngay_ket_thuc, so_nga
 INSERT INTO ca_lam_viec (ma_ca, ten_ca, gio_vao, gio_ra, so_gio_chuan, he_so) VALUES
 ('CA01', 'Hành chính', '08:00:00', '17:00:00', 8.00, 1.00),
 ('CA02', 'Ca sáng',    '06:00:00', '14:00:00', 8.00, 1.00),
-('CA03', 'Ca chiều',   '14:00:00', '22:00:00', 8.00, 1.00),
-('CA04', 'Ca đêm',     '22:00:00', '06:00:00', 8.00, 1.30);
+('CA03', 'Ca chiều',   '14:00:00', '22:00:00', 8.00, 1.00);
 
 -- 10. Chấm công
 INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_vao, gio_ra, so_gio_lam, so_gio_tang_ca, loai_cong, so_cong, ghi_chu) VALUES
@@ -531,8 +530,8 @@ INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_vao, gio_ra, so_gio_lam
 ('NV07','2026-09-01','CA02','05:50:00','14:05:00',8.00,0.00,'CONG_DU',1.00,NULL),
 ('NV07','2026-09-02','CA02','05:45:00','14:00:00',8.00,0.00,'CONG_DU',1.00,NULL),
 ('NV07','2026-09-03','CA02','05:55:00','16:00:00',8.00,2.00,'CONG_DU',1.00,'OT 2 giờ'),
-('NV15','2026-09-01','CA04','21:50:00','06:05:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV15','2026-09-02','CA04','21:45:00','06:00:00',8.00,0.00,'CONG_DU',1.00,NULL),
+('NV15','2026-09-01','CA03','13:50:00','22:05:00',8.00,0.00,'CONG_DU',1.00,NULL),
+('NV15','2026-09-02','CA03','13:45:00','22:00:00',8.00,0.00,'CONG_DU',1.00,NULL),
 ('NV09','2026-09-01','CA01','07:58:00','17:00:00',8.00,0.00,'CONG_DU',1.00,NULL),
 ('NV09','2026-09-03','CA01','07:50:00','20:00:00',8.00,3.00,'CONG_DU',1.00,'OT 3 giờ deploy');
 
