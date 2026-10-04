@@ -51,8 +51,8 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
     try {
       const cleanId = employeeId.trim().toUpperCase().replace('-', '');
 
-      // Endpoint login-manager cho phép xác thực ADMIN, QUAN_LY và TRUONG_NHOM
-      let response = await fetch('/api/v1/auth/login-manager', {
+      // Endpoint login-manage thống nhất cho Admin, Quản lý và Trưởng nhóm
+      let response = await fetch('/api/v1/auth/login-manage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -63,7 +63,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
 
       // Fallback endpoint cũ nếu cần
       if (response.status === 404) {
-        response = await fetch('/api/v1/auth/manager-login', {
+        response = await fetch('/api/v1/auth/login-manager', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

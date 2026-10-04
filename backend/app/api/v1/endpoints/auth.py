@@ -31,6 +31,7 @@ def admin_login(
 
 @router.post("/manager-login")
 @router.post("/login-manager")
+@router.post("/login-manage")
 def management_login(
     request: request_login,
     db: DbSession,

@@ -47,17 +47,31 @@ const isManagerRole = (role) => {
   return upper === "ADMIN" || upper === "QUAN_LY" || upper === "TRUONG_NHOM";
 };
 
+// Kiểm tra route đăng nhập quản lý & admin (Thống nhất 1 đường dẫn: login-manage)
+const isManagerLoginRoute = (route) => {
+  return route === "login-manage" || route === "login-manager" || route === "login-admin";
+};
+
 function App() {
   const [userSession, setUserSession] = useState(null);
   const [currentPage, setCurrentPage] = useState(() => {
     const route = getCleanRoute();
-    if (route === "login-admin" || route === "login-manager" || route === "login") {
-      return route;
+    if (isManagerLoginRoute(route)) {
+      if (route !== "login-manage") {
+        window.history.replaceState(null, "", "/login-manage");
+      }
+      return "login-manage";
+    }
+    if (route === "login") {
+      return "login";
     }
 
     const savedMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
     if (!savedMaNv) {
-      if (route === "login-admin" || route === "login-manager") return route;
+      if (isManagerLoginRoute(route)) {
+        window.history.replaceState(null, "", "/login-manage");
+        return "login-manage";
+      }
       return "login";
     }
 
@@ -105,8 +119,11 @@ function App() {
         localStorage.setItem("user_role", savedRole);
       }
     } else {
-      if (route === "login-admin" || route === "login-manager") {
-        setCurrentPage(route);
+      if (isManagerLoginRoute(route)) {
+        if (route !== "login-manage") {
+          window.history.replaceState(null, "", "/login-manage");
+        }
+        setCurrentPage("login-manage");
       } else {
         setCurrentPage("login");
       }
@@ -125,15 +142,25 @@ function App() {
       }
 
       // Cho phép mở trang đăng nhập chuyên biệt bất kể trạng thái session
-      if (route === "login-admin" || route === "login-manager" || route === "login") {
-        setCurrentPage(route);
+      if (isManagerLoginRoute(route)) {
+        if (route !== "login-manage") {
+          window.history.replaceState(null, "", "/login-manage");
+        }
+        setCurrentPage("login-manage");
+        return;
+      }
+      if (route === "login") {
+        setCurrentPage("login");
         return;
       }
 
       const savedMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
       if (!savedMaNv) {
-        if (route === "login-admin" || route === "login-manager") {
-          setCurrentPage(route);
+        if (isManagerLoginRoute(route)) {
+          if (route !== "login-manage") {
+            window.history.replaceState(null, "", "/login-manage");
+          }
+          setCurrentPage("login-manage");
         } else {
           setCurrentPage("login");
         }
@@ -204,12 +231,9 @@ function App() {
     setUserSession(null);
 
     // Chuyển về đúng trang đăng nhập tương ứng vai trò vừa đăng xuất (URL sạch)
-    if (String(prevRole).toUpperCase() === "ADMIN") {
-      navigateClean("login-admin");
-      setCurrentPage("login-admin");
-    } else if (isManagerRole(prevRole)) {
-      navigateClean("login-manager");
-      setCurrentPage("login-manager");
+    if (isManagerRole(prevRole)) {
+      navigateClean("login-manage");
+      setCurrentPage("login-manage");
     } else {
       navigateClean("login");
       setCurrentPage("login");
@@ -217,9 +241,9 @@ function App() {
   };
 
   // 1. Nếu chưa đăng nhập hoặc đang ở các trang đăng nhập
-  const isLoginPage = currentPage === "login" || currentPage === "login-admin" || currentPage === "login-manager";
+  const isLoginPage = currentPage === "login" || isManagerLoginRoute(currentPage);
   if (!userSession || isLoginPage) {
-    if (currentPage === "login-admin" || currentPage === "login-manager") {
+    if (isManagerLoginRoute(currentPage)) {
       return (
         <div className="min-h-screen w-full bg-gradient-to-br from-slate-100 via-sky-50/40 to-slate-200 flex flex-col justify-center items-center">
           <AdminManagerLogin

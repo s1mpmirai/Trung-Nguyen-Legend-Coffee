@@ -1,7 +1,7 @@
 # ==============================================================================
 # TRUNG NGUYEN LEGEND COFFEE - DANH MỤC API BACKEND (API LINKS)
 # Tự động cập nhật mỗi khi có API mới hoặc thay đổi endpoint
-# Cập nhật lần cuối: 2026-10-04 10:38:00 (UTC+7)
+# Cập nhật lần cuối: 2026-10-04 11:58:00 (UTC+7)
 # ==============================================================================
 
 [AUTH - XÁC THỰC & ĐĂNG NHẬP]
@@ -9,6 +9,7 @@
 - POST /api/v1/auth/login-admin             | Đăng nhập tài khoản Quản trị viên (Admin - Alias)
 - POST /api/v1/auth/manager-login           | Đăng nhập tài khoản Quản lý (Manager)
 - POST /api/v1/auth/login-manager           | Đăng nhập tài khoản Quản lý (Manager - Alias)
+- POST /api/v1/auth/login-manage            | Đăng nhập tài khoản Quản lý & Admin (Thống nhất link web)
 - POST /api/v1/auth/employee-login          | Đăng nhập tài khoản Nhân viên (Employee)
 - POST /api/v1/auth/login-employee         | Đăng nhập tài khoản Nhân viên (Employee - Alias)
 
