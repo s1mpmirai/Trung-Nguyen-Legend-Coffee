@@ -1,7 +1,7 @@
 # ==============================================================================
 # TRUNG NGUYEN LEGEND COFFEE - DANH MỤC API BACKEND (API LINKS)
 # Tự động cập nhật mỗi khi có API mới hoặc thay đổi endpoint
-# Cập nhật lần cuối: 2026-10-04 10:25:00 (UTC+7)
+# Cập nhật lần cuối: 2026-10-04 10:38:00 (UTC+7)
 # ==============================================================================
 
 [AUTH - XÁC THỰC & ĐĂNG NHẬP]
@@ -15,12 +15,22 @@
 - POST /api/v1/accounts/change-password     | Đổi mật khẩu tài khoản
 - GET  /api/v1/accounts/without_account     | Danh sách mã nhân viên (list[str]) chưa được cấp tài khoản để Admin chọn
 
+[PERMISSIONS - PHÂN QUYỀN RBAC]
+- GET  /api/v1/permissions/roles            | [Phân quyền] Danh sách các vai trò hệ thống kèm quyền mặc định
+- GET  /api/v1/permissions/all-permissions  | [Phân quyền] Danh sách tất cả 16 quyền chức năng trong hệ thống
+- GET  /api/v1/permissions/matrix           | [Phân quyền] Ma trận phân quyền và so sánh quyền khi lên Trưởng nhóm
+- GET  /api/v1/permissions/employee/{ma_nv} | [Phân quyền] Xem quyền hạn thực tế của một nhân sự
+- PUT  /api/v1/permissions/employee/{ma_nv}/role | [Phân quyền] Cấp vai trò / Thăng chức cho nhân sự (vd: lên Trưởng nhóm)
+- PUT  /api/v1/permissions/employee/{ma_nv}/custom-permissions | [Phân quyền] Cấp hoặc thu hồi quyền riêng biệt cho nhân sự
 
 [EMPLOYEES - HỒ SƠ NHÂN SỰ]
 - POST /api/v1/employees/create_employee    | Thêm mới hồ sơ nhân sự
 - GET  /api/v1/employees/get_employee_list  | Lấy danh sách nhân sự (lọc, tìm kiếm, phân trang)
 - GET  /api/v1/employees/profile/{ma_nv}    | Lấy chi tiết hồ sơ cá nhân nhân viên
 - PUT  /api/v1/employees/profile/{ma_nv}    | Cập nhật thông tin hồ sơ nhân viên trực tiếp (Admin/Hệ thống)
+- PUT  /api/v1/employees/{ma_nv}/status     | [Quản lý] Khóa hoặc cập nhật trạng thái làm việc (DA_NGHI_VIEC, TAM_HOAN_HD, DANG_LAM...)
+- PUT  /api/v1/employees/{ma_nv}/deactivate | [Quản lý] Khóa tài khoản và cho thôi việc nhân sự một chạm (Xóa mềm)
+- GET  /api/v1/employees/reports/monthly    | [Quản lý] Báo cáo thống kê biến động và tình hình nhân sự theo tháng (đang làm, nghỉ phép, thôi việc)
 - POST /api/v1/employees/profile/{ma_nv}/request-update          | [Nhân viên] Gửi yêu cầu chỉnh sửa hồ sơ chờ Quản lý phê duyệt (không sửa DB trực tiếp)
 - GET  /api/v1/employees/profile/{ma_nv}/pending-request         | [Nhân viên] Xem yêu cầu cập nhật hồ sơ đang chờ Quản lý duyệt
 - PUT  /api/v1/employees/profile-request/{ma_yc}/cancel          | [Nhân viên] Tự hủy yêu cầu cập nhật hồ sơ đang chờ duyệt

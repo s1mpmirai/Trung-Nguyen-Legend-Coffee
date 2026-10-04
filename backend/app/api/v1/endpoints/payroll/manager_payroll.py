@@ -48,6 +48,11 @@ def calculate_payroll_endpoint(
     response_model=payroll_company_summary_response,
     summary="[Quản lý] Xem bảng lương tháng của toàn bộ nhân viên",
 )
+@router.get(
+    "/summary",
+    response_model=payroll_company_summary_response,
+    include_in_schema=False,
+)
 def get_company_payroll_endpoint(
     thang: int = Query(..., ge=1, le=12, description="Tháng (1-12)"),
     nam: int = Query(..., ge=2000, description="Năm"),

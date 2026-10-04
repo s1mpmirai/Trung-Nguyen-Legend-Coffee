@@ -413,3 +413,163 @@ def review_profile_update_request(
     db.commit()
     return get_profile_request_by_id(db, ma_yc)
 
+
+def update_employee_status(
+    db: Session,
+    ma_nv: str,
+    trang_thai: str,
+    ngay_nghi_viec: Optional[date] = None,
+    khoa_tai_khoan: bool = True,
+    ly_do: Optional[str] = None,
+) -> dict | None:
+    """Cập nhật trạng thái nhân viên (khóa / thôi việc / tạm hoãn / đi làm lại)."""
+    now_vn = get_vietnam_now()
+    today_vn = now_vn.date()
+
+    if trang_thai == "DA_NGHI_VIEC" and not ngay_nghi_viec:
+        ngay_nghi_viec = today_vn
+    elif trang_thai == "DANG_LAM":
+        ngay_nghi_viec = None
+
+    db.execute(
+        text("""
+            UPDATE nhan_vien
+            SET trang_thai = :trang_thai,
+                ngay_nghi_viec = :ngay_nghi_viec,
+                ngay_cap_nhat = :ngay_cap_nhat
+            WHERE ma_nv = :ma_nv
+        """),
+        {
+            "ma_nv": ma_nv,
+            "trang_thai": trang_thai,
+            "ngay_nghi_viec": ngay_nghi_viec,
+            "ngay_cap_nhat": now_vn,
+        },
+    )
+
+    # Nếu chọn khóa/mở khóa tài khoản kèm theo
+    if khoa_tai_khoan:
+        if trang_thai in ["DA_NGHI_VIEC", "TAM_HOAN_HD"]:
+            db.execute(
+                text("""
+                    UPDATE tai_khoan
+                    SET trang_thai = 'KHOA',
+                        ngay_cap_nhat = :now
+                    WHERE ma_nv = :ma_nv
+                """),
+                {"ma_nv": ma_nv, "now": now_vn},
+            )
+        elif trang_thai == "DANG_LAM":
+            db.execute(
+                text("""
+                    UPDATE tai_khoan
+                    SET trang_thai = 'HOAT_DONG',
+                        ngay_cap_nhat = :now
+                    WHERE ma_nv = :ma_nv AND trang_thai = 'KHOA'
+                """),
+                {"ma_nv": ma_nv, "now": now_vn},
+            )
+
+    db.commit()
+    return get_by_ma_nv(db, ma_nv)
+
+
+def get_monthly_personnel_report(
+    db: Session,
+    thang: int,
+    nam: int,
+    ma_pb: Optional[str] = None,
+) -> dict:
+    """Báo cáo biến động và tình hình nhân sự theo tháng (đang làm, nghỉ phép, nghỉ việc)."""
+    where_pb = "AND nv.ma_pb = :ma_pb" if ma_pb else ""
+    params = {"thang": thang, "nam": nam}
+    if ma_pb:
+        params["ma_pb"] = ma_pb
+
+    # Lấy tên phòng ban nếu có lọc
+    ten_pb = None
+    if ma_pb:
+        pb_row = db.execute(text("SELECT ten_pb FROM phong_ban WHERE ma_pb = :ma_pb"), {"ma_pb": ma_pb}).fetchone()
+        ten_pb = pb_row[0] if pb_row else ma_pb
+
+    # 1. Toàn bộ danh sách nhân viên thuộc phạm vi
+    query = text(f"""
+        SELECT 
+            nv.ma_nv, nv.ho_ten, nv.ma_pb, pb.ten_pb, nv.ma_cv, cv.ten_cv,
+            nv.trang_thai, nv.ngay_vao_lam, nv.ngay_nghi_viec
+        FROM nhan_vien nv
+        LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
+        LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+        WHERE 1=1 {where_pb}
+        ORDER BY nv.ma_nv ASC
+    """)
+    rows = db.execute(query, params).mappings().all()
+
+    # 2. Lấy thông tin số ngày nghỉ phép trong tháng từ đơn từ đã duyệt
+    leave_query = text(f"""
+        SELECT 
+            dt.ma_nv,
+            COALESCE(SUM(dt.so_ngay), 0) as tong_nghi
+        FROM don_tu dt
+        JOIN nhan_vien nv ON dt.ma_nv = nv.ma_nv
+        WHERE dt.trang_thai = 'DA_DUYET'
+          AND (
+                (MONTH(dt.ngay_bat_dau) = :thang AND YEAR(dt.ngay_bat_dau) = :nam)
+             OR (MONTH(dt.ngay_ket_thuc) = :thang AND YEAR(dt.ngay_ket_thuc) = :nam)
+          )
+          {where_pb}
+        GROUP BY dt.ma_nv
+    """)
+    leave_rows = db.execute(leave_query, params).mappings().all()
+    leave_map = {r["ma_nv"]: float(r["tong_nghi"]) for r in leave_rows}
+
+    danh_sach_dang_lam = []
+    danh_sach_nghi_phep = []
+    danh_sach_da_nghi_viec = []
+    danh_sach_moi_vao = []
+
+    for r in rows:
+        m = dict(r)
+        emp_id = m["ma_nv"]
+        m["so_ngay_nghi_thang"] = leave_map.get(emp_id, 0.0)
+
+        # Mới vào làm trong tháng
+        if m.get("ngay_vao_lam") and m["ngay_vao_lam"].month == thang and m["ngay_vao_lam"].year == nam:
+            danh_sach_moi_vao.append(m)
+
+        # Đã nghỉ việc trong tháng hoặc hiện đang có trạng thái DA_NGHI_VIEC
+        if m.get("trang_thai") == "DA_NGHI_VIEC" or (
+            m.get("ngay_nghi_viec") and m["ngay_nghi_viec"].month == thang and m["ngay_nghi_viec"].year == nam
+        ):
+            danh_sach_da_nghi_viec.append(m)
+        elif m.get("trang_thai") in ["NGHI_PHEP", "NGHI_THAI_SAN"] or m["so_ngay_nghi_thang"] > 0:
+            danh_sach_nghi_phep.append(m)
+        else:
+            danh_sach_dang_lam.append(m)
+
+    tong_nhan_su = len(rows)
+    so_dang_lam = len(danh_sach_dang_lam)
+    so_nghi_phep = len(danh_sach_nghi_phep)
+    so_da_nghi_viec = len(danh_sach_da_nghi_viec)
+    so_moi_vao_lam = len(danh_sach_moi_vao)
+
+    ty_le_bien_dong = round((so_da_nghi_viec / max(tong_nhan_su, 1)) * 100, 1)
+
+    return {
+        "thang": thang,
+        "nam": nam,
+        "ma_pb": ma_pb,
+        "ten_pb": ten_pb,
+        "tong_nhan_su": tong_nhan_su,
+        "so_dang_lam": so_dang_lam,
+        "so_nghi_phep": so_nghi_phep,
+        "so_da_nghi_viec": so_da_nghi_viec,
+        "so_moi_vao_lam": so_moi_vao_lam,
+        "ty_le_bien_dong": ty_le_bien_dong,
+        "danh_sach_dang_lam": danh_sach_dang_lam,
+        "danh_sach_nghi_phep": danh_sach_nghi_phep,
+        "danh_sach_da_nghi_viec": danh_sach_da_nghi_viec,
+        "danh_sach_moi_vao_lam": danh_sach_moi_vao,
+    }
+
+
