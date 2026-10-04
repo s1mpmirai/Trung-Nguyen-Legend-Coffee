@@ -1,7 +1,7 @@
 # ==============================================================================
 # TRUNG NGUYEN LEGEND COFFEE - DANH MỤC API BACKEND (API LINKS)
 # Tự động cập nhật mỗi khi có API mới hoặc thay đổi endpoint
-# Cập nhật lần cuối: 2026-10-04 12:40:00 (UTC+7)
+# Cập nhật lần cuối: 2026-10-04 12:47:00 (UTC+7)
 # ==============================================================================
 
 [AUTH - XÁC THỰC & ĐĂNG NHẬP]
@@ -11,36 +11,82 @@
 - POST /api/v1/auth/login-manager           | Đăng nhập tài khoản Quản lý (Manager - Alias)
 - POST /api/v1/auth/login-manage            | Đăng nhập tài khoản Quản lý & Admin (Thống nhất link web)
 - POST /api/v1/auth/employee-login          | Đăng nhập tài khoản Nhân viên (Employee)
-- POST /api/v1/auth/login-employee         | Đăng nhập tài khoản Nhân viên (Employee - Alias)
+- POST /api/v1/auth/login-employee          | Đăng nhập tài khoản Nhân viên (Employee - Alias)
 
 [ACCOUNTS - QUẢN LÝ TÀI KHOẢN NGƯỜI DÙNG]
-- POST /api/v1/accounts/create_account      | Tạo tài khoản người dùng mới
-- PUT  /api/v1/accounts/{ma_nv}/status      | Cập nhật trạng thái tài khoản (Kích hoạt / Khóa)
-- POST /api/v1/accounts/change-password     | Đổi mật khẩu tài khoản
-- GET  /api/v1/accounts/without_account     | Danh sách mã nhân viên (list[str]) chưa được cấp tài khoản để Admin chọn
+- GET  /api/v1/accounts                     | [Admin] Lấy danh sách toàn bộ tài khoản (phân trang, tìm kiếm, lọc vai trò, trạng thái)
+- POST /api/v1/accounts/create_account      | [Admin] Tạo tài khoản người dùng mới (Mật khẩu mặc định là 1)
+- PUT  /api/v1/accounts/{ma_nv}/status      | [Admin] Cập nhật trạng thái tài khoản (Kích hoạt / Khóa)
+- POST /api/v1/accounts/change-password     | [Cá nhân] Đổi mật khẩu tài khoản
+- GET  /api/v1/accounts/without_account     | [Admin] Danh sách mã nhân viên chưa được cấp tài khoản để chọn cấp tài khoản
 
 [PERMISSIONS - PHÂN QUYỀN RBAC]
-- GET  /api/v1/permissions/roles            | [Phân quyền] Danh sách các vai trò hệ thống kèm quyền mặc định
-- GET  /api/v1/permissions/all-permissions  | [Phân quyền] Danh sách tất cả 16 quyền chức năng trong hệ thống
-- GET  /api/v1/permissions/matrix           | [Phân quyền] Ma trận phân quyền và so sánh quyền khi lên Trưởng nhóm
-- GET  /api/v1/permissions/employee/{ma_nv} | [Phân quyền] Xem quyền hạn thực tế của một nhân sự
-- PUT  /api/v1/permissions/employee/{ma_nv}/role | [Phân quyền] Cấp vai trò / Thăng chức cho nhân sự (vd: lên Trưởng nhóm)
-- PUT  /api/v1/permissions/employee/{ma_nv}/custom-permissions | [Phân quyền] Cấp hoặc thu hồi quyền riêng biệt cho nhân sự
+- GET  /api/v1/permissions/roles            | [Admin/QL] Danh sách các vai trò hệ thống kèm quyền mặc định
+- GET  /api/v1/permissions/all-permissions  | [Admin/QL] Danh sách tất cả 16 quyền chức năng trong hệ thống
+- GET  /api/v1/permissions/matrix           | [Admin/QL] Ma trận phân quyền và so sánh quyền khi lên Trưởng nhóm
+- GET  /api/v1/permissions/employee/{ma_nv} | [Admin/QL] Xem quyền hạn thực tế của một nhân sự
+- PUT  /api/v1/permissions/employee/{ma_nv}/role | [Admin] Cấp vai trò / Thăng chức cho nhân sự (vd: lên Trưởng nhóm)
+- PUT  /api/v1/permissions/employee/{ma_nv}/custom-permissions | [Admin] Cấp hoặc thu hồi quyền riêng biệt cho nhân sự
+
+[ADMIN DASHBOARD - THỐNG KÊ TỔNG QUAN HỆ THỐNG]
+- GET  /api/v1/admin/dashboard/stats        | [Admin] Báo cáo thống kê toàn diện: Nhân sự, Phòng ban, Chức vụ, Tài khoản, Kho hàng, Hợp đồng
+
+[DEPARTMENTS - CƠ CẤU PHÒNG BAN]
+- GET  /api/v1/departments                  | [Admin/QL] Danh sách phòng ban (kèm thông tin trưởng phòng, số lượng nhân sự)
+- GET  /api/v1/departments/{ma_pb}          | [Admin/QL] Chi tiết phòng ban kèm danh sách nhân sự trực thuộc
+- POST /api/v1/departments                  | [Admin] Thêm phòng ban mới
+- PUT  /api/v1/departments/{ma_pb}          | [Admin] Cập nhật thông tin phòng ban, thay đổi/bổ nhiệm trưởng phòng
+- DELETE /api/v1/departments/{ma_pb}        | [Admin] Xóa phòng ban (khi không còn nhân sự trực thuộc)
+
+[POSITIONS - CHỨC VỤ & BẬC LƯƠNG]
+- GET  /api/v1/positions                    | [Admin/QL] Danh sách chức vụ (phụ cấp chức vụ, cấp bậc 1-5, số nhân sự đảm nhiệm)
+- GET  /api/v1/positions/{ma_cv}            | [Admin/QL] Chi tiết chức vụ kèm thang bảng lương
+- POST /api/v1/positions                    | [Admin] Thêm chức vụ mới
+- PUT  /api/v1/positions/{ma_cv}            | [Admin] Cập nhật thông tin chức vụ, phụ cấp
+- DELETE /api/v1/positions/{ma_cv}          | [Admin] Xóa chức vụ (khi không còn nhân sự giữ chức)
+- GET  /api/v1/positions/{ma_cv}/salary-scales | [Admin/QL] Danh sách các bậc lương theo chức vụ
+- POST /api/v1/positions/{ma_cv}/salary-scales | [Admin] Thêm bậc lương cho chức vụ
+
+[CONTRACTS - HỢP ĐỒNG LAO ĐỘNG]
+- GET  /api/v1/contracts                    | [Admin/HR] Danh sách hợp đồng (lọc loại HĐ, trạng thái, hợp đồng sắp hết hạn 30 ngày)
+- GET  /api/v1/contracts/{ma_hd}            | [Admin/HR] Chi tiết hợp đồng (lương cơ bản, tỷ lệ hưởng, STK, ngân hàng, MST, BHXH)
+- GET  /api/v1/contracts/employee/{ma_nv}   | [Admin/HR/NV] Lịch sử các hợp đồng lao động của một nhân viên
+- POST /api/v1/contracts                    | [Admin/HR] Ký / Tạo mới hợp đồng lao động
+- PUT  /api/v1/contracts/{ma_hd}            | [Admin/HR] Cập nhật điều khoản hợp đồng (lương, tài khoản ngân hàng, MST, BHXH)
+- PUT  /api/v1/contracts/{ma_hd}/liquidate  | [Admin/HR] Thanh lý / Kết thúc hợp đồng lao động
+- DELETE /api/v1/contracts/{ma_hd}          | [Admin] Xóa hợp đồng khỏi hệ thống
+
+[SUPPLIERS - NHÀ CUNG CẤP NGUYÊN VẬT LIỆU]
+- GET  /api/v1/suppliers                    | [Admin/QL] Danh sách nhà cung cấp (tìm kiếm, lọc loại hàng, trạng thái hợp tác)
+- GET  /api/v1/suppliers/{ma_ncc}           | [Admin/QL] Chi tiết nhà cung cấp kèm danh sách sản phẩm cung cấp
+- POST /api/v1/suppliers                    | [Admin] Thêm nhà cung cấp mới
+- PUT  /api/v1/suppliers/{ma_ncc}           | [Admin] Cập nhật thông tin nhà cung cấp
+- PUT  /api/v1/suppliers/{ma_ncc}/status    | [Admin] Bật / Tắt trạng thái hợp tác (1: Hoạt động, 0: Ngừng hợp tác)
+- DELETE /api/v1/suppliers/{ma_ncc}         | [Admin] Xóa nhà cung cấp (khi chưa có sản phẩm liên kết)
+
+[PRODUCTS - SẢN PHẨM & KHO HÀNG]
+- GET  /api/v1/products                     | [Admin/QL] Danh sách sản phẩm (tìm kiếm, lọc loại SP, nhà cung cấp, tồn kho, giá)
+- GET  /api/v1/products/categories/list     | [Admin/QL] Danh sách các nhóm loại sản phẩm phục vụ bộ lọc dropdown
+- GET  /api/v1/products/{ma_sp}             | [Admin/QL] Chi tiết sản phẩm kèm thông tin nhà cung cấp & quản lý
+- POST /api/v1/products                     | [Admin] Thêm sản phẩm mới vào kho
+- PUT  /api/v1/products/{ma_sp}             | [Admin] Cập nhật thông tin sản phẩm, giá bán, giá nhập, quy cách
+- PUT  /api/v1/products/{ma_sp}/stock       | [Admin/QL] Nhập kho, xuất kho hoặc điều chỉnh số lượng tồn kho
+- PUT  /api/v1/products/{ma_sp}/status      | [Admin] Bật / Tắt trạng thái kinh doanh (1: Đang bán, 0: Tạm ngưng)
+- DELETE /api/v1/products/{ma_sp}           | [Admin] Xóa sản phẩm khỏi kho hàng
 
 [EMPLOYEES - HỒ SƠ NHÂN SỰ]
-- POST /api/v1/employees/create_employee    | Thêm mới hồ sơ nhân sự
-- GET  /api/v1/employees/get_employee_list  | Lấy danh sách nhân sự (lọc, tìm kiếm, phân trang)
-- GET  /api/v1/employees/profile/{ma_nv}    | Lấy chi tiết hồ sơ cá nhân nhân viên
-- PUT  /api/v1/employees/profile/{ma_nv}    | Cập nhật thông tin hồ sơ nhân viên trực tiếp (Admin/Hệ thống)
-- PUT  /api/v1/employees/{ma_nv}/status     | [Quản lý] Khóa hoặc cập nhật trạng thái làm việc (DA_NGHI_VIEC, TAM_HOAN_HD, DANG_LAM...)
-- PUT  /api/v1/employees/{ma_nv}/deactivate | [Quản lý] Khóa tài khoản và cho thôi việc nhân sự một chạm (Xóa mềm)
-- GET  /api/v1/employees/reports/monthly    | [Quản lý] Báo cáo thống kê biến động và tình hình nhân sự theo tháng (đang làm, nghỉ phép, thôi việc)
-- POST /api/v1/employees/profile/{ma_nv}/request-update          | [Nhân viên] Gửi yêu cầu chỉnh sửa hồ sơ chờ Quản lý phê duyệt (không sửa DB trực tiếp)
+- POST /api/v1/employees/create_employee    | [Admin/QL] Thêm mới hồ sơ nhân sự (tự động tạo đồng thời HĐ khởi tạo)
+- GET  /api/v1/employees/get_employee_list  | [Admin/QL] Lấy danh sách nhân sự (lọc, tìm kiếm, phân trang)
+- GET  /api/v1/employees/profile/{ma_nv}    | [Admin/QL/NV] Lấy chi tiết hồ sơ cá nhân nhân viên
+- PUT  /api/v1/employees/profile/{ma_nv}    | [Admin/QL] Cập nhật thông tin hồ sơ nhân viên trực tiếp
+- PUT  /api/v1/employees/{ma_nv}/status     | [Admin/QL] Khóa hoặc cập nhật trạng thái làm việc (DA_NGHI_VIEC, TAM_HOAN_HD, DANG_LAM...)
+- PUT  /api/v1/employees/{ma_nv}/deactivate | [Admin/QL] Khóa tài khoản và cho thôi việc nhân sự một chạm (Xóa mềm)
+- GET  /api/v1/employees/reports/monthly    | [Admin/QL] Báo cáo thống kê biến động và tình hình nhân sự theo tháng
+- POST /api/v1/employees/profile/{ma_nv}/request-update          | [Nhân viên] Gửi yêu cầu chỉnh sửa hồ sơ chờ Quản lý duyệt
 - GET  /api/v1/employees/profile/{ma_nv}/pending-request         | [Nhân viên] Xem yêu cầu cập nhật hồ sơ đang chờ Quản lý duyệt
 - PUT  /api/v1/employees/profile-request/{ma_yc}/cancel          | [Nhân viên] Tự hủy yêu cầu cập nhật hồ sơ đang chờ duyệt
 - GET  /api/v1/employees/manager/profile-requests                | [Quản lý] Danh sách yêu cầu cập nhật hồ sơ cá nhân cần duyệt / đã xử lý
-- PUT  /api/v1/employees/manager/profile-requests/{ma_yc}/review | [Quản lý] Phê duyệt (áp dụng vào bảng nhan_vien) hoặc Từ chối yêu cầu
-
+- PUT  /api/v1/employees/manager/profile-requests/{ma_yc}/review | [Quản lý] Phê duyệt hoặc Từ chối yêu cầu cập nhật hồ sơ
 
 [ATTENDANCE - CHẤM CÔNG & CA LÀM VIỆC]
 - GET  /api/v1/attendance/dashboard/{ma_nv} | [Nhân viên] Dashboard chấm công, GPS, thống kê tháng, lịch sử gần đây

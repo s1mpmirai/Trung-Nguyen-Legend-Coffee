@@ -67,3 +67,24 @@ def get_without_account_endpoint(db: DbSession):
         return account_service.get_without_account(db)
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err))
+
+
+@router.get("", summary="Danh sách tài khoản hệ thống")
+def list_accounts_endpoint(
+    db: DbSession,
+    page: int = 1,
+    page_size: int = 10,
+    search: str | None = None,
+    ma_vai_tro: str | None = None,
+    trang_thai: str | None = None,
+):
+    """Lấy danh sách tất cả tài khoản hệ thống phục vụ màn hình Quản trị Tài khoản Admin."""
+    return account_service.get_accounts_list(
+        db,
+        page=page,
+        page_size=page_size,
+        search=search,
+        ma_vai_tro=ma_vai_tro,
+        trang_thai=trang_thai,
+    )
+

@@ -112,4 +112,22 @@ def change_password(db: Session, ma_nv: str, old_pass: str, new_pass: str):
     return {"message": "Đổi mật khẩu thành công"}
 
 def get_without_account(db: Session) -> list[str]:
-    return account_repository.get_employees_without_account(db)
+    return account_repository.get_employees_without_account(db)
+
+
+def get_accounts_list(
+    db: Session,
+    page: int = 1,
+    page_size: int = 10,
+    search: str | None = None,
+    ma_vai_tro: str | None = None,
+    trang_thai: str | None = None,
+) -> dict:
+    return account_repository.get_accounts_list(
+        db,
+        page=page,
+        page_size=page_size,
+        search=search,
+        ma_vai_tro=ma_vai_tro,
+        trang_thai=trang_thai,
+    )
