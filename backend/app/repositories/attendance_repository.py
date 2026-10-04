@@ -15,12 +15,11 @@ def get_employee_attendance_info(db: Session, ma_nv: str) -> Optional[dict[str, 
             COALESCE(pb.ten_pb, 'Khối Văn Phòng') AS ten_pb,
             COALESCE(pb.ma_pb, 'PB01') AS ma_pb,
             COALESCE(cv.ten_cv, 'Nhân viên') AS ten_cv,
-            COALESCE(cn.ten_cn, 'Trụ sở chính Trung Nguyên') AS ten_cn,
-            cn.dia_chi AS dia_chi_cn
+            'Trụ sở chính Trung Nguyên' AS ten_cn,
+            '82 Nguyễn Du, Quận 1, TP. Hồ Chí Minh' AS dia_chi_cn
         FROM nhan_vien nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
-        LEFT JOIN chi_nhanh cn ON nv.ma_cn = cn.ma_cn
         WHERE nv.ma_nv = :ma_nv
         LIMIT 1
     """)
@@ -308,12 +307,11 @@ def get_attendance_history_by_employee(
             bcc.so_gio_lam, bcc.so_gio_tang_ca, bcc.loai_cong, bcc.ghi_chu,
             COALESCE(bcc.trang_thai_duyet, 'CHO_DUYET') as trang_thai_duyet,
             COALESCE(ca.ten_ca, 'Hành chính') as ca_lam_viec,
-            COALESCE(cn.ten_cn, 'Trụ sở chính Trung Nguyên') as ten_cn,
-            cn.dia_chi as dia_chi_cn
+            'Trụ sở chính Trung Nguyên' as ten_cn,
+            '82 Nguyễn Du, Quận 1, TP. Hồ Chí Minh' as dia_chi_cn
         FROM bang_cham_cong bcc
         LEFT JOIN ca_lam_viec ca ON bcc.ma_ca = ca.ma_ca
         LEFT JOIN nhan_vien nv ON bcc.ma_nv = nv.ma_nv
-        LEFT JOIN chi_nhanh cn ON nv.ma_cn = cn.ma_cn
         WHERE {' AND '.join(where_parts)}
         ORDER BY bcc.ngay_cong DESC, bcc.ma_cc DESC
     """)

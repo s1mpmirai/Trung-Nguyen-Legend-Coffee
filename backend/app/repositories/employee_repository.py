@@ -39,11 +39,11 @@ def create(db: Session, employee: dict) -> dict:
             """
             INSERT INTO nhan_vien (
                 ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
-                so_nguoi_pt, ma_pb, ma_cv, ma_cn, ngay_vao_lam, ngay_nghi_viec,
+                so_nguoi_pt, ma_pb, ma_cv, ngay_vao_lam, ngay_nghi_viec,
                 trang_thai, hinh_thuc_lam_viec, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
             ) VALUES (
                 :ma_nv, :ho_ten, :ngay_sinh, :gioi_tinh, :cccd, :dia_chi, :sdt, :email,
-                :so_nguoi_pt, :ma_pb, :ma_cv, :ma_cn, :ngay_vao_lam, :ngay_nghi_viec,
+                :so_nguoi_pt, :ma_pb, :ma_cv, :ngay_vao_lam, :ngay_nghi_viec,
                 :trang_thai, :hinh_thuc_lam_viec, :so_tai_khoan, :ngan_hang, :ma_so_thue, :so_bhxh
             )
             """
@@ -63,7 +63,7 @@ def get_employee_list(
 
     query = """
         SELECT ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
-               so_nguoi_pt, ma_pb, ma_cv, ma_cn, ngay_vao_lam, ngay_nghi_viec,
+               so_nguoi_pt, ma_pb, ma_cv, ngay_vao_lam, ngay_nghi_viec,
                trang_thai, hinh_thuc_lam_viec, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
         FROM nhan_vien
         ORDER BY ma_nv ASC

@@ -48,11 +48,6 @@ const POSITION_MAP = {
   CV08: "Tổng Giám đốc",
 };
 
-const BRANCH_MAP = {
-  CN01: "Trụ sở chính TP.HCM",
-  CN02: "Nhà máy Buôn Ma Thuột",
-  CN03: "Chi nhánh Hà Nội",
-};
 
 const getInitials = (name) => {
   if (!name) return "NV";
@@ -125,7 +120,7 @@ export default function PersonnelReport() {
             const tenure = calculateTenureData(emp.ngay_vao_lam);
             const deptName = DEPARTMENT_MAP[emp.ma_pb] || emp.ma_pb || "Chưa phân bổ";
             const roleName = POSITION_MAP[emp.ma_cv] || emp.ma_cv || "Nhân viên";
-            const locationName = BRANCH_MAP[emp.ma_cn] || emp.dia_chi || "Trụ sở chính";
+            const locationName = emp.dia_chi || "Trụ sở chính";
 
             return {
               id: emp.ma_nv,

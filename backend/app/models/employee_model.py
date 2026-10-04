@@ -31,7 +31,6 @@ class nhan_vien(Base):
     so_nguoi_pt = Column(Integer, default=0)  # Số người phụ thuộc
     ma_pb = Column(String, ForeignKey("phong_ban.ma_pb"), nullable=False)
     ma_cv = Column(String, ForeignKey("chuc_vu.ma_cv"), nullable=False)
-    ma_cn = Column(String, ForeignKey("chuyen_nganh.ma_cn"), nullable=True)
     ma_ngl = Column(String, ForeignKey("ngach_luong.ma_ngl"), nullable=True)
     ngay_vao_lam = Column(Date, nullable=False)
     ngay_nghi_viec = Column(Date)
@@ -45,5 +44,4 @@ class nhan_vien(Base):
     
     ma_pb_rel = relationship("phong_ban", back_populates="nhan_vien")
     ma_cv_rel = relationship("chuc_vu", back_populates="nhan_vien")
-    ma_cn_rel = relationship("chuyen_nganh", back_populates="nhan_vien")
     ma_ngl_rel = relationship("ngach_luong", back_populates="nhan_vien")

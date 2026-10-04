@@ -17,7 +17,6 @@ class employee_profile(BaseModel):
     so_nguoi_pt: Optional[int] = Field(0, description="Số người phụ thuộc")
     ma_pb: str = Field(..., description="Mã phòng ban")
     ma_cv: str = Field(..., description="Mã chức vụ")
-    ma_cn: Optional[str] = Field(None, description="Mã chi nhánh")
     ma_ngl: Optional[str] = Field(None, description="Mã ngạch lương")
     ngay_vao_lam: date = Field(..., description="Ngày vào làm")
     ngay_nghi_viec: Optional[date] = Field(None, description="Ngày nghỉ việc")

@@ -12,39 +12,22 @@ CREATE DATABASE trungnguyen_hrm_lite CHARACTER SET utf8mb4 COLLATE utf8mb4_unico
 USE trungnguyen_hrm_lite;
 
 -- =====================================================================
--- PHẦN 1: CẤU TRÚC CƠ SỞ DỮ LIỆU (DDL - 19 BẢNG)
+-- PHẦN 1: CẤU TRÚC CƠ SỞ DỮ LIỆU (DDL - 18 BẢNG)
 -- =====================================================================
 
--- 1. Chi nhánh
-CREATE TABLE chi_nhanh (
-    ma_cn VARCHAR(10) PRIMARY KEY,
-    ten_cn VARCHAR(150) NOT NULL,
-    loai_cn ENUM('TRU_SO', 'NHA_MAY', 'CHI_NHANH', 'CUA_HANG') DEFAULT 'CHI_NHANH',
-    dia_chi VARCHAR(255),
-    tinh_thanh VARCHAR(80),
-    sdt VARCHAR(20),
-    email VARCHAR(100),
-    ngay_thanh_lap DATE,
-    trang_thai TINYINT(1) DEFAULT 1 COMMENT '1=Hoạt động, 0=Ngừng',
-    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB COMMENT='Danh mục chi nhánh, nhà máy, cửa hàng';
-
--- 2. Phòng ban
+-- 1. Phòng ban
 CREATE TABLE phong_ban (
     ma_pb VARCHAR(10) PRIMARY KEY,
     ten_pb VARCHAR(150) NOT NULL,
-    ma_cn VARCHAR(10) NOT NULL,
     ma_truong_pb VARCHAR(10) NULL,
     sdt VARCHAR(20),
     mo_ta VARCHAR(255),
     trang_thai TINYINT(1) DEFAULT 1,
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_pb_chinhanh FOREIGN KEY (ma_cn) REFERENCES chi_nhanh(ma_cn) ON UPDATE CASCADE
+    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='Danh mục phòng ban';
 
--- 3. Chức vụ
+-- 2. Chức vụ
 CREATE TABLE chuc_vu (
     ma_cv VARCHAR(10) PRIMARY KEY,
     ten_cv VARCHAR(100) NOT NULL,
@@ -83,7 +66,6 @@ CREATE TABLE nhan_vien (
     ma_pb VARCHAR(10) NOT NULL,
     ma_cv VARCHAR(10) NOT NULL,
     ma_bac INT NULL COMMENT 'Bậc lương hiện tại',
-    ma_cn VARCHAR(10) NOT NULL COMMENT 'Nơi làm việc thực tế',
     ma_nql VARCHAR(10) NULL COMMENT 'Mã người quản lý trực tiếp',
     ngay_vao_lam DATE NOT NULL,
     ngay_nghi_viec DATE NULL,
@@ -99,7 +81,6 @@ CREATE TABLE nhan_vien (
     CONSTRAINT fk_nv_phongban FOREIGN KEY (ma_pb) REFERENCES phong_ban(ma_pb) ON UPDATE CASCADE,
     CONSTRAINT fk_nv_chucvu FOREIGN KEY (ma_cv) REFERENCES chuc_vu(ma_cv) ON UPDATE CASCADE,
     CONSTRAINT fk_nv_bacluong FOREIGN KEY (ma_bac) REFERENCES bac_luong(ma_bac) ON UPDATE CASCADE ON DELETE SET NULL,
-    CONSTRAINT fk_nv_chinhanh FOREIGN KEY (ma_cn) REFERENCES chi_nhanh(ma_cn) ON UPDATE CASCADE,
     CONSTRAINT fk_nv_quanly FOREIGN KEY (ma_nql) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Hồ sơ thông tin nhân viên';
 
@@ -356,7 +337,6 @@ CREATE TABLE san_pham (
     ten_sp VARCHAR(180) NOT NULL,
     loai_sp VARCHAR(50) NOT NULL,
     ma_ncc VARCHAR(10) NULL,
-    ma_cn VARCHAR(10) NULL,
     ma_nv_quan_ly VARCHAR(10) NULL,
     don_vi_tinh VARCHAR(20) NOT NULL DEFAULT 'Hộp',
     quy_cach VARCHAR(80),
@@ -368,7 +348,6 @@ CREATE TABLE san_pham (
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_sp_ncc FOREIGN KEY (ma_ncc) REFERENCES nha_cung_cap(ma_ncc) ON UPDATE CASCADE ON DELETE SET NULL,
-    CONSTRAINT fk_sp_chinhanh FOREIGN KEY (ma_cn) REFERENCES chi_nhanh(ma_cn) ON UPDATE CASCADE ON DELETE SET NULL,
     CONSTRAINT fk_sp_nhanvien FOREIGN KEY (ma_nv_quan_ly) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL,
     CONSTRAINT ck_sp_gia CHECK (gia_ban >= 0 AND gia_nhap >= 0)
 ) ENGINE=InnoDB COMMENT='Sản phẩm cà phê Trung Nguyên';
@@ -385,26 +364,18 @@ FOREIGN KEY (ma_truong_pb) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELE
 
 START TRANSACTION;
 
--- 1. Chi nhánh
-INSERT INTO chi_nhanh (ma_cn, ten_cn, loai_cn, dia_chi, tinh_thanh, sdt, email, ngay_thanh_lap) VALUES
-('CN01', 'Trụ sở chính Trung Nguyên',   'TRU_SO',    '82 Nguyễn Du, Quận 1',          'TP. Hồ Chí Minh', '028 3829 1234', 'info@trungnguyen.com',    '1996-06-16'),
-('CN02', 'Nhà máy Buôn Ma Thuột',        'NHA_MAY',   'KCN Hòa Phú, TP. Buôn Ma Thuột', 'Đắk Lắk',        '0262 385 6789', 'nhamay@trungnguyen.com',  '2000-03-15'),
-('CN03', 'Chi nhánh Hà Nội',             'CHI_NHANH', '25 Lý Thường Kiệt, Hoàn Kiếm',  'Hà Nội',           '024 3933 5678', 'hanoi@trungnguyen.com',   '2005-08-10'),
-('CN04', 'Chi nhánh Đà Nẵng',            'CHI_NHANH', '120 Bạch Đằng, Hải Châu',        'Đà Nẵng',          '0236 382 4567', 'danang@trungnguyen.com',  '2010-01-20'),
-('CN05', 'Cửa hàng E-Coffee Quận 1',     'CUA_HANG',  '15 Đồng Khởi, Quận 1',          'TP. Hồ Chí Minh',  '028 3822 9999', 'ecoffee1@trungnguyen.com', '2018-06-01');
+-- 1. Phòng ban
+INSERT INTO phong_ban (ma_pb, ten_pb, sdt, mo_ta) VALUES
+('PB01', 'Ban Giám đốc',              '028 3829 1234', 'Điều hành toàn bộ tập đoàn'),
+('PB02', 'Phòng Nhân sự',             '028 3829 1235', 'Quản lý nhân sự, tuyển dụng, đào tạo'),
+('PB03', 'Phòng Kế toán – Tài chính', '028 3829 1236', 'Kế toán, tài chính, thuế'),
+('PB04', 'Phòng Marketing',           '028 3829 1237', 'Truyền thông, quảng cáo thương hiệu'),
+('PB05', 'Phòng Kinh doanh',          '028 3829 1238', 'Bán hàng, phát triển thị trường'),
+('PB06', 'Phòng IT',                   '028 3829 1239', 'Công nghệ thông tin, hạ tầng'),
+('PB07', 'Xưởng Sản xuất',            '0262 385 6780', 'Sản xuất, chế biến cà phê'),
+('PB08', 'Phòng Kinh doanh Miền Bắc', '024 3933 5679', 'Kinh doanh khu vực phía Bắc');
 
--- 2. Phòng ban
-INSERT INTO phong_ban (ma_pb, ten_pb, ma_cn, sdt, mo_ta) VALUES
-('PB01', 'Ban Giám đốc',              'CN01', '028 3829 1234', 'Điều hành toàn bộ tập đoàn'),
-('PB02', 'Phòng Nhân sự',             'CN01', '028 3829 1235', 'Quản lý nhân sự, tuyển dụng, đào tạo'),
-('PB03', 'Phòng Kế toán – Tài chính', 'CN01', '028 3829 1236', 'Kế toán, tài chính, thuế'),
-('PB04', 'Phòng Marketing',           'CN01', '028 3829 1237', 'Truyền thông, quảng cáo thương hiệu'),
-('PB05', 'Phòng Kinh doanh',          'CN01', '028 3829 1238', 'Bán hàng, phát triển thị trường'),
-('PB06', 'Phòng IT',                   'CN01', '028 3829 1239', 'Công nghệ thông tin, hạ tầng'),
-('PB07', 'Xưởng Sản xuất',            'CN02', '0262 385 6780', 'Sản xuất, chế biến cà phê'),
-('PB08', 'Phòng Kinh doanh Hà Nội',   'CN03', '024 3933 5679', 'Kinh doanh khu vực phía Bắc');
-
--- 3. Chức vụ
+-- 2. Chức vụ
 INSERT INTO chuc_vu (ma_cv, ten_cv, cap_bac, phu_cap_chuc_vu, mo_ta) VALUES
 ('CV01', 'Nhân viên',               1,        0, 'Nhân viên thử việc / chính thức'),
 ('CV02', 'Nhân viên chính',         1,   500000, 'Nhân viên có kinh nghiệm'),
@@ -437,28 +408,28 @@ INSERT INTO bac_luong (ma_cv, bac, he_so, muc_luong, mo_ta) VALUES
 
 -- 5. Nhân viên
 INSERT INTO nhan_vien (ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
-  so_nguoi_pt, ma_pb, ma_cv, ma_bac, ma_cn, ma_nql, ngay_vao_lam, ngay_nghi_viec, trang_thai,
+  so_nguoi_pt, ma_pb, ma_cv, ma_bac, ma_nql, ngay_vao_lam, ngay_nghi_viec, trang_thai,
   so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh) VALUES
-('NV01','Đặng Lê Nguyên Vũ',  '1971-02-10','Nam','079071000001','Quận 2, TPHCM',         '0901234567','vudln@trungnguyen.com',    2,'PB01','CV08', 17,'CN01',NULL, '1996-06-16',NULL,'DANG_LAM','1001234567','Vietcombank','8071234567','7196000001'),
-('NV02','Nguyễn Thị Minh Tâm','1985-05-15','Nu', '079185000002','Quận 7, TPHCM',         '0912345678','tamntm@trungnguyen.com',   1,'PB02','CV05', 11,'CN01','NV01','2010-03-01',NULL,'DANG_LAM','1002345678','Techcombank','8085234567','7110000002'),
-('NV03','Trần Văn Hùng',      '1982-10-20','Nam','079082000003','Bình Thạnh, TPHCM',     '0923456789','hungtv@trungnguyen.com',   0,'PB03','CV05', 11,'CN01','NV01','2012-05-15',NULL,'DANG_LAM','1003456789','BIDV',       '8082345678','7112000003'),
-('NV04','Lê Hoàng Phúc',      '1988-08-08','Nam','079088000004','Phú Nhuận, TPHCM',      '0934567890','phuclh@trungnguyen.com',   1,'PB04','CV05', 11,'CN01','NV01','2015-09-01',NULL,'DANG_LAM','1004567890','MB Bank',    '8088456789','7115000004'),
-('NV05','Phạm Thị Hương',     '1990-12-12','Nu', '079190000005','Quận 1, TPHCM',         '0945678901','huongpt@trungnguyen.com',  0,'PB05','CV05', 11,'CN01','NV01','2016-01-10',NULL,'DANG_LAM','1005678901','ACB',        '8090567890','7116000005'),
-('NV06','Võ Minh Tuấn',       '1987-07-07','Nam','079087000006','Quận 3, TPHCM',         '0956789012','tuanvm@trungnguyen.com',   2,'PB06','CV05', 11,'CN01','NV01','2014-11-01',NULL,'DANG_LAM','1006789012','Sacombank',  '8087678901','7114000006'),
-('NV07','Nguyễn Văn Đức',     '1979-04-30','Nam','066079000007','TP. BMT, Đắk Lắk',     '0967890123','ducnv@trungnguyen.com',    1,'PB07','CV05', 11,'CN02','NV01','2005-02-15',NULL,'DANG_LAM','1007890123','Agribank',   '8079789012','7105000007'),
-('NV08','Hoàng Thị Lan',      '1992-09-02','Nu', '079192000008','Quận 4, TPHCM',         '0978901234','lanht@trungnguyen.com',    0,'PB02','CV04',  9,'CN01','NV02','2018-06-01',NULL,'DANG_LAM','1008901234','VPBank',     '8092890123','7118000008'),
-('NV09','Trần Minh Khoa',     '1995-11-11','Nam','079095000009','Quận 10, TPHCM',        '0989012345','khoatm@trungnguyen.com',   0,'PB06','CV03',  7,'CN01','NV06','2019-08-15',NULL,'DANG_LAM','1009012345','TPBank',     '8095901234','7119000009'),
-('NV10','Lê Thị Thu',         '1996-03-08','Nu', '079196000010','Gò Vấp, TPHCM',        '0990123456','thult@trungnguyen.com',    0,'PB02','CV01',  1,'CN01','NV08','2020-02-01',NULL,'DANG_LAM','1010123456','Vietcombank','8096012345','7120000010'),
-('NV11','Phạm Văn Nam',       '1994-06-15','Nam','079094000011','Tân Bình, TPHCM',       '0902345678','nampv@trungnguyen.com',    1,'PB03','CV02',  4,'CN01','NV03','2019-05-10',NULL,'DANG_LAM','1011234567','BIDV',       '8094123456','7119000011'),
-('NV12','Vũ Thị Ngọc',        '1997-10-10','Nu', '079197000012','Tân Phú, TPHCM',        '0913456789','ngocvt@trungnguyen.com',   0,'PB04','CV01',  1,'CN01','NV04','2021-07-01',NULL,'DANG_LAM','1012345678','MB Bank',    '8097234567','7121000012'),
-('NV13','Bùi Văn Tiến',       '1993-01-25','Nam','079093000013','Quận 8, TPHCM',         '0924567890','tienbv@trungnguyen.com',   2,'PB05','CV02',  4,'CN01','NV05','2018-09-15',NULL,'DANG_LAM','1013456789','ACB',        '8093345678','7118000013'),
-('NV14','Đinh Thị Mai',       '1998-12-20','Nu', '079198000014','Thủ Đức, TPHCM',        '0935678901','maidt@trungnguyen.com',    0,'PB06','CV01',  1,'CN01','NV09','2022-03-01',NULL,'DANG_LAM','1014567890','Sacombank',  '8098456789','7122000014'),
-('NV15','Lý Văn Cường',       '1985-08-15','Nam','066085000015','Cư M''gar, Đắk Lắk',   '0946789012','cuonglv@trungnguyen.com',  1,'PB07','CV03',  7,'CN02','NV07','2010-11-20',NULL,'DANG_LAM','1015678901','Agribank',   '8085567890','7110000015'),
-('NV16','Ngô Thị Cẩm',        '1990-04-05','Nu', '066190000016','Buôn Đôn, Đắk Lắk',    '0957890123','camnt@trungnguyen.com',    0,'PB07','CV01',  1,'CN02','NV15','2015-06-10',NULL,'DANG_LAM','1016789012','Agribank',   '8090678901','7115000016'),
-('NV17','Trần Văn Long',      '1989-02-14','Nam','001089000017','Cầu Giấy, Hà Nội',     '0968901234','longtv@trungnguyen.com',   1,'PB08','CV04',  9,'CN03','NV01','2016-08-01',NULL,'DANG_LAM','1017890123','Vietinbank', '8089789012','7116000017'),
-('NV18','Lê Thị Phương',      '1995-07-22','Nu', '001195000018','Đống Đa, Hà Nội',      '0979012345','phuonglt@trungnguyen.com', 0,'PB08','CV01',  1,'CN03','NV17','2020-04-15',NULL,'DANG_LAM','1018901234','Vietinbank', '8095890123','7120000018'),
-('NV19','Phạm Minh Trí',      '1997-11-30','Nam','048097000019','Hải Châu, Đà Nẵng',    '0980123456','tripm@trungnguyen.com',    0,'PB05','CV01',  1,'CN04','NV05','2021-09-01',NULL,'DANG_LAM','1019012345','ACB',        '8097901234','7121000019'),
-('NV20','Nguyễn Thị Tuyết',   '1994-01-01','Nu', '079194000020','Quận 1, TPHCM',         '0991234567','tuyetnt@trungnguyen.com',  0,'PB02','CV01',  1,'CN01','NV08','2019-10-01','2025-12-31','DA_NGHI_VIEC','1020123456','VPBank','8094012345','7119000020');
+('NV01','Đặng Lê Nguyên Vũ',  '1971-02-10','Nam','079071000001','Quận 2, TPHCM',         '0901234567','vudln@trungnguyen.com',    2,'PB01','CV08', 17,NULL, '1996-06-16',NULL,'DANG_LAM','1001234567','Vietcombank','8071234567','7196000001'),
+('NV02','Nguyễn Thị Minh Tâm','1985-05-15','Nu', '079185000002','Quận 7, TPHCM',         '0912345678','tamntm@trungnguyen.com',   1,'PB02','CV05', 11,'NV01','2010-03-01',NULL,'DANG_LAM','1002345678','Techcombank','8085234567','7110000002'),
+('NV03','Trần Văn Hùng',      '1982-10-20','Nam','079082000003','Bình Thạnh, TPHCM',     '0923456789','hungtv@trungnguyen.com',   0,'PB03','CV05', 11,'NV01','2012-05-15',NULL,'DANG_LAM','1003456789','BIDV',       '8082345678','7112000003'),
+('NV04','Lê Hoàng Phúc',      '1988-08-08','Nam','079088000004','Phú Nhuận, TPHCM',      '0934567890','phuclh@trungnguyen.com',   1,'PB04','CV05', 11,'NV01','2015-09-01',NULL,'DANG_LAM','1004567890','MB Bank',    '8088456789','7115000004'),
+('NV05','Phạm Thị Hương',     '1990-12-12','Nu', '079190000005','Quận 1, TPHCM',         '0945678901','huongpt@trungnguyen.com',  0,'PB05','CV05', 11,'NV01','2016-01-10',NULL,'DANG_LAM','1005678901','ACB',        '8090567890','7116000005'),
+('NV06','Võ Minh Tuấn',       '1987-07-07','Nam','079087000006','Quận 3, TPHCM',         '0956789012','tuanvm@trungnguyen.com',   2,'PB06','CV05', 11,'NV01','2014-11-01',NULL,'DANG_LAM','1006789012','Sacombank',  '8087678901','7114000006'),
+('NV07','Nguyễn Văn Đức',     '1979-04-30','Nam','066079000007','TP. BMT, Đắk Lắk',     '0967890123','ducnv@trungnguyen.com',    1,'PB07','CV05', 11,'NV01','2005-02-15',NULL,'DANG_LAM','1007890123','Agribank',   '8079789012','7105000007'),
+('NV08','Hoàng Thị Lan',      '1992-09-02','Nu', '079192000008','Quận 4, TPHCM',         '0978901234','lanht@trungnguyen.com',    0,'PB02','CV04',  9,'NV02','2018-06-01',NULL,'DANG_LAM','1008901234','VPBank',     '8092890123','7118000008'),
+('NV09','Trần Minh Khoa',     '1995-11-11','Nam','079095000009','Quận 10, TPHCM',        '0989012345','khoatm@trungnguyen.com',   0,'PB06','CV03',  7,'NV06','2019-08-15',NULL,'DANG_LAM','1009012345','TPBank',     '8095901234','7119000009'),
+('NV10','Lê Thị Thu',         '1996-03-08','Nu', '079196000010','Gò Vấp, TPHCM',        '0990123456','thult@trungnguyen.com',    0,'PB02','CV01',  1,'NV08','2020-02-01',NULL,'DANG_LAM','1010123456','Vietcombank','8096012345','7120000010'),
+('NV11','Phạm Văn Nam',       '1994-06-15','Nam','079094000011','Tân Bình, TPHCM',       '0902345678','nampv@trungnguyen.com',    1,'PB03','CV02',  4,'NV03','2019-05-10',NULL,'DANG_LAM','1011234567','BIDV',       '8094123456','7119000011'),
+('NV12','Vũ Thị Ngọc',        '1997-10-10','Nu', '079197000012','Tân Phú, TPHCM',        '0913456789','ngocvt@trungnguyen.com',   0,'PB04','CV01',  1,'NV04','2021-07-01',NULL,'DANG_LAM','1012345678','MB Bank',    '8097234567','7121000012'),
+('NV13','Bùi Văn Tiến',       '1993-01-25','Nam','079093000013','Quận 8, TPHCM',         '0924567890','tienbv@trungnguyen.com',   2,'PB05','CV02',  4,'NV05','2018-09-15',NULL,'DANG_LAM','1013456789','ACB',        '8093345678','7118000013'),
+('NV14','Đinh Thị Mai',       '1998-12-20','Nu', '079198000014','Thủ Đức, TPHCM',        '0935678901','maidt@trungnguyen.com',    0,'PB06','CV01',  1,'NV09','2022-03-01',NULL,'DANG_LAM','1014567890','Sacombank',  '8098456789','7122000014'),
+('NV15','Lý Văn Cường',       '1985-08-15','Nam','066085000015','Cư M''gar, Đắk Lắk',   '0946789012','cuonglv@trungnguyen.com',  1,'PB07','CV03',  7,'NV07','2010-11-20',NULL,'DANG_LAM','1015678901','Agribank',   '8085567890','7110000015'),
+('NV16','Ngô Thị Cẩm',        '1990-04-05','Nu', '066190000016','Buôn Đôn, Đắk Lắk',    '0957890123','camnt@trungnguyen.com',    0,'PB07','CV01',  1,'NV15','2015-06-10',NULL,'DANG_LAM','1016789012','Agribank',   '8090678901','7115000016'),
+('NV17','Trần Văn Long',      '1989-02-14','Nam','001089000017','Cầu Giấy, Hà Nội',     '0968901234','longtv@trungnguyen.com',   1,'PB08','CV04',  9,'NV01','2016-08-01',NULL,'DANG_LAM','1017890123','Vietinbank', '8089789012','7116000017'),
+('NV18','Lê Thị Phương',      '1995-07-22','Nu', '001195000018','Đống Đa, Hà Nội',      '0979012345','phuonglt@trungnguyen.com', 0,'PB08','CV01',  1,'NV17','2020-04-15',NULL,'DANG_LAM','1018901234','Vietinbank', '8095890123','7120000018'),
+('NV19','Phạm Minh Trí',      '1997-11-30','Nam','048097000019','Hải Châu, Đà Nẵng',    '0980123456','tripm@trungnguyen.com',    0,'PB05','CV01',  1,'NV05','2021-09-01',NULL,'DANG_LAM','1019012345','ACB',        '8097901234','7121000019'),
+('NV20','Nguyễn Thị Tuyết',   '1994-01-01','Nu', '079194000020','Quận 1, TPHCM',         '0991234567','tuyetnt@trungnguyen.com',  0,'PB02','CV01',  1,'NV08','2019-10-01','2025-12-31','DA_NGHI_VIEC','1020123456','VPBank','8094012345','7119000020');
 
 -- Cập nhật trưởng phòng
 UPDATE phong_ban SET ma_truong_pb = 'NV01' WHERE ma_pb = 'PB01';
@@ -629,17 +600,17 @@ INSERT INTO nha_cung_cap (ma_ncc, ten_ncc, dia_chi, tinh_thanh, sdt, email, nguo
 ('NCC06', 'Hợp tác xã Nông nghiệp Ea Tu',          'TP. Buôn Ma Thuột','Đắk Lắk',        '0262 381 4455', 'eatu_coop@gmail.com',     'H''Nhi Kbuôr',     'Cà phê hữu cơ đạt chuẩn',     'NV15');
 
 -- 18. Sản phẩm
-INSERT INTO san_pham (ma_sp, ten_sp, loai_sp, ma_ncc, ma_cn, ma_nv_quan_ly, don_vi_tinh, quy_cach, gia_nhap, gia_ban, ton_kho, mo_ta) VALUES
-('SP01', 'Cà phê G7 3in1 (Hộp 18 gói)',                                'Cà phê hòa tan', 'NCC02', 'CN01', 'NV04', 'Hộp',  'Hộp 18 gói x 16g',         38000,  52000, 1500, 'Cà phê hòa tan hương vị đậm đà được ưa chuộng nhất'),
-('SP02', 'Cà phê G7 3in1 (Bịch 50 gói)',                               'Cà phê hòa tan', 'NCC02', 'CN01', 'NV04', 'Bịch', 'Bịch 50 gói x 16g',        95000, 135000, 2200, 'Cà phê hòa tan dạng bịch tiết kiệm gia đình'),
-('SP03', 'Cà phê G7 Đen đá (Hộp 15 gói)',                              'Cà phê hòa tan', 'NCC02', 'CN01', 'NV12', 'Hộp',  'Hộp 15 gói x 16g',         28000,  42000,  850, 'Cà phê đen nguyên chất không đường'),
-('SP04', 'Cà phê Chế Phin 1 (500g)',                                   'Cà phê rang xay', 'NCC01', 'CN02', 'NV07', 'Gói',  'Gói 500g',                 55000,  78000,  950, 'Thành phần Culi Robusta nguyên chất, nước nâu cánh gián'),
-('SP05', 'Cà phê Chế Phin 4 (500g)',                                   'Cà phê rang xay', 'NCC01', 'CN02', 'NV07', 'Gói',  'Gói 500g',                 72000, 105000, 1100, 'Hỗn hợp Culi Arabica, Robusta đặc trưng'),
-('SP06', 'Cà phê Sáng Tạo 8 (500g)',                                  'Cà phê rang xay', 'NCC03', 'CN02', 'NV15', 'Hộp',  'Hộp 500g',                180000, 260000,  400, 'Được mệnh danh là Cà phê của Nguyên thủ & Ngoại giao'),
-('SP07', 'Cà phê Hạt Mộc Robusta (1kg)',                              'Cà phê hạt',     'NCC01', 'CN02', 'NV07', 'Túi',  'Túi 1kg có van 1 chiều',  140000, 210000,  600, 'Cà phê hạt rang mộc nguyên chất'),
-('SP08', 'Cà phê Hạt Mộc Arabica Cầu Đất (1kg)',                      'Cà phê hạt',     'NCC03', 'CN02', 'NV15', 'Túi',  'Túi 1kg có van 1 chiều',  220000, 320000,  350, 'Arabica vùng Cầu Đất Đà Lạt hương thơm thanh tao'),
-('SP09', 'Cà phê Năng Lượng Trung Nguyên Legend Classic (Hộp 12 gói)', 'Cà phê hòa tan', 'NCC02', 'CN01', 'NV04', 'Hộp',  'Hộp 12 gói',               45000,  68000, 1200, 'Dòng sản phẩm cao cấp Trung Nguyên Legend'),
-('SP10', 'Phin Cà Phê Nhôm Trung Nguyên In Hoa Văn',                   'Dụng cụ pha chế','NCC04', 'CN05', 'NV13', 'Cái',  'Phin nhôm cao cấp',        22000,  35000,  750, 'Phin nhôm truyền thống chuẩn hương vị');
+INSERT INTO san_pham (ma_sp, ten_sp, loai_sp, ma_ncc, ma_nv_quan_ly, don_vi_tinh, quy_cach, gia_nhap, gia_ban, ton_kho, mo_ta) VALUES
+('SP01', 'Cà phê G7 3in1 (Hộp 18 gói)',                                'Cà phê hòa tan', 'NCC02', 'NV04', 'Hộp',  'Hộp 18 gói x 16g',         38000,  52000, 1500, 'Cà phê hòa tan hương vị đậm đà được ưa chuộng nhất'),
+('SP02', 'Cà phê G7 3in1 (Bịch 50 gói)',                               'Cà phê hòa tan', 'NCC02', 'NV04', 'Bịch', 'Bịch 50 gói x 16g',        95000, 135000, 2200, 'Cà phê hòa tan dạng bịch tiết kiệm gia đình'),
+('SP03', 'Cà phê G7 Đen đá (Hộp 15 gói)',                              'Cà phê hòa tan', 'NCC02', 'NV12', 'Hộp',  'Hộp 15 gói x 16g',         28000,  42000,  850, 'Cà phê đen nguyên chất không đường'),
+('SP04', 'Cà phê Chế Phin 1 (500g)',                                   'Cà phê rang xay', 'NCC01', 'NV07', 'Gói',  'Gói 500g',                 55000,  78000,  950, 'Thành phần Culi Robusta nguyên chất, nước nâu cánh gián'),
+('SP05', 'Cà phê Chế Phin 4 (500g)',                                   'Cà phê rang xay', 'NCC01', 'NV07', 'Gói',  'Gói 500g',                 72000, 105000, 1100, 'Hỗn hợp Culi Arabica, Robusta đặc trưng'),
+('SP06', 'Cà phê Sáng Tạo 8 (500g)',                                  'Cà phê rang xay', 'NCC03', 'NV15', 'Hộp',  'Hộp 500g',                180000, 260000,  400, 'Được mệnh danh là Cà phê của Nguyên thủ & Ngoại giao'),
+('SP07', 'Cà phê Hạt Mộc Robusta (1kg)',                              'Cà phê hạt',     'NCC01', 'NV07', 'Túi',  'Túi 1kg có van 1 chiều',  140000, 210000,  600, 'Cà phê hạt rang mộc nguyên chất'),
+('SP08', 'Cà phê Hạt Mộc Arabica Cầu Đất (1kg)',                      'Cà phê hạt',     'NCC03', 'NV15', 'Túi',  'Túi 1kg có van 1 chiều',  220000, 320000,  350, 'Arabica vùng Cầu Đất Đà Lạt hương thơm thanh tao'),
+('SP09', 'Cà phê Năng Lượng Trung Nguyên Legend Classic (Hộp 12 gói)', 'Cà phê hòa tan', 'NCC02', 'NV04', 'Hộp',  'Hộp 12 gói',               45000,  68000, 1200, 'Dòng sản phẩm cao cấp Trung Nguyên Legend'),
+('SP10', 'Phin Cà Phê Nhôm Trung Nguyên In Hoa Văn',                   'Dụng cụ pha chế','NCC04', 'NV13', 'Cái',  'Phin nhôm cao cấp',        22000,  35000,  750, 'Phin nhôm truyền thống chuẩn hương vị');
 
 COMMIT;
 

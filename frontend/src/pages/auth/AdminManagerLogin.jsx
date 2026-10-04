@@ -156,7 +156,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
               <div>
                 <h4 className="text-xs font-bold text-white">Quản Lý Nhân Sự Toàn Diện</h4>
                 <p className="text-[11px] text-sky-100 mt-0.5">
-                  Hồ sơ nhân viên, hợp đồng, phòng ban và chức danh chi nhánh.
+                  Hồ sơ nhân viên, hợp đồng, phòng ban và chức vụ.
                 </p>
               </div>
             </div>
@@ -304,7 +304,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
                     type="button"
                     onClick={() => { setEmployeeId('NV02'); setPassword('1'); }}
                     className="px-2 py-0.5 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-700 rounded-lg font-semibold text-[11px] transition-colors shadow-xs"
-                    title="Quản lý chi nhánh / nhân sự"
+                    title="Quản lý phòng ban / nhân sự"
                   >
                     NV02 (QL)
                   </button>
