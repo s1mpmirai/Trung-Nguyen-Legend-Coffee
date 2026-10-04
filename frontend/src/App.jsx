@@ -221,12 +221,10 @@ function App() {
   if (!userSession || isLoginPage) {
     if (currentPage === "login-admin" || currentPage === "login-manager") {
       return (
-        <div className="min-h-screen bg-slate-100 flex justify-center items-start">
-          <div className="w-full max-w-md min-h-screen bg-[#F8FAFC] shadow-2xl flex flex-col relative overflow-x-hidden">
-            <AdminManagerLogin
-              onLoginSuccess={handleLoginSuccess}
-            />
-          </div>
+        <div className="min-h-screen w-full bg-gradient-to-br from-slate-100 via-sky-50/40 to-slate-200 flex flex-col justify-center items-center">
+          <AdminManagerLogin
+            onLoginSuccess={handleLoginSuccess}
+          />
         </div>
       );
     }
