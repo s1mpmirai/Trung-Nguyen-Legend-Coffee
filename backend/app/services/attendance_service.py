@@ -563,9 +563,11 @@ def get_attendance_history(
             "loai_cong": loai,
             "so_gio_lam": float(r.get("so_gio_lam") or 0.0),
             "so_gio_tang_ca": float(r.get("so_gio_tang_ca") or 0.0),
+            "so_cong": float(r.get("so_cong") or 1.0),
+            "trang_thai_duyet": r.get("trang_thai_duyet") or "CHO_DUYET",
         })
 
-    total_cong = sum([float(r.get("so_gio_lam") or 0) / 8.0 for r in rows]) if rows else 0.0
+    total_cong = sum([float(r.get("so_cong") if r.get("so_cong") is not None else (float(r.get("so_gio_lam") or 0) / 8.0)) for r in rows]) if rows else 0.0
     total_ot = sum([float(r.get("so_gio_tang_ca") or 0) for r in rows]) if rows else 0.0
     total_muon = sum([1 for r in rows if r.get("loai_cong") == "DI_TRE"])
     total_phep = sum([1 for r in rows if r.get("loai_cong") == "NGHI_PHEP"])

@@ -304,7 +304,7 @@ def get_attendance_history_by_employee(
     query = text(f"""
         SELECT 
             bcc.ma_cc, bcc.ngay_cong, bcc.gio_vao, bcc.gio_ra, 
-            bcc.so_gio_lam, bcc.so_gio_tang_ca, bcc.loai_cong, bcc.ghi_chu,
+            bcc.so_gio_lam, bcc.so_gio_tang_ca, bcc.so_cong, bcc.loai_cong, bcc.ghi_chu,
             COALESCE(bcc.trang_thai_duyet, 'CHO_DUYET') as trang_thai_duyet,
             COALESCE(ca.ten_ca, 'Hành chính') as ca_lam_viec,
             'Trụ sở chính Trung Nguyên' as ten_cn,
