@@ -6,8 +6,11 @@
 
 [AUTH - XÁC THỰC & ĐĂNG NHẬP]
 - POST /api/v1/auth/admin-login             | Đăng nhập tài khoản Quản trị viên (Admin)
+- POST /api/v1/auth/login-admin             | Đăng nhập tài khoản Quản trị viên (Admin - Alias)
 - POST /api/v1/auth/manager-login           | Đăng nhập tài khoản Quản lý (Manager)
+- POST /api/v1/auth/login-manager           | Đăng nhập tài khoản Quản lý (Manager - Alias)
 - POST /api/v1/auth/employee-login          | Đăng nhập tài khoản Nhân viên (Employee)
+- POST /api/v1/auth/login-employee         | Đăng nhập tài khoản Nhân viên (Employee - Alias)
 
 [ACCOUNTS - QUẢN LÝ TÀI KHOẢN NGƯỜI DÙNG]
 - POST /api/v1/accounts/create_account      | Tạo tài khoản người dùng mới

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Login from "./pages/auth/Login";
+import AdminManagerLogin from "./pages/auth/AdminManagerLogin";
 import AttendanceDashboard from "./pages/employee/AttendanceDashboard";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import EmployeePayroll from "./pages/employee/EmployeePayroll";
@@ -8,14 +9,36 @@ import ManagerDashboard from "./pages/manager/ManagerDashboard";
 
 /**
  * App – Root component tích hợp:
- *   - Login (Trang đăng nhập)
+ *   - Login Nhân viên (#/login)
+ *   - Login Quản lý & Admin (#/login-manager, #/login-admin)
  *   - Chấm công (AttendanceDashboard)
  *   - Bảng lương (EmployeePayroll)
  *   - Hồ sơ cá nhân (EmployeeProfile)
+ *   - Quản lý & Admin Portal (ManagerDashboard)
  *
- * Hỗ trợ Hash-based routing (#/attendance, #/payroll, #/profile)
+ * Hỗ trợ Hash-based routing (#/attendance, #/payroll, #/profile, #/manager, #/login-manager, #/login-admin)
  * và tự động giữ phiên đăng nhập qua localStorage.
  */
+
+// Lấy route hiện tại từ pathname hoặc hash (chuẩn hóa bỏ dấu / và #)
+const getCleanRoute = () => {
+  const hash = window.location.hash.replace(/^#\/?/, "").replace(/\/+$/, "");
+  const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
+  return path || hash || "";
+};
+
+// Điều hướng URL sạch (Clean pathname không có dấu #)
+const navigateClean = (route) => {
+  const clean = String(route || "").replace(/^#\/?/, "").replace(/^\/+/, "");
+  const targetUrl = clean ? `/${clean}` : "/";
+  if (window.location.pathname !== targetUrl) {
+    window.history.pushState(null, "", targetUrl);
+  }
+  if (window.location.hash) {
+    window.history.replaceState(null, "", targetUrl);
+  }
+  window.dispatchEvent(new Event("app-route-change"));
+};
 
 // Kiểm tra role có quyền quản lý hay không (ADMIN, QUAN_LY, TRUONG_NHOM)
 const isManagerRole = (role) => {
@@ -27,22 +50,29 @@ const isManagerRole = (role) => {
 function App() {
   const [userSession, setUserSession] = useState(null);
   const [currentPage, setCurrentPage] = useState(() => {
+    const route = getCleanRoute();
+    if (route === "login-admin" || route === "login-manager" || route === "login") {
+      return route;
+    }
+
     const savedMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
-    if (!savedMaNv) return "login";
+    if (!savedMaNv) {
+      if (route === "login-admin" || route === "login-manager") return route;
+      return "login";
+    }
 
     const savedRole = localStorage.getItem("user_role");
-    const hash = window.location.hash.replace("#/", "");
 
-    if (hash && hash.startsWith("manager")) {
+    if (route && route.startsWith("manager")) {
       // Chỉ cho phép truy cập nếu tài khoản có quyền Quản lý
       if (isManagerRole(savedRole)) {
-        return hash;
+        return route;
       }
-      window.location.hash = "#/attendance";
+      navigateClean("attendance");
       return "attendance";
     }
 
-    return hash || (isManagerRole(savedRole) ? "manager" : "attendance");
+    return route || (isManagerRole(savedRole) ? "manager" : "attendance");
   });
 
   // Đồng bộ phiên đăng nhập khi khởi động
@@ -50,6 +80,13 @@ function App() {
     const savedMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
     const savedToken = localStorage.getItem("auth_token") || localStorage.getItem("access_token");
     const savedRole = localStorage.getItem("user_role");
+    const route = getCleanRoute();
+
+    // Nếu URL còn dấu #, chuẩn hóa ngay thành clean pathname
+    if (window.location.hash) {
+      const clean = window.location.hash.replace(/^#\/?/, "");
+      window.history.replaceState(null, "", clean ? `/${clean}` : "/");
+    }
 
     if (savedMaNv) {
       setUserSession({
@@ -68,42 +105,68 @@ function App() {
         localStorage.setItem("user_role", savedRole);
       }
     } else {
-      setCurrentPage("login");
+      if (route === "login-admin" || route === "login-manager") {
+        setCurrentPage(route);
+      } else {
+        setCurrentPage("login");
+      }
     }
   }, []);
 
-  // Lắng nghe thay đổi URL Hash với Route Guard phân quyền chặt chẽ
+  // Lắng nghe thay đổi URL (popstate, hashchange, custom event) với Route Guard phân quyền chặt chẽ
   useEffect(() => {
-    const handleHashChange = () => {
+    const handleRouteSync = () => {
+      const route = getCleanRoute();
+
+      // Nếu còn hash thì xóa hash để URL sạch 100%
+      if (window.location.hash) {
+        const clean = window.location.hash.replace(/^#\/?/, "");
+        window.history.replaceState(null, "", clean ? `/${clean}` : "/");
+      }
+
+      // Cho phép mở trang đăng nhập chuyên biệt bất kể trạng thái session
+      if (route === "login-admin" || route === "login-manager" || route === "login") {
+        setCurrentPage(route);
+        return;
+      }
+
       const savedMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
       if (!savedMaNv) {
-        setCurrentPage("login");
+        if (route === "login-admin" || route === "login-manager") {
+          setCurrentPage(route);
+        } else {
+          setCurrentPage("login");
+        }
         return;
       }
 
       const savedRole = localStorage.getItem("user_role");
-      const hash = window.location.hash.replace("#/", "");
 
-      // Chặn nhân viên không có quyền quản lý truy cập #/manager
-      if (hash && hash.startsWith("manager")) {
+      // Chặn nhân viên không có quyền quản lý truy cập /manager
+      if (route && route.startsWith("manager")) {
         if (isManagerRole(savedRole)) {
-          setCurrentPage(hash);
+          setCurrentPage(route);
         } else {
-          // Nhân viên thường không có quyền -> đưa về trang Chấm công
           alert("Bạn không có quyền truy cập vào khu vực Quản lý.");
-          window.location.hash = "#/attendance";
+          navigateClean("attendance");
           setCurrentPage("attendance");
         }
         return;
       }
 
-      if (hash) {
-        setCurrentPage(hash);
+      if (route) {
+        setCurrentPage(route);
       }
     };
 
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("popstate", handleRouteSync);
+    window.addEventListener("hashchange", handleRouteSync);
+    window.addEventListener("app-route-change", handleRouteSync);
+    return () => {
+      window.removeEventListener("popstate", handleRouteSync);
+      window.removeEventListener("hashchange", handleRouteSync);
+      window.removeEventListener("app-route-change", handleRouteSync);
+    };
   }, []);
 
   const handleLoginSuccess = (userData) => {
@@ -121,29 +184,53 @@ function App() {
       localStorage.setItem("user_role", userData.role);
     }
 
-    // Điều hướng theo Role: Quản lý vào #/manager, Nhân viên vào #/attendance
+    // Điều hướng sạch: Quản lý / Admin vào /manager, Nhân viên vào /attendance
     if (isManagerRole(userData?.role)) {
-      window.location.hash = "#/manager";
+      navigateClean("manager");
       setCurrentPage("manager");
     } else {
-      window.location.hash = "#/attendance";
+      navigateClean("attendance");
       setCurrentPage("attendance");
     }
   };
 
   const handleLogout = () => {
+    const prevRole = userSession?.role || localStorage.getItem("user_role");
     localStorage.removeItem("user_ma_nv");
     localStorage.removeItem("ma_nv");
     localStorage.removeItem("auth_token");
     localStorage.removeItem("access_token");
     localStorage.removeItem("user_role");
     setUserSession(null);
-    window.location.hash = "";
-    setCurrentPage("login");
+
+    // Chuyển về đúng trang đăng nhập tương ứng vai trò vừa đăng xuất (URL sạch)
+    if (String(prevRole).toUpperCase() === "ADMIN") {
+      navigateClean("login-admin");
+      setCurrentPage("login-admin");
+    } else if (isManagerRole(prevRole)) {
+      navigateClean("login-manager");
+      setCurrentPage("login-manager");
+    } else {
+      navigateClean("login");
+      setCurrentPage("login");
+    }
   };
 
-  // 1. Nếu chưa đăng nhập, hiển thị trang Login
-  if (!userSession || currentPage === "login") {
+  // 1. Nếu chưa đăng nhập hoặc đang ở các trang đăng nhập
+  const isLoginPage = currentPage === "login" || currentPage === "login-admin" || currentPage === "login-manager";
+  if (!userSession || isLoginPage) {
+    if (currentPage === "login-admin" || currentPage === "login-manager") {
+      return (
+        <div className="min-h-screen bg-slate-100 flex justify-center items-start">
+          <div className="w-full max-w-md min-h-screen bg-[#F8FAFC] shadow-2xl flex flex-col relative overflow-x-hidden">
+            <AdminManagerLogin
+              onLoginSuccess={handleLoginSuccess}
+            />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-slate-100 flex justify-center items-start">
         <div className="w-full max-w-md min-h-screen bg-[#F8FAFC] shadow-2xl flex flex-col relative overflow-x-hidden">
@@ -153,7 +240,7 @@ function App() {
     );
   }
 
-  // 2. Nếu vào trang quản lý (#/manager), kiểm tra quyền quản lý
+  // 2. Nếu vào trang quản lý (/manager), kiểm tra quyền quản lý
   if (currentPage.startsWith("manager")) {
     const role = userSession?.role || localStorage.getItem("user_role");
     if (isManagerRole(role)) {
@@ -165,7 +252,7 @@ function App() {
       );
     }
     // Nếu không có quyền, chuyển về chấm công
-    window.location.hash = "#/attendance";
+    navigateClean("attendance");
   }
 
   // Điều hướng các trang sau khi đăng nhập
