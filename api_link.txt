@@ -52,9 +52,12 @@
 - POST /api/v1/attendance/manager/toggle-lock | [Quản lý] Chốt hoặc Mở khóa bảng công tháng
 
 [LEAVES - NGHỈ PHÉP & ĐƠN TỪ]
-- POST /api/v1/leaves/request               | [Nhân viên] Gửi đơn xin nghỉ phép/nghỉ việc
-- GET  /api/v1/leaves/my-history/{ma_nv}    | [Nhân viên] Lịch sử đơn từ của cá nhân
-- PUT  /api/v1/leaves/cancel/{ma_don}       | [Nhân viên] Hủy đơn nghỉ phép đang chờ duyệt
+- POST /api/v1/leaves/create                | [Nhân viên] Nộp đơn xin nghỉ phép/nghỉ việc
+- POST /api/v1/leaves/request               | [Nhân viên] Gửi đơn xin nghỉ phép/nghỉ việc (Alias)
+- GET  /api/v1/leaves/history/{ma_nv}       | [Nhân viên] Lịch sử đơn từ của cá nhân
+- GET  /api/v1/leaves/my-history/{ma_nv}    | [Nhân viên] Lịch sử đơn từ của cá nhân (Alias)
+- PUT  /api/v1/leaves/{ma_don}/cancel       | [Nhân viên] Hủy đơn nghỉ phép đang chờ duyệt
+- PUT  /api/v1/leaves/cancel/{ma_don}       | [Nhân viên] Hủy đơn nghỉ phép đang chờ duyệt (Alias)
 - GET  /api/v1/leaves/pending               | [Quản lý] Danh sách đơn từ đang chờ duyệt
 - GET  /api/v1/leaves/all                   | [Quản lý] Danh sách tất cả đơn từ nhân viên
 - PUT  /api/v1/leaves/{ma_don}/review       | [Quản lý] Phê duyệt hoặc từ chối đơn từ
