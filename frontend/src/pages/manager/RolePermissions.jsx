@@ -158,7 +158,7 @@ export default function RolePermissions() {
       isNewForLead: true,
     },
     {
-      module: "Duyệt đơn từ",
+      module: "Nộp đơn",
       action: "Gửi đơn cá nhân",
       staff: true,
       lead: true,
@@ -166,7 +166,7 @@ export default function RolePermissions() {
       admin: true,
     },
     {
-      module: "Duyệt đơn từ",
+      module: "Duyệt đơn",
       action: "Duyệt đơn nghỉ phép nhóm (< 3 ngày)",
       staff: false,
       lead: true,
@@ -175,7 +175,7 @@ export default function RolePermissions() {
       isNewForLead: true,
     },
     {
-      module: "Duyệt đơn từ",
+      module: "Quản lý đơn thôi việc, dài hạn",
       action: "Duyệt đơn thôi việc & phép dài hạn",
       staff: false,
       lead: false,
@@ -221,15 +221,7 @@ export default function RolePermissions() {
       lead: true,
       manager: true,
       admin: true,
-    },
-    {
-      module: "Cài đặt hệ thống",
-      action: "Cấu hình GPS & Tham số API",
-      staff: false,
-      lead: false,
-      manager: false,
-      admin: true,
-    },
+    }
   ];
 
   const handleSave = () => {
@@ -246,8 +238,8 @@ export default function RolePermissions() {
       newRole === "staff"
         ? "Nhân viên tiêu chuẩn"
         : newRole === "leader"
-        ? "Trưởng nhóm / Leader"
-        : "Trưởng phòng / Quản lý";
+          ? "Trưởng nhóm / Leader"
+          : "Trưởng phòng / Quản lý";
 
     setToast(
       `Đã cập nhật vai trò cho ${member?.name} thành "${roleName}"! Quyền hạn có hiệu lực ngay trong phiên đăng nhập tới.`
@@ -272,12 +264,8 @@ export default function RolePermissions() {
       {/* ──────────────── HEADER ──────────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-sky-700 text-xs font-bold uppercase tracking-wider">
-            <span className="w-2 h-2 rounded-full bg-sky-600"></span>
-            <span>Bảo mật & Quản trị tổ chức • RBAC-v4.2</span>
-          </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-1 font-['Plus_Jakarta_Sans',sans-serif]">
-            Phân quyền & Vai trò nhân sự
+            PHÂN QUYỀN & VAI TRÒ NHÂN SỰ
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Thiết lập phạm vi quyền hạn theo vị trí công tác và thăng tiến cấp bậc tức thời
@@ -308,7 +296,7 @@ export default function RolePermissions() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div>
             <h2 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-base text-slate-900">
-              Ma trận đối chiếu phân quyền (Matrix RBAC)
+              Ma trận đối chiếu phân quyền
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
               Chi tiết thẩm quyền thao tác trên 6 phân hệ lõi của tập đoàn Trung Nguyên Legend
@@ -317,17 +305,15 @@ export default function RolePermissions() {
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
             <button
               onClick={() => setFilterType("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-                filterType === "all" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${filterType === "all" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Tất cả chức năng
             </button>
             <button
               onClick={() => setFilterType("approval")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-                filterType === "approval" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${filterType === "approval" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700"
+                }`}
             >
               Chỉ quyền duyệt
             </button>
@@ -365,11 +351,10 @@ export default function RolePermissions() {
                   <td className="py-3 px-3 text-center bg-emerald-50/30">
                     {row.lead ? (
                       <span
-                        className={`w-5 h-5 rounded-full inline-flex items-center justify-center mx-auto ${
-                          row.isNewForLead
-                            ? "bg-emerald-600 text-white shadow-xs font-bold"
-                            : "bg-emerald-100 text-emerald-700"
-                        }`}
+                        className={`w-5 h-5 rounded-full inline-flex items-center justify-center mx-auto ${row.isNewForLead
+                          ? "bg-emerald-600 text-white shadow-xs font-bold"
+                          : "bg-emerald-100 text-emerald-700"
+                          }`}
                         title={row.isNewForLead ? "Quyền mới mở khi nâng bậc" : ""}
                       >
                         <Check className="w-3.5 h-3.5" />
@@ -500,15 +485,14 @@ export default function RolePermissions() {
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${
-                      m.tagType === "promote"
-                        ? "bg-sky-100 text-sky-800 border border-sky-200"
-                        : m.tagType === "leader"
+                    className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${m.tagType === "promote"
+                      ? "bg-sky-100 text-sky-800 border border-sky-200"
+                      : m.tagType === "leader"
                         ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
                         : m.tagType === "probation"
-                        ? "bg-amber-100 text-amber-800 border border-amber-200"
-                        : "bg-slate-200 text-slate-700"
-                    }`}
+                          ? "bg-amber-100 text-amber-800 border border-amber-200"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
                   >
                     {m.statusTag}
                   </span>
