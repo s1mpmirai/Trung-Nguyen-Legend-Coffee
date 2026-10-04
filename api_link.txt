@@ -1,7 +1,7 @@
 # ==============================================================================
 # TRUNG NGUYEN LEGEND COFFEE - DANH MỤC API BACKEND (API LINKS)
 # Tự động cập nhật mỗi khi có API mới hoặc thay đổi endpoint
-# Cập nhật lần cuối: 2026-10-04 11:58:00 (UTC+7)
+# Cập nhật lần cuối: 2026-10-04 12:40:00 (UTC+7)
 # ==============================================================================
 
 [AUTH - XÁC THỰC & ĐĂNG NHẬP]

@@ -34,21 +34,70 @@ def get_latest_employee_code(db: Session) -> str | None:
 def create(db: Session, employee: dict) -> dict:
     if "hinh_thuc_lam_viec" not in employee or not employee["hinh_thuc_lam_viec"]:
         employee["hinh_thuc_lam_viec"] = "FULL_TIME"
+    
+    nv_data = {
+        "ma_nv": employee["ma_nv"],
+        "ho_ten": employee["ho_ten"],
+        "ngay_sinh": employee["ngay_sinh"],
+        "gioi_tinh": employee["gioi_tinh"],
+        "cccd": employee.get("cccd"),
+        "dia_chi": employee.get("dia_chi"),
+        "sdt": employee.get("sdt"),
+        "email": employee.get("email"),
+        "so_nguoi_pt": employee.get("so_nguoi_pt", 0),
+        "ma_pb": employee["ma_pb"],
+        "ma_cv": employee["ma_cv"],
+        "ngay_nghi_viec": employee.get("ngay_nghi_viec"),
+        "trang_thai": employee.get("trang_thai", "DANG_LAM"),
+        "hinh_thuc_lam_viec": employee.get("hinh_thuc_lam_viec", "FULL_TIME"),
+    }
     db.execute(
         text(
             """
             INSERT INTO nhan_vien (
                 ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
-                so_nguoi_pt, ma_pb, ma_cv, ngay_vao_lam, ngay_nghi_viec,
-                trang_thai, hinh_thuc_lam_viec, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
+                so_nguoi_pt, ma_pb, ma_cv, ngay_nghi_viec,
+                trang_thai, hinh_thuc_lam_viec
             ) VALUES (
                 :ma_nv, :ho_ten, :ngay_sinh, :gioi_tinh, :cccd, :dia_chi, :sdt, :email,
-                :so_nguoi_pt, :ma_pb, :ma_cv, :ngay_vao_lam, :ngay_nghi_viec,
-                :trang_thai, :hinh_thuc_lam_viec, :so_tai_khoan, :ngan_hang, :ma_so_thue, :so_bhxh
+                :so_nguoi_pt, :ma_pb, :ma_cv, :ngay_nghi_viec,
+                :trang_thai, :hinh_thuc_lam_viec
             )
             """
         ),
-        employee,
+        nv_data,
+    )
+
+    ngay_vao_lam = employee.get("ngay_vao_lam") or date.today()
+    ma_hd = f"HD-{employee['ma_nv']}"
+    hd_data = {
+        "ma_hd": ma_hd,
+        "ma_nv": employee["ma_nv"],
+        "loai_hd": "THU_VIEC",
+        "ngay_ky": ngay_vao_lam,
+        "ngay_bat_dau": ngay_vao_lam,
+        "ngay_ket_thuc": None,
+        "luong_co_ban": 8000000,
+        "ty_le_huong": 100.0,
+        "so_tai_khoan": employee.get("so_tai_khoan"),
+        "ngan_hang": employee.get("ngan_hang"),
+        "ma_so_thue": employee.get("ma_so_thue"),
+        "so_bhxh": employee.get("so_bhxh"),
+        "trang_thai": "HIEU_LUC",
+    }
+    db.execute(
+        text(
+            """
+            INSERT INTO hop_dong_lao_dong (
+                ma_hd, ma_nv, loai_hd, ngay_ky, ngay_bat_dau, ngay_ket_thuc,
+                luong_co_ban, ty_le_huong, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh, trang_thai
+            ) VALUES (
+                :ma_hd, :ma_nv, :loai_hd, :ngay_ky, :ngay_bat_dau, :ngay_ket_thuc,
+                :luong_co_ban, :ty_le_huong, :so_tai_khoan, :ngan_hang, :ma_so_thue, :so_bhxh, :trang_thai
+            )
+            """
+        ),
+        hd_data,
     )
     return employee
 
@@ -62,11 +111,26 @@ def get_employee_list(
     total = db.execute(text("SELECT COUNT(*) FROM nhan_vien")).scalar() or 0
 
     query = """
-        SELECT ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
-               so_nguoi_pt, ma_pb, ma_cv, ngay_vao_lam, ngay_nghi_viec,
-               trang_thai, hinh_thuc_lam_viec, so_tai_khoan, ngan_hang, ma_so_thue, so_bhxh
-        FROM nhan_vien
-        ORDER BY ma_nv ASC
+        SELECT 
+            nv.ma_nv, nv.ho_ten, nv.ngay_sinh, nv.gioi_tinh, nv.cccd, nv.dia_chi, nv.sdt, nv.email,
+            nv.so_nguoi_pt, nv.ma_pb, nv.ma_cv, nv.ngay_nghi_viec,
+            nv.trang_thai, nv.hinh_thuc_lam_viec,
+            hd.ngay_bat_dau AS ngay_vao_lam,
+            hd.so_tai_khoan,
+            hd.ngan_hang,
+            hd.ma_so_thue,
+            hd.so_bhxh
+        FROM nhan_vien nv
+        LEFT JOIN (
+            SELECT hd1.*
+            FROM hop_dong_lao_dong hd1
+            INNER JOIN (
+                SELECT ma_nv, MAX(ngay_bat_dau) AS max_ngay
+                FROM hop_dong_lao_dong
+                GROUP BY ma_nv
+            ) latest ON hd1.ma_nv = latest.ma_nv AND hd1.ngay_bat_dau = latest.max_ngay
+        ) hd ON hd.ma_nv = nv.ma_nv
+        ORDER BY nv.ma_nv ASC
         LIMIT :limit OFFSET :offset
     """
     rows = db.execute(
@@ -99,18 +163,17 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
             pb.ten_pb,
             nv.ma_cv,
             cv.ten_cv,
-            nv.ngay_vao_lam,
+            hd.ngay_bat_dau AS ngay_vao_lam,
             nv.ngay_nghi_viec,
             nv.trang_thai,
-            nv.hinh_thuc_lam_viec,
-            nv.so_tai_khoan,
-            nv.ngan_hang,
-            nv.ma_so_thue,
-            nv.so_bhxh,
+            COALESCE(nv.hinh_thuc_lam_viec, 'FULL_TIME') AS hinh_thuc_lam_viec,
+            hd.so_tai_khoan,
+            hd.ngan_hang,
+            hd.ma_so_thue,
+            hd.so_bhxh,
             hd.ma_hd,
             hd.loai_hd,
             hd.trang_thai AS trang_thai_hd,
-            COALESCE(nv.hinh_thuc_lam_viec, 'FULL_TIME') AS hinh_thuc_lam_viec,
             tk.lan_dn_cuoi,
             tk.ngay_cap_nhat AS ngay_cap_nhat_tk
         FROM nhan_vien nv
@@ -119,7 +182,11 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
         LEFT JOIN (
             SELECT hd1.*
             FROM hop_dong_lao_dong hd1
-            WHERE hd1.trang_thai = 'HIEU_LUC'
+            INNER JOIN (
+                SELECT ma_nv, MAX(ngay_bat_dau) AS max_ngay
+                FROM hop_dong_lao_dong
+                GROUP BY ma_nv
+            ) latest ON hd1.ma_nv = latest.ma_nv AND hd1.ngay_bat_dau = latest.max_ngay
         ) hd ON hd.ma_nv = nv.ma_nv
         LEFT JOIN tai_khoan tk ON tk.ma_nv = nv.ma_nv
         WHERE nv.ma_nv = :ma_nv
@@ -130,34 +197,42 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
 
 
 def update_contact(db: Session, ma_nv: str, data: dict) -> dict | None:
-    # Cho phép nhân viên cập nhật thông tin cá nhân & liên hệ, thuế, bảo hiểm
-    allowed_fields = {
-        "sdt", "email", "dia_chi", "so_tai_khoan", "ngan_hang",
-        "ngay_sinh", "gioi_tinh", "hinh_thuc_lam_viec", "ma_so_thue", "so_bhxh"
-    }
-    update_data = {k: v for k, v in data.items() if k in allowed_fields and v is not None}
+    nv_fields = {"sdt", "email", "dia_chi", "ngay_sinh", "gioi_tinh", "hinh_thuc_lam_viec"}
+    hd_fields = {"so_tai_khoan", "ngan_hang", "ma_so_thue", "so_bhxh"}
+    
+    nv_data = {k: v for k, v in data.items() if k in nv_fields and v is not None}
+    hd_data = {k: v for k, v in data.items() if k in hd_fields and v is not None}
     
     # Chuẩn hóa giới tính theo enum ENUM('Nam', 'Nu', 'Khac')
-    if "gioi_tinh" in update_data:
-        gt_raw = str(update_data["gioi_tinh"]).strip()
+    if "gioi_tinh" in nv_data:
+        gt_raw = str(nv_data["gioi_tinh"]).strip()
         if gt_raw in ["Nữ", "Nu", "nu", "FEMALE", "Female"]:
-            update_data["gioi_tinh"] = "Nu"
+            nv_data["gioi_tinh"] = "Nu"
         elif gt_raw in ["Khác", "Khac", "khac", "OTHER", "Other"]:
-            update_data["gioi_tinh"] = "Khac"
+            nv_data["gioi_tinh"] = "Khac"
         else:
-            update_data["gioi_tinh"] = "Nam"
+            nv_data["gioi_tinh"] = "Nam"
 
-    if not update_data:
-        return get_by_ma_nv(db, ma_nv)
+    if nv_data:
+        set_clauses = [f"{k} = :{k}" for k in nv_data.keys()]
+        query_nv = f"""
+            UPDATE nhan_vien
+            SET {', '.join(set_clauses)}
+            WHERE ma_nv = :ma_nv
+        """
+        db.execute(text(query_nv), {**nv_data, "ma_nv": ma_nv})
 
-    set_clauses = [f"{k} = :{k}" for k in update_data.keys()]
-    query = f"""
-        UPDATE nhan_vien
-        SET {', '.join(set_clauses)}
-        WHERE ma_nv = :ma_nv
-    """
-    params = {**update_data, "ma_nv": ma_nv}
-    db.execute(text(query), params)
+    if hd_data:
+        set_clauses_hd = [f"{k} = :{k}" for k in hd_data.keys()]
+        query_hd = f"""
+            UPDATE hop_dong_lao_dong
+            SET {', '.join(set_clauses_hd)}
+            WHERE ma_nv = :ma_nv
+            ORDER BY (trang_thai = 'HIEU_LUC') DESC, ngay_bat_dau DESC
+            LIMIT 1
+        """
+        db.execute(text(query_hd), {**hd_data, "ma_nv": ma_nv})
+
     db.commit()
     return get_by_ma_nv(db, ma_nv)
 
@@ -497,10 +572,19 @@ def get_monthly_personnel_report(
     query = text(f"""
         SELECT 
             nv.ma_nv, nv.ho_ten, nv.ma_pb, pb.ten_pb, nv.ma_cv, cv.ten_cv,
-            nv.trang_thai, nv.ngay_vao_lam, nv.ngay_nghi_viec
+            nv.trang_thai, hd.ngay_bat_dau AS ngay_vao_lam, nv.ngay_nghi_viec
         FROM nhan_vien nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+        LEFT JOIN (
+            SELECT hd1.*
+            FROM hop_dong_lao_dong hd1
+            INNER JOIN (
+                SELECT ma_nv, MAX(ngay_bat_dau) AS max_ngay
+                FROM hop_dong_lao_dong
+                GROUP BY ma_nv
+            ) latest ON hd1.ma_nv = latest.ma_nv AND hd1.ngay_bat_dau = latest.max_ngay
+        ) hd ON hd.ma_nv = nv.ma_nv
         WHERE 1=1 {where_pb}
         ORDER BY nv.ma_nv ASC
     """)

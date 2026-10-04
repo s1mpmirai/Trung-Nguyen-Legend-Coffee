@@ -18,7 +18,7 @@ class employee_profile(BaseModel):
     ma_pb: str = Field(..., description="Mã phòng ban")
     ma_cv: str = Field(..., description="Mã chức vụ")
     ma_ngl: Optional[str] = Field(None, description="Mã ngạch lương")
-    ngay_vao_lam: date = Field(..., description="Ngày vào làm")
+    ngay_vao_lam: Optional[date] = Field(None, description="Ngày vào làm / bắt đầu HĐ (từ hợp đồng lao động)")
     ngay_nghi_viec: Optional[date] = Field(None, description="Ngày nghỉ việc")
     trang_thai: str = Field("DANG_LAM", description="Trạng thái: DANG_LAM, NGHI_PHEP, DA_NGHI_VIEC")
     hinh_thuc_lam_viec: Optional[str] = Field("FULL_TIME", description="Hình thức: FULL_TIME hoặc PART_TIME")
