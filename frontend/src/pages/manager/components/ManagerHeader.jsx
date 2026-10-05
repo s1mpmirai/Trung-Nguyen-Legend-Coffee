@@ -31,25 +31,13 @@ export default function ManagerHeader({ userSession, onLogout, collapsed = false
 
       {/* User Actions & Avatar Profile */}
       <div className="flex items-center gap-4">
-        {/* Notification Bell */}
-        <button
-          type="button"
-          className="relative w-9 h-9 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-          title="Thông báo hệ thống"
-        >
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white"></span>
-        </button>
-
-        <div className="h-5 w-[1px] bg-slate-200"></div>
-
         {/* User Card */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0284c7] to-[#0ea5e9] text-white font-['Plus_Jakarta_Sans',sans-serif] font-bold text-xs flex items-center justify-center shadow-xs">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0284c7] to-[#0ea5e9] text-white font-bold text-xs flex items-center justify-center shadow-xs">
             {initials}
           </div>
           <div className="flex flex-col text-left">
-            <span className="font-['Plus_Jakarta_Sans',sans-serif] font-semibold text-xs text-slate-800 leading-tight">
+            <span className="font-semibold text-xs text-slate-800 leading-tight">
               {userName}
             </span>
             <span className="text-[11px] text-slate-400 leading-none mt-0.5">{userRole}</span>

@@ -63,19 +63,25 @@ export const getManagerDashboardStats = async () => {
   }
 
   // 2. Phân tích dữ liệu Chấm công hôm nay (attendance/daily)
-  let activeToday = 18;
-  let onTimeToday = 16;
-  let lateToday = 2;
-  let notCheckedIn = Math.max(0, totalEmployees - activeToday);
-  let attendanceRate = "94.7";
+  let activeToday = 0;
+  let onTimeToday = 0;
+  let lateToday = 0;
+  let notCheckedIn = totalEmployees;
+  let attendanceRate = "0.0";
 
   if (attSettled.status === "fulfilled") {
     const rawAtt = attSettled.value;
     const daily = Array.isArray(rawAtt) ? rawAtt : (rawAtt?.data && Array.isArray(rawAtt.data)) ? rawAtt.data : [];
     if (daily.length > 0) {
-      activeToday = daily.filter((item) => item.gio_vao).length;
-      onTimeToday = daily.filter((item) => item.loai_cong === "CONG_DU").length;
-      lateToday = daily.filter((item) => item.loai_cong === "DI_TRE").length;
+      // Nhân viên chỉ được tính là ĐÃ ĐIỂM DANH nếu có giờ vào thực tế (khác "--:--", "-") và không phải trạng thái CHUA_CHAM
+      const isCheckedIn = (item) => {
+        const gv = item.gio_vao;
+        return Boolean(gv && gv !== "--:--" && gv !== "-" && item.loai_cong !== "CHUA_CHAM");
+      };
+
+      activeToday = daily.filter(isCheckedIn).length;
+      onTimeToday = daily.filter((item) => isCheckedIn(item) && item.loai_cong === "CONG_DU").length;
+      lateToday = daily.filter((item) => isCheckedIn(item) && item.loai_cong === "DI_TRE").length;
       notCheckedIn = Math.max(0, totalEmployees - activeToday);
 
       if (totalEmployees > 0) {
@@ -153,8 +159,8 @@ export const getManagerDashboardStats = async () => {
         dept: "Phòng Kinh doanh",
         type: "HĐ Thử việc",
         typeBadge: "bg-amber-50 text-amber-700 border-amber-200",
-        endDate: "30/11/2025",
-        remainingDays: -307,
+        endDate: "30/11/2026",
+        remainingDays: 57,
         action: "Đánh giá thử việc",
       },
       {
@@ -165,8 +171,8 @@ export const getManagerDashboardStats = async () => {
         dept: "Phòng Nhân sự",
         type: "HĐ Xác định 1 năm",
         typeBadge: "bg-sky-50 text-sky-700 border-sky-200",
-        endDate: "31/01/2026",
-        remainingDays: -245,
+        endDate: "31/01/2027",
+        remainingDays: 119,
         action: "Chuẩn bị tái ký",
       },
       {
@@ -177,8 +183,8 @@ export const getManagerDashboardStats = async () => {
         dept: "Phòng IT",
         type: "HĐ Xác định 1 năm",
         typeBadge: "bg-sky-50 text-sky-700 border-sky-200",
-        endDate: "28/02/2026",
-        remainingDays: -217,
+        endDate: "28/02/2027",
+        remainingDays: 147,
         action: "Theo dõi gia hạn",
       },
     ],

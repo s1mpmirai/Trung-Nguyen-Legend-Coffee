@@ -43,7 +43,7 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 antialiased font-['Be_Vietnam_Pro',sans-serif] selection:bg-sky-100 selection:text-sky-900">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 antialiased selection:bg-sky-100 selection:text-sky-900">
       {/* ───────────────── LEFT SIDEBAR ───────────────── */}
       <ManagerSidebar
         activeTab={activeTab}
@@ -65,8 +65,9 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
       <div className={`${sidebarCollapsed ? "pl-20" : "pl-64"} transition-all duration-300`}>
         <main className="pt-16 pb-14 min-h-screen">
           <div className="max-w-[1480px] mx-auto px-8 py-8 flex flex-col gap-6">
-            {/* 1. TAB: Quản lý nhân sự */}
-            {activeTab === "employees" && <EmployeeManagement />}
+            {/* 1. TAB: Quản lý & Báo cáo nhân sự (Hợp nhất) */}
+            {activeTab === "employees" && <EmployeeManagement initialTab="list" />}
+            {activeTab === "reports" && <EmployeeManagement initialTab="reports" />}
 
             {/* 2. TAB: Duyệt đơn từ */}
             {activeTab === "leaves" && <LeaveApprovals />}
@@ -77,10 +78,7 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
             {/* 4. TAB: Bảng tính lương */}
             {activeTab === "payroll" && <PayrollManagement />}
 
-            {/* 5. TAB: Báo cáo Thông tin Nhân sự Chuyên sâu */}
-            {activeTab === "reports" && <PersonnelReport />}
-
-            {/* 6. TAB: Phân quyền & Vai trò */}
+            {/* 5. TAB: Phân quyền & Vai trò */}
             {activeTab === "roles" && <RolePermissions />}
 
             {/* 7. TAB: Tổng quan (Default) */}
@@ -88,7 +86,7 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
               <>
                 {/* Header Tiêu đề trang */}
                 <div className="flex flex-col gap-1">
-                  <h1 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight uppercase">
+                  <h1 className="font-bold text-2xl text-slate-900 tracking-tight uppercase">
                     TỔNG QUAN
                   </h1>
                   <p className="text-xs text-slate-500">

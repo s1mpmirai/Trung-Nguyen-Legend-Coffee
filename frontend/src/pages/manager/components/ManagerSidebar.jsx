@@ -45,7 +45,6 @@ export default function ManagerSidebar({
 
   const navItems = [
     { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
-    { id: "reports", label: "Báo cáo nhân sự", icon: FileBarChart2 },
     { id: "employees", label: "Quản lý nhân sự", icon: Users },
     { id: "leaves", label: "Duyệt đơn từ", icon: ClipboardCheck },
     { id: "attendance", label: "Chấm công & Ca làm", icon: Clock },
@@ -88,10 +87,10 @@ export default function ManagerSidebar({
             </div>
             {!collapsed && (
               <div className="flex flex-col min-w-0">
-                <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-lg tracking-tight leading-tight group-hover:text-sky-600 transition-colors truncate">
+                <span className="font-bold text-slate-900 text-lg tracking-tight leading-tight group-hover:text-sky-600 transition-colors truncate">
                   TrungNguyen<span className="text-sky-600">HR</span>
                 </span>
-                <span className="font-['Plus_Jakarta_Sans',sans-serif] font-semibold text-[10px] text-slate-400 tracking-wider uppercase mt-0.5 truncate">
+                <span className="font-semibold text-[10px] text-slate-400 tracking-wider uppercase mt-0.5 truncate">
                   HR Legend Portal
                 </span>
               </div>
