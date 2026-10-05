@@ -347,7 +347,22 @@ def get_daily_attendance_all(
         LEFT JOIN bang_cham_cong bcc ON nv.ma_nv = bcc.ma_nv AND bcc.ngay_cong = :target_date
         LEFT JOIN ca_lam_viec ca ON bcc.ma_ca = ca.ma_ca
         WHERE nv.trang_thai = 'DANG_LAM' {where_pb}
-        ORDER BY nv.ma_nv ASC
+        ORDER BY 
+            CASE 
+                WHEN bcc.ma_cc IS NOT NULL 
+                     AND bcc.gio_vao IS NOT NULL 
+                     AND bcc.gio_vao != '' 
+                     AND bcc.gio_vao != '--:--' 
+                     AND (bcc.trang_thai_duyet = 'CHO_DUYET' OR bcc.trang_thai_duyet IS NULL OR bcc.trang_thai_duyet = '') 
+                THEN 0
+                WHEN bcc.ma_cc IS NOT NULL 
+                     AND bcc.gio_vao IS NOT NULL 
+                     AND bcc.gio_vao != '' 
+                     AND bcc.gio_vao != '--:--' 
+                THEN 1
+                ELSE 2
+            END ASC,
+            nv.ma_nv ASC
     """)
     rows = db.execute(query, params).fetchall()
     return [dict(r._mapping) for r in rows]

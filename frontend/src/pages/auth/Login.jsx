@@ -5,7 +5,7 @@ import logoImg from '../../assets/logo/logo.png';
 
 export default function Login({ onLoginSuccess }) {
   const [employeeId, setEmployeeId] = useState('NV10');
-  const [password, setPassword] = useState('password');
+  const [password, setPassword] = useState('1');
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +35,7 @@ export default function Login({ onLoginSuccess }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ma_nv: cleanId,
-          mat_khau: password === '••••••••••••' ? 'password' : password,
+          mat_khau: password,
         }),
       });
 
@@ -65,6 +65,7 @@ export default function Login({ onLoginSuccess }) {
       localStorage.setItem('user_role', role);
       localStorage.setItem('user_ma_nv', data.ma_nv);
       localStorage.setItem('ma_nv', data.ma_nv);
+      localStorage.setItem('auth_portal', 'employee');
       if (data.access_token) {
         localStorage.setItem('auth_token', data.access_token);
         localStorage.setItem('access_token', data.access_token);
@@ -77,7 +78,7 @@ export default function Login({ onLoginSuccess }) {
           token: data.access_token,
           role: role,
           must_change_password: Boolean(data.must_change_password),
-        });
+        }, 'employee');
       }
     } catch (err) {
       setIsLoading(false);

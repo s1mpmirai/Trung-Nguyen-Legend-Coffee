@@ -88,6 +88,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
       localStorage.setItem('user_role', role);
       localStorage.setItem('user_ma_nv', data.ma_nv);
       localStorage.setItem('ma_nv', data.ma_nv);
+      localStorage.setItem('auth_portal', 'manage');
       if (data.access_token) {
         localStorage.setItem('auth_token', data.access_token);
         localStorage.setItem('access_token', data.access_token);
@@ -100,7 +101,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
           token: data.access_token,
           role: role,
           must_change_password: Boolean(data.must_change_password),
-        });
+        }, 'manage');
       }
     } catch (err) {
       setIsLoading(false);

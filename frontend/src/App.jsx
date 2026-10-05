@@ -43,11 +43,24 @@ const isManagerLoginRoute = (route) => {
   return route === "login-manage" || route === "login-manager" || route === "login-admin";
 };
 
+// Kiểm tra toàn bộ các route thuộc quyền điều hành quản lý & admin (kể cả trang dashboard lẫn login)
+const isManagePortalRoute = (route) => {
+  if (!route) return false;
+  const r = String(route).toLowerCase();
+  return (
+    r.startsWith("admin") ||
+    r.startsWith("manager") ||
+    r === "login-manage" ||
+    r === "login-manager" ||
+    r === "login-admin"
+  );
+};
+
 function App() {
   const [userSession, setUserSession] = useState(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
-  // Điều hướng người dùng vào đúng cổng theo phân quyền vai trò
+  // Điều hướng người dùng vào đúng cổng theo phân quyền vai trò (dùng cho cổng Quản lý/Admin)
   const routeUserToPortal = (role, maNv) => {
     let target = "attendance";
     if (isAdminRole(role, maNv)) {
@@ -58,6 +71,7 @@ function App() {
     window.history.replaceState({ inApp: true, page: target }, "", `/${target}`);
     setCurrentPage(target);
   };
+
   const [currentPage, setCurrentPage] = useState(() => {
     const route = getCleanRoute();
     if (isManagerLoginRoute(route)) {
@@ -71,41 +85,48 @@ function App() {
     }
 
     const savedMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
+    // NẾU CHƯA ĐĂNG NHẬP:
     if (!savedMaNv) {
-      if (isManagerLoginRoute(route)) {
-        window.history.replaceState(null, "", "/login-manage");
+      // Nếu cố vào các route thuộc quản lý / admin -> Chuyển về /login-manage
+      if (isManagePortalRoute(route)) {
+        if (route !== "login-manage") {
+          window.history.replaceState(null, "", "/login-manage");
+        }
         return "login-manage";
+      }
+      // Ngược lại (route nhân viên hoặc root) -> Chuyển về /login nhân viên
+      if (route !== "login") {
+        window.history.replaceState(null, "", "/login");
       }
       return "login";
     }
 
+    // NẾU ĐÃ ĐĂNG NHẬP:
     const savedRole = localStorage.getItem("user_role");
+    const savedPortal = localStorage.getItem("auth_portal");
 
-    // Nếu vào route admin (/admin)
-    if (route && route.startsWith("admin")) {
-      if (isAdminRole(savedRole, savedMaNv)) {
-        return route;
+    // Nếu thuộc Cổng Quản lý / Admin
+    if (savedPortal === "manage" || isAdminRole(savedRole, savedMaNv) || isManagerRole(savedRole)) {
+      if (route && route.startsWith("admin")) {
+        if (isAdminRole(savedRole, savedMaNv)) return route;
+        if (isManagerRole(savedRole)) {
+          navigateClean("manager");
+          return "manager";
+        }
       }
-      if (isManagerRole(savedRole)) {
-        navigateClean("manager");
-        return "manager";
+      if (route && route.startsWith("manager")) {
+        if (isManagerRole(savedRole)) return route;
       }
+      if (isAdminRole(savedRole, savedMaNv)) return "admin";
+      if (isManagerRole(savedRole)) return "manager";
+    }
+
+    // Nếu là Cổng Nhân viên: Không cho truy cập route admin/manager
+    if (route && (route.startsWith("admin") || route.startsWith("manager"))) {
       navigateClean("attendance");
       return "attendance";
     }
 
-    // Nếu vào route quản lý (/manager)
-    if (route && route.startsWith("manager")) {
-      if (isManagerRole(savedRole)) {
-        return route;
-      }
-      navigateClean("attendance");
-      return "attendance";
-    }
-
-    // Route mặc định theo quyền hạn:
-    if (isAdminRole(savedRole, savedMaNv)) return "admin";
-    if (isManagerRole(savedRole)) return "manager";
     return route || "attendance";
   });
 
@@ -114,6 +135,7 @@ function App() {
     const savedMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
     const savedToken = localStorage.getItem("auth_token") || localStorage.getItem("access_token");
     const savedRole = localStorage.getItem("user_role");
+    const savedPortal = localStorage.getItem("auth_portal");
     const route = getCleanRoute();
 
     // Nếu URL còn dấu #, chuẩn hóa ngay thành clean pathname
@@ -127,6 +149,7 @@ function App() {
         ma_nv: savedMaNv,
         token: savedToken,
         role: savedRole,
+        portal: savedPortal,
       });
       localStorage.setItem("user_ma_nv", savedMaNv);
       localStorage.setItem("ma_nv", savedMaNv);
@@ -141,12 +164,16 @@ function App() {
         window.history.replaceState({ inApp: true, page: route || "attendance" }, "", window.location.pathname);
       }
     } else {
-      if (isManagerLoginRoute(route)) {
+      // Chưa có phiên đăng nhập
+      if (isManagePortalRoute(route)) {
         if (route !== "login-manage") {
           window.history.replaceState(null, "", "/login-manage");
         }
         setCurrentPage("login-manage");
       } else {
+        if (route !== "login") {
+          window.history.replaceState(null, "", "/login");
+        }
         setCurrentPage("login");
       }
     }
@@ -159,6 +186,7 @@ function App() {
     const handlePopState = (e) => {
       const savedMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
       const savedRole = localStorage.getItem("user_role");
+      const savedPortal = localStorage.getItem("auth_portal");
 
       if (savedMaNv) {
         // Nếu là điều hướng lịch sử trong ứng dụng: cho phép điều hướng bình thường
@@ -167,12 +195,17 @@ function App() {
           return;
         }
 
-        const isMgrOrAdmin = isAdminRole(savedRole, savedMaNv) || isManagerRole(savedRole);
+        const isMgrOrAdmin =
+          savedPortal === "manage" ||
+          isAdminRole(savedRole, savedMaNv) ||
+          isManagerRole(savedRole);
+
         localStorage.removeItem("user_ma_nv");
         localStorage.removeItem("ma_nv");
         localStorage.removeItem("auth_token");
         localStorage.removeItem("access_token");
         localStorage.removeItem("user_role");
+        localStorage.removeItem("auth_portal");
         setUserSession(null);
         setMustChangePassword(false);
 
@@ -212,45 +245,64 @@ function App() {
       const savedMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
       if (!savedMaNv) {
         // Chưa đăng nhập mà truy cập route của quản lý/admin -> về login-manage
-        if (route.startsWith("admin") || route.startsWith("manager") || isManagerLoginRoute(route)) {
+        if (isManagePortalRoute(route)) {
           if (route !== "login-manage") {
             window.history.replaceState(null, "", "/login-manage");
           }
           setCurrentPage("login-manage");
         } else {
-          window.history.replaceState(null, "", "/login");
+          if (route !== "login") {
+            window.history.replaceState(null, "", "/login");
+          }
           setCurrentPage("login");
         }
         return;
       }
 
       const savedRole = localStorage.getItem("user_role");
+      const savedPortal = localStorage.getItem("auth_portal");
 
-      // Chặn nếu không có quyền admin truy cập /admin
-      if (route && route.startsWith("admin")) {
-        if (isAdminRole(savedRole, savedMaNv)) {
+      // Nếu thuộc Cổng Quản lý / Admin
+      if (savedPortal === "manage" || isAdminRole(savedRole, savedMaNv) || isManagerRole(savedRole)) {
+        // Chặn nếu không có quyền admin truy cập /admin
+        if (route && route.startsWith("admin")) {
+          if (isAdminRole(savedRole, savedMaNv)) {
+            setCurrentPage(route);
+          } else if (isManagerRole(savedRole)) {
+            alert("Khu vực Cổng Admin Tối Cao chỉ dành cho Quản trị viên (NV01).");
+            navigateClean("manager");
+            setCurrentPage("manager");
+          } else {
+            alert("Bạn không có quyền truy cập vào Cổng Quản trị viên.");
+            navigateClean("login-manage");
+            setCurrentPage("login-manage");
+          }
+          return;
+        }
+
+        // Chặn nhân viên không có quyền quản lý truy cập /manager
+        if (route && route.startsWith("manager")) {
+          if (isManagerRole(savedRole)) {
+            setCurrentPage(route);
+          } else {
+            alert("Bạn không có quyền truy cập vào khu vực Quản lý.");
+            navigateClean("login-manage");
+            setCurrentPage("login-manage");
+          }
+          return;
+        }
+
+        if (route) {
           setCurrentPage(route);
-        } else if (isManagerRole(savedRole)) {
-          alert("Khu vực Cổng Admin Tối Cao chỉ dành cho Quản trị viên (NV01).");
-          navigateClean("manager");
-          setCurrentPage("manager");
-        } else {
-          alert("Bạn không có quyền truy cập vào Cổng Quản trị viên.");
-          navigateClean("attendance");
-          setCurrentPage("attendance");
         }
         return;
       }
 
-      // Chặn nhân viên không có quyền quản lý truy cập /manager
-      if (route && route.startsWith("manager")) {
-        if (isManagerRole(savedRole)) {
-          setCurrentPage(route);
-        } else {
-          alert("Bạn không có quyền truy cập vào khu vực Quản lý.");
-          navigateClean("attendance");
-          setCurrentPage("attendance");
-        }
+      // Nếu thuộc Cổng Nhân Viên: Chặn không cho vào route admin/manager
+      if (route && (route.startsWith("admin") || route.startsWith("manager"))) {
+        alert("Bạn không có quyền truy cập vào khu vực Quản trị / Điều hành.");
+        navigateClean("attendance");
+        setCurrentPage("attendance");
         return;
       }
 
@@ -269,7 +321,7 @@ function App() {
     };
   }, []);
 
-  const handleLoginSuccess = (userData) => {
+  const handleLoginSuccess = (userData, portalOrigin = "employee") => {
     setUserSession(userData);
     if (userData?.ma_nv) {
       localStorage.setItem("user_ma_nv", userData.ma_nv);
@@ -283,6 +335,7 @@ function App() {
     if (userData?.role) {
       localStorage.setItem("user_role", userData.role);
     }
+    localStorage.setItem("auth_portal", portalOrigin);
 
     // BẮT BUỘC: Nếu là tài khoản vừa tạo/dùng mật khẩu khởi tạo mặc định -> Đổi mật khẩu đầu tiên
     if (userData?.must_change_password) {
@@ -290,8 +343,23 @@ function App() {
       return;
     }
 
-    // Điều hướng vào đúng cổng theo phân quyền:
-    routeUserToPortal(userData?.role, userData?.ma_nv);
+    // TÁCH BIỆT HOÀN TOÀN 2 LUỒNG ĐĂNG NHẬP:
+    if (portalOrigin === "manage") {
+      // Đăng nhập từ Cổng Quản lý & Admin: Vô đúng của admin và ql
+      let target = "manager";
+      if (isAdminRole(userData?.role, userData?.ma_nv)) {
+        target = "admin";
+      } else if (isManagerRole(userData?.role)) {
+        target = "manager";
+      }
+      window.history.replaceState({ inApp: true, page: target }, "", `/${target}`);
+      setCurrentPage(target);
+    } else {
+      // Đăng nhập từ Cổng Nhân viên: Chỉ vô trang của nhân viên (/attendance)
+      const target = "attendance";
+      window.history.replaceState({ inApp: true, page: target }, "", `/${target}`);
+      setCurrentPage(target);
+    }
   };
 
   const handlePasswordChanged = (updatedSession) => {
@@ -304,26 +372,51 @@ function App() {
     if (updatedSession?.role) {
       localStorage.setItem("user_role", updatedSession.role);
     }
-    // Sau khi đổi mật khẩu đầu tiên thành công, truy cập ngay vào portal phân quyền của họ:
-    routeUserToPortal(updatedSession?.role, updatedSession?.ma_nv);
+
+    const portal = localStorage.getItem("auth_portal") || "employee";
+    if (portal === "manage") {
+      let target = "manager";
+      if (isAdminRole(updatedSession?.role, updatedSession?.ma_nv)) {
+        target = "admin";
+      }
+      window.history.replaceState({ inApp: true, page: target }, "", `/${target}`);
+      setCurrentPage(target);
+    } else {
+      const target = "attendance";
+      window.history.replaceState({ inApp: true, page: target }, "", `/${target}`);
+      setCurrentPage(target);
+    }
   };
 
   const handleLogout = () => {
+    const prevPortal = localStorage.getItem("auth_portal");
     const prevRole = userSession?.role || localStorage.getItem("user_role");
     const prevMaNv = userSession?.ma_nv || localStorage.getItem("user_ma_nv");
+    const isCurrentManagePage = currentPage.startsWith("admin") || currentPage.startsWith("manager");
+
+    // Xác định xem có phải luồng Quản lý / Admin hay không:
+    const isManageUser =
+      prevPortal === "manage" ||
+      isCurrentManagePage ||
+      isAdminRole(prevRole, prevMaNv) ||
+      isManagerRole(prevRole);
+
     localStorage.removeItem("user_ma_nv");
     localStorage.removeItem("ma_nv");
     localStorage.removeItem("auth_token");
     localStorage.removeItem("access_token");
     localStorage.removeItem("user_role");
+    localStorage.removeItem("auth_portal");
     setUserSession(null);
     setMustChangePassword(false);
 
-    // Chuyển về đúng trang đăng nhập tương ứng vai trò vừa đăng xuất (URL sạch)
-    if (isAdminRole(prevRole, prevMaNv) || isManagerRole(prevRole)) {
+    // TÁCH BIỆT HOÀN TOÀN 2 LUỒNG ĐĂNG XUẤT:
+    if (isManageUser) {
+      // Logout từ Cổng Admin / Quản lý -> Về lại trang login của admin và ql (/login-manage), KHÔNG về trang login nhân viên
       window.history.replaceState(null, "", "/login-manage");
       setCurrentPage("login-manage");
     } else {
+      // Logout từ Cổng Nhân viên -> Chỉ về trang login của nhân viên (/login)
       window.history.replaceState(null, "", "/login");
       setCurrentPage("login");
     }
@@ -336,7 +429,7 @@ function App() {
       return (
         <div className="min-h-screen w-full bg-gradient-to-br from-slate-100 via-sky-50/40 to-slate-200 flex flex-col justify-center items-center">
           <AdminManagerLogin
-            onLoginSuccess={handleLoginSuccess}
+            onLoginSuccess={(userData) => handleLoginSuccess(userData, "manage")}
           />
         </div>
       );
@@ -345,7 +438,7 @@ function App() {
     return (
       <div className="min-h-screen bg-slate-100 flex justify-center items-start">
         <div className="w-full max-w-md min-h-screen bg-[#F8FAFC] shadow-2xl flex flex-col relative overflow-x-hidden">
-          <Login onLoginSuccess={handleLoginSuccess} />
+          <Login onLoginSuccess={(userData) => handleLoginSuccess(userData, "employee")} />
         </div>
       </div>
     );

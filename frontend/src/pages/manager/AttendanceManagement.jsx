@@ -545,8 +545,51 @@ export default function AttendanceManagement() {
     );
   });
 
-  // Sắp xếp: Ban Giám đốc (PB01) đầu tiên -> theo phòng ban -> theo tên
-  const sortByDeptThenName = (a, b) => {
+  // Kiểm tra nhân sự có công đang CHỜ DUYỆT (có ma_cc, có giờ vào hợp lệ và chưa được duyệt hoặc từ chối)
+  const isPendingApprovalRow = (r) => {
+    const isCheckedIn = r.gio_vao && r.gio_vao !== "--:--" && r.gio_vao !== "-";
+    const isApproved = r.trang_thai_duyet === "DA_DUYET";
+    const isRejected = r.trang_thai_duyet === "TU_CHOI" || r.loai_cong === "NGHI_KHONG_PHEP";
+    return Boolean(r.ma_cc) && isCheckedIn && !isApproved && !isRejected;
+  };
+
+  // Sắp xếp Daily: ƯU TIÊN CHỜ DUYỆT CÔNG LÊN ĐẦU TIÊN -> Đã duyệt/từ chối -> Chưa có công -> Ban Giám đốc -> Phòng ban -> Tên
+  const sortDailyByPendingFirst = (a, b) => {
+    const getPriority = (r) => {
+      // 0: Chờ duyệt công (ưu tiên hàng đầu)
+      if (isPendingApprovalRow(r)) return 0;
+      // 1: Đã có công (đã duyệt, từ chối, v.v.)
+      if (r.ma_cc && r.gio_vao && r.gio_vao !== "--:--" && r.gio_vao !== "-") return 1;
+      // 2: Chưa có công / Chưa chấm
+      return 2;
+    };
+
+    const prioA = getPriority(a);
+    const prioB = getPriority(b);
+    if (prioA !== prioB) return prioA - prioB;
+
+    // Trong cùng nhóm: Ban Giám đốc (PB01)
+    const aIsBGD = (a.ma_pb === "PB01") ? 0 : 1;
+    const bIsBGD = (b.ma_pb === "PB01") ? 0 : 1;
+    if (aIsBGD !== bIsBGD) return aIsBGD - bIsBGD;
+
+    // Theo phòng ban
+    const deptA = (a.ten_pb || "").toLowerCase();
+    const deptB = (b.ten_pb || "").toLowerCase();
+    if (deptA !== deptB) return deptA.localeCompare(deptB, "vi");
+
+    // Theo tên nhân viên
+    const nameA = (a.ho_ten || "").toLowerCase();
+    const nameB = (b.ho_ten || "").toLowerCase();
+    return nameA.localeCompare(nameB, "vi");
+  };
+
+  // Sắp xếp Monthly: Nhân viên 0 công lên đầu -> Ban Giám đốc (PB01) -> theo phòng ban -> theo tên
+  const sortMonthlyByZeroWorkDaysFirst = (a, b) => {
+    const aZero = (Number(a.tong_ngay_cong) === 0) ? 0 : 1;
+    const bZero = (Number(b.tong_ngay_cong) === 0) ? 0 : 1;
+    if (aZero !== bZero) return aZero - bZero;
+
     const aIsBGD = (a.ma_pb === "PB01") ? 0 : 1;
     const bIsBGD = (b.ma_pb === "PB01") ? 0 : 1;
     if (aIsBGD !== bIsBGD) return aIsBGD - bIsBGD;
@@ -560,8 +603,8 @@ export default function AttendanceManagement() {
     return nameA.localeCompare(nameB, "vi");
   };
 
-  filteredDaily.sort(sortByDeptThenName);
-  filteredMonthly.sort(sortByDeptThenName);
+  filteredDaily.sort(sortDailyByPendingFirst);
+  filteredMonthly.sort(sortMonthlyByZeroWorkDaysFirst);
 
   // Tiêu chí kiểm tra trạng thái dòng công:
   const isLateRow = (r) =>
