@@ -495,8 +495,14 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
 
       {/* ───────────────── POPUP MODAL XÁC NHẬN RA CA ───────────────── */}
       {showCheckOutModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl border border-slate-100 space-y-4 relative animate-in zoom-in-95 duration-150">
+        <div
+          onClick={() => !isCheckingOut && setShowCheckOutModal(false)}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl border border-slate-100 space-y-4 relative animate-in zoom-in-95 duration-150 cursor-default"
+          >
             {/* Header modal */}
             <div className="flex items-start justify-between">
               <div>

@@ -35,6 +35,30 @@ def get_employees_without_account(db: Session) -> list[str]:
     return list(rows)
 
 
+def get_employees_without_account_detailed(db: Session) -> list[dict]:
+    query = """
+        SELECT 
+            nv.ma_nv,
+            nv.ho_ten,
+            nv.email,
+            nv.sdt,
+            pb.ten_pb,
+            cv.ten_cv,
+            nv.trang_thai
+        FROM nhan_vien nv
+        LEFT JOIN tai_khoan tk ON nv.ma_nv = tk.ma_nv
+        LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
+        LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+        WHERE tk.ma_nv IS NULL
+          AND nv.trang_thai = 'DANG_LAM'
+        ORDER BY 
+            CASE WHEN nv.ma_nv REGEXP '^NV[0-9]+$' THEN CAST(SUBSTRING(nv.ma_nv, 3) AS UNSIGNED) ELSE 999999 END ASC,
+            nv.ma_nv ASC
+    """
+    rows = db.execute(text(query)).mappings().all()
+    return [dict(r) for r in rows]
+
+
 def get_accounts_list(
     db: Session,
     page: int = 1,

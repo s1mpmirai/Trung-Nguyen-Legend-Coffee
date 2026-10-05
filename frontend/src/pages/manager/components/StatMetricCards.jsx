@@ -7,16 +7,16 @@ export default function StatMetricCards({ stats, onNavigateTab }) {
     activeStatus: "19 Đang làm • 1 Đã nghỉ",
     fullTimeCount: 19,
     partTimeCount: 0,
-    attendanceRate: "95.0",
-    activeToday: 18,
-    onTimeToday: 16,
-    lateToday: 2,
-    notCheckedIn: 1,
-    pendingLeavesCount: 2,
-    pendingProfileCount: 2,
-    totalPendingCount: 4,
-    monthlyPayroll: "428.500.000 đ",
-    payrollStatus: "Đã duyệt bảng lương",
+    attendanceRate: "0.0",
+    activeToday: 0,
+    onTimeToday: 0,
+    lateToday: 0,
+    notCheckedIn: 19,
+    pendingLeavesCount: 0,
+    pendingProfileCount: 0,
+    totalPendingCount: 0,
+    monthlyPayroll: "0 đ",
+    payrollStatus: "Đang tải",
   };
 
   return (
@@ -34,12 +34,12 @@ export default function StatMetricCards({ stats, onNavigateTab }) {
         <div>
           <div className="flex items-baseline gap-2 mb-2">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight">
-              {data.totalEmployees || 19}
+              {data.totalEmployees ?? 19}
             </span>
             <span className="text-xs font-medium text-slate-500">nhân viên đang làm</span>
           </div>
           <div className="flex justify-between items-center text-[11px] text-slate-500 pt-2 border-t border-slate-100">
-            <span>{data.fullTimeCount || 19} Toàn thời gian</span>
+            <span>{data.fullTimeCount ?? 19} Toàn thời gian</span>
             <span className="font-semibold text-emerald-600">100% có HĐLĐ</span>
           </div>
         </div>
@@ -57,17 +57,19 @@ export default function StatMetricCards({ stats, onNavigateTab }) {
         </div>
         <div>
           <div className="flex items-baseline gap-2 mb-2">
-            <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-emerald-600 tracking-tight">
-              {data.attendanceRate || "95.0"}%
+            <span className={`font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl tracking-tight ${
+              Number(data.attendanceRate) > 0 ? "text-emerald-600" : "text-slate-400"
+            }`}>
+              {data.attendanceRate ?? "0.0"}%
             </span>
             <span className="text-xs text-slate-500 font-medium">
-              {data.activeToday || 18} người có mặt
+              {data.activeToday ?? 0} người có mặt
             </span>
           </div>
           <div className="flex justify-between items-center text-[11px] text-slate-500 pt-2 border-t border-slate-100">
-            <span className="text-emerald-700 font-medium">{data.onTimeToday || 16} đúng giờ</span>
-            <span className="text-amber-700 font-medium">{data.lateToday || 2} đi trễ</span>
-            <span className="text-slate-400">{data.notCheckedIn || 1} vắng</span>
+            <span className="text-emerald-700 font-medium">{data.onTimeToday ?? 0} đúng giờ</span>
+            <span className="text-amber-700 font-medium">{data.lateToday ?? 0} đi trễ</span>
+            <span className="text-slate-400">{data.notCheckedIn ?? data.totalEmployees ?? 0} vắng</span>
           </div>
         </div>
       </div>
@@ -89,15 +91,15 @@ export default function StatMetricCards({ stats, onNavigateTab }) {
           <div className="flex items-baseline justify-between mb-2">
             <div className="flex items-baseline gap-2">
               <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-amber-600 tracking-tight">
-                {data.totalPendingCount || 4}
+                {data.totalPendingCount ?? 0}
               </span>
               <span className="text-xs text-slate-500 font-medium">yêu cầu chờ xử lý</span>
             </div>
             <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
           </div>
           <div className="flex justify-between items-center text-[11px] pt-2 border-t border-slate-100">
-            <span className="text-sky-700 font-medium">{data.pendingLeavesCount || 2} Đơn nghỉ phép</span>
-            <span className="text-emerald-700 font-medium">{data.pendingProfileCount || 2} Sửa hồ sơ</span>
+            <span className="text-sky-700 font-medium">{data.pendingLeavesCount ?? 0} Đơn nghỉ phép</span>
+            <span className="text-emerald-700 font-medium">{data.pendingProfileCount ?? 0} Sửa hồ sơ</span>
           </div>
         </div>
       </div>

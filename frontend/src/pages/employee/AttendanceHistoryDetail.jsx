@@ -13,6 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { getAttendanceHistory } from '../../services/attendanceService';
+import BottomNavBar from './components/BottomNavBar';
 
 export default function AttendanceHistoryDetail({ userSession, onBack, onTabChange }) {
   // Mặc định tháng/năm hiện tại
@@ -236,39 +237,7 @@ export default function AttendanceHistoryDetail({ userSession, onBack, onTabChan
       </main>
 
       {/* ───────────────── BOTTOM NAVIGATION BAR ───────────────── */}
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-slate-100 py-2 px-4 flex items-center justify-around z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
-        <button
-          onClick={onBack}
-          className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-[#0EA5E9]"
-        >
-          <Clock size={20} className="stroke-[2.5]" />
-          <span className="text-[10px] font-semibold leading-none">Chấm công</span>
-        </button>
-
-        <button
-          onClick={() => (onTabChange ? onTabChange('requests') : showToast('Chuyển sang Đơn từ'))}
-          className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
-        >
-          <FileText size={20} className="stroke-2" />
-          <span className="text-[10px] font-semibold leading-none">Đơn từ</span>
-        </button>
-
-        <button
-          onClick={() => showToast('Chức năng "Bảng lương" đang đồng bộ')}
-          className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
-        >
-          <DollarSign size={20} className="stroke-2" />
-          <span className="text-[10px] font-semibold leading-none">Bảng lương</span>
-        </button>
-
-        <button
-          onClick={() => showToast(`Tài khoản: ${userSession?.ma_nv || 'NV10'}`)}
-          className="flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all text-slate-400 hover:text-slate-600"
-        >
-          <User size={20} className="stroke-2" />
-          <span className="text-[10px] font-semibold leading-none">Cá nhân</span>
-        </button>
-      </nav>
+      <BottomNavBar activeTab="attendance" />
     </div>
   );
 }

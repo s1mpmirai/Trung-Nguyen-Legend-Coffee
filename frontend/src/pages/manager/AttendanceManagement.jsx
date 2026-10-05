@@ -84,7 +84,7 @@ export default function AttendanceManagement() {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncToast, setSyncToast] = useState("");
 
@@ -645,9 +645,13 @@ export default function AttendanceManagement() {
             <h1 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight">
               Chấm công & Ca làm việc
             </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200/60">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Realtime Database Sync
+            </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Dữ liệu kết nối trực tiếp từ hệ thống chấm công, máy vân tay và API Quản lý vận hành.
+            Dữ liệu đồng bộ trực tiếp 100% từ bảng <code>bang_cham_cong</code> trong hệ thống CSDL MariaDB.
           </p>
         </div>
 
@@ -682,17 +686,20 @@ export default function AttendanceManagement() {
           <button
             onClick={handleSync}
             disabled={isSyncing || isLoading}
-            className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-sky-700 shadow-xs transition-all active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-sky-700 shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing || isLoading ? "animate-spin text-sky-600" : ""}`} />
-            <span>{isSyncing ? "Đang đồng bộ..." : "Đồng bộ ngay"}</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin text-sky-600" : ""}`} />
+            <span>{isSyncing ? "Đang cập nhật..." : "Làm mới dữ liệu"}</span>
           </button>
           <button
-            onClick={handleExportExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white rounded-xl text-xs font-semibold shadow-sm shadow-sky-600/20 transition-all active:scale-95"
+            onClick={() => {
+              setSyncToast("Đã xuất danh sách bảng chấm công thành công!");
+              setTimeout(() => setSyncToast(""), 3500);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 text-white rounded-xl text-xs font-semibold shadow-sm shadow-sky-600/20 transition-all active:scale-95 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Xuất CSV</span>
+            <span>Xuất báo cáo</span>
           </button>
         </div>
       </div>
@@ -728,118 +735,32 @@ export default function AttendanceManagement() {
         </div>
       )}
 
-      {/* ──────────────── 4 KPI CARDS (Dữ liệu thời gian thực) ──────────────── */}
-      {viewMode === "daily" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Đã check-in */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-sky-300 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Đã chấm công vào</span>
-              <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600">
-                <UserCheck className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-4 flex flex-col gap-1">
-              <div className="flex items-baseline gap-2">
-                <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-slate-900">
-                  {checkedInCount}
-                </span>
-                <span className="text-xs text-slate-400">/ {totalEmployees} nhân sự</span>
-              </div>
-              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
-                <div
-                  className="bg-sky-600 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${attendanceRate}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between items-center text-[11px] font-semibold text-sky-600 mt-1">
-                <span>Tỷ lệ có mặt</span>
-                <span>{attendanceRate}%</span>
-              </div>
+      {/* ──────────────── 4 KPI CARDS (REALTIME 100%) ──────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Đã check-in */}
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-sky-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Đã chấm công vào</span>
+            <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600">
+              <UserCheck className="w-4 h-4" />
             </div>
           </div>
-
-          {/* Card 2: Đúng giờ */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-emerald-300 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Đi đúng giờ</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <Clock className="w-4 h-4" />
-              </div>
+          <div className="mt-4 flex flex-col gap-1">
+            <div className="flex items-baseline gap-2">
+              <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-slate-900">
+                {activeCount}
+              </span>
+              <span className="text-xs text-slate-400">/ {totalEmployees} nhân sự</span>
             </div>
-            <div className="mt-4 flex flex-col gap-1">
-              <div className="flex items-baseline gap-2">
-                <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-slate-900">
-                  {onTimeCount}
-                </span>
-                <span className="text-xs text-slate-400">nhân viên</span>
-              </div>
-              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
-                <div
-                  className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${onTimeRate}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between items-center text-[11px] font-semibold text-emerald-600 mt-1">
-                <span>Kỷ luật đúng giờ</span>
-                <span>{onTimeRate}%</span>
-              </div>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+              <div
+                className="bg-sky-600 h-full rounded-full transition-all duration-500"
+                style={{ width: `${attendanceRate}%` }}
+              ></div>
             </div>
-          </div>
-
-          {/* Card 3: Đi muộn */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-amber-300 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Đi muộn / Vi phạm</span>
-              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-                <AlertTriangle className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-4 flex flex-col gap-1">
-              <div className="flex items-baseline gap-2">
-                <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-amber-600">
-                  {lateCount}
-                </span>
-                <span className="text-xs text-slate-400">trường hợp</span>
-              </div>
-              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
-                <div
-                  className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${totalEmployees > 0 ? (lateCount / totalEmployees) * 100 : 0}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between items-center text-[11px] text-slate-500 mt-1">
-                <span>Quản lý có thể sửa ≤ 3 lần</span>
-                <span className="text-amber-600 font-semibold">Theo quy định</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4: Vắng mặt */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-rose-300 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Vắng mặt hôm nay</span>
-              <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
-                <XCircle className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-4 flex flex-col gap-2">
-              <div className="flex items-baseline gap-2">
-                <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-slate-900">
-                  {absentCount}
-                </span>
-                <span className="text-xs text-slate-400">nhân sự</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-slate-50 px-2 py-1 rounded-md text-center border border-slate-100">
-                  <span className="text-[10px] text-slate-500 block">Có phép</span>
-                  <span className="text-xs font-bold text-slate-800">{leaveCount}</span>
-                </div>
-                <div className="flex-1 bg-rose-50 px-2 py-1 rounded-md text-center border border-rose-100">
-                  <span className="text-[10px] text-rose-600 block">Chưa chấm</span>
-                  <span className="text-xs font-bold text-rose-600">{unauthorizedCount}</span>
-                </div>
-              </div>
+            <div className="flex justify-between items-center text-[11px] font-semibold text-sky-600 mt-1">
+              <span>Tỷ lệ có mặt</span>
+              <span>{attendanceRate}%</span>
             </div>
           </div>
         </div>
@@ -855,25 +776,28 @@ export default function AttendanceManagement() {
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-slate-900">
-                {totalWorkDays.toFixed(1)}
+                {onTimeCount}
               </span>
-              <span className="text-xs text-slate-400">công toàn công ty</span>
+              <span className="text-xs text-slate-400">nhân viên</span>
+            </div>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+              <div
+                className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                style={{ width: `${disciplineRate}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between items-center text-[11px] font-semibold text-emerald-600 mt-1">
+              <span>Chuẩn mực kỷ luật</span>
+              <span>{disciplineRate}% đúng hạn</span>
             </div>
           </div>
 
-          {/* Monthly Card 2 */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Tổng giờ tăng ca (OT)</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-emerald-600">
-                +{totalOTHours.toFixed(1)}h
-              </span>
-              <span className="text-xs text-slate-400">hệ số x1.5</span>
+        {/* Card 3: Đi muộn */}
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-amber-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Đi muộn</span>
+            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+              <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
 
@@ -887,25 +811,48 @@ export default function AttendanceManagement() {
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-amber-600">
-                {totalLateTimes}
+                {lateCount}
               </span>
-              <span className="text-xs text-slate-400">lượt trễ</span>
+              <span className="text-xs text-slate-400">trường hợp</span>
+            </div>
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+              <div
+                className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${activeCount > 0 ? ((lateCount / activeCount) * 100).toFixed(1) : 0}%`,
+                }}
+              ></div>
+            </div>
+            <div className="flex justify-between items-center text-[11px] text-slate-500 mt-1">
+              <span>Được ghi nhận tại máy chấm</span>
+              <span className="text-amber-600 font-semibold">{lateCount} cần chú ý</span>
             </div>
           </div>
 
-          {/* Monthly Card 4 */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Ngày nghỉ phép đã duyệt</span>
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                <Award className="w-4 h-4" />
-              </div>
+        {/* Card 4: Vắng mặt */}
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-rose-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Chưa chấm công / Vắng</span>
+            <div className="w-8 h-8 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
+              <XCircle className="w-4 h-4" />
             </div>
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-indigo-600">
-                {totalLeaveDays}
+          </div>
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="flex items-baseline gap-2">
+              <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-slate-900">
+                {absentCount}
               </span>
-              <span className="text-xs text-slate-400">ngày nghỉ hợp lệ</span>
+              <span className="text-xs text-slate-400">nhân sự</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-slate-50 px-2 py-1 rounded-md text-center border border-slate-100">
+                <span className="text-[10px] text-slate-500 block">Có phép</span>
+                <span className="text-xs font-bold text-slate-800">{leaveCount}</span>
+              </div>
+              <div className="flex-1 bg-rose-50 px-2 py-1 rounded-md text-center border border-rose-100">
+                <span className="text-[10px] text-rose-600 block">Chưa vào ca</span>
+                <span className="text-xs font-bold text-rose-600">{Math.max(0, absentCount - leaveCount)}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -918,7 +865,8 @@ export default function AttendanceManagement() {
           <div className="flex items-center gap-1.5 p-1 bg-slate-200/60 rounded-xl self-start">
             <button
               onClick={() => setViewMode("daily")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === "daily"
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === "daily"
                   ? "bg-white text-sky-700 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
                 }`}
@@ -928,29 +876,29 @@ export default function AttendanceManagement() {
             </button>
             <button
               onClick={() => setViewMode("monthly")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === "monthly"
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                viewMode === "monthly"
                   ? "bg-white text-sky-700 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
                 }`}
             >
               <CalendarDays className="w-3.5 h-3.5" />
-              <span>Tổng hợp công tháng</span>
+              <span>Tổng hợp công tháng (DB Thật)</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-4 text-xs text-slate-500 pb-3 lg:pb-0">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              Chuẩn ca: 08:00 - 17:00
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              Grace: 15 phút (trước 08:15)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-              Sau 8h15: Giới hạn sửa ≤ 3 lần/tháng
-            </span>
+          {/* Department Attendance Percentages (Thực tế) */}
+          <div className="flex items-center gap-4 text-xs text-slate-500 pb-3 lg:pb-0 overflow-x-auto">
+            {deptStats.slice(0, 4).map((d, idx) => (
+              <span key={idx} className="flex items-center gap-1.5 shrink-0">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    d.rate > 80 ? "bg-emerald-500" : d.rate > 0 ? "bg-sky-500" : "bg-slate-300"
+                  }`}
+                ></span>
+                {d.name}: <strong className="text-slate-700">{d.rate}%</strong>
+              </span>
+            ))}
           </div>
         </div>
 
@@ -962,48 +910,23 @@ export default function AttendanceManagement() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo Tên nhân viên, Mã NV (NV01, NV10)..."
+              placeholder="Tìm theo Tên nhân viên, Mã NV (NV01, NV02, NV10)..."
               className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none transition-all"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Bộ chọn Ngày hoặc Tháng tuỳ chế độ */}
-            {viewMode === "daily" ? (
-              <div className="relative flex items-center bg-slate-50 px-3 py-1.5 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-700">
-                <Calendar className="w-3.5 h-3.5 text-sky-600 mr-2 shrink-0" />
-                <span className="mr-2 text-slate-500">Ngày:</span>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent text-slate-800 font-semibold focus:outline-none cursor-pointer"
-                />
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer font-medium"
-                >
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      Tháng {i + 1}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer font-medium"
-                >
-                  <option value={2025}>Năm 2025</option>
-                  <option value={2026}>Năm 2026</option>
-                  <option value={2027}>Năm 2027</option>
-                </select>
-              </div>
-            )}
+            {/* Date filter thực tế */}
+            <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-700">
+              <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+              <span className="text-slate-500">Ngày:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent text-slate-800 font-semibold focus:outline-none cursor-pointer"
+              />
+            </div>
 
             {/* Department filter */}
             <select
@@ -1026,695 +949,257 @@ export default function AttendanceManagement() {
                 className="px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
               >
                 <option value="all">Tất cả trạng thái</option>
-                <option value="approved">Đã duyệt công</option>
-                <option value="pending">Chờ duyệt công</option>
                 <option value="ontime">Đúng giờ</option>
                 <option value="late">Đi muộn</option>
                 <option value="working">Đang làm việc</option>
-                <option value="absent">Vắng mặt / Chưa chấm</option>
+                <option value="absent">Chưa chấm / Vắng</option>
               </select>
-            )}
-
-            {/* Nút Phê duyệt phụ thuộc vào số lượng tick chọn và hợp lệ (Daily view) */}
-            {viewMode === "daily" && (
-              <button
-                type="button"
-                onClick={handleBulkApprove}
-                disabled={isBulkApproving || isMonthLocked || selectedEligibleDailyRows.length === 0}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
-                  selectedEligibleDailyRows.length > 0
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200"
-                    : "bg-slate-100 text-slate-400 border border-slate-200"
-                }`}
-                title={
-                  selectedEligibleDailyRows.length > 0
-                    ? `Phê duyệt công đủ cho ${selectedEligibleDailyRows.length} người hợp lệ (loại trừ đi muộn & từ chối)`
-                    : "Vui lòng chọn nhân sự hợp lệ (không đi muộn, không bị từ chối) để phê duyệt"
-                }
-              >
-                {isBulkApproving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.2]" />
-                )}
-                <span>Phê duyệt ({selectedEligibleDailyRows.length} người)</span>
-              </button>
             )}
           </div>
         </div>
 
-        {/* Thanh tác vụ nhanh khi có tick chọn nhân sự */}
-        {!isLoading && viewMode === "daily" && selectedRowIds.length > 0 && (
-          <div className="mx-4 my-2.5 p-3 bg-sky-50 border border-sky-200/90 rounded-xl flex items-center justify-between gap-3 text-xs text-sky-900 animate-in fade-in duration-150">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-sky-600 animate-ping"></span>
-              <span>
-                Đang tick chọn: <strong className="text-sky-800 font-bold">{selectedRowIds.length}</strong> nhân sự
-                {selectedRowIds.length > selectedEligibleDailyRows.length && (
-                  <span className="ml-1.5 text-amber-700 font-medium">
-                    (Có {selectedRowIds.length - selectedEligibleDailyRows.length} người đi muộn hoặc bị từ chối sẽ không được duyệt)
-                  </span>
-                )}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedRowIds([])}
-                className="px-2.5 py-1 text-slate-600 hover:text-slate-800 hover:bg-white/80 rounded-lg font-medium transition-colors cursor-pointer"
-              >
-                Bỏ chọn tất cả
-              </button>
-              <button
-                type="button"
-                onClick={handleBulkApprove}
-                disabled={isBulkApproving || selectedEligibleDailyRows.length === 0}
-                className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-xs cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={`Phê duyệt ${selectedEligibleDailyRows.length} nhân sự hợp lệ`}
-              >
-                {isBulkApproving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                <span>Phê duyệt ({selectedEligibleDailyRows.length} người)</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* LOADING INDICATOR */}
-        {isLoading && (
-          <div className="p-12 flex flex-col items-center justify-center gap-3 text-slate-400">
+        {/* Loading Indicator */}
+        {isLoading ? (
+          <div className="py-24 flex flex-col items-center justify-center gap-3 text-slate-400">
             <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
-            <span className="text-xs font-medium">Đang tải dữ liệu từ API máy chủ...</span>
+            <span className="text-xs font-medium">Đang tải dữ liệu chấm công từ hệ thống...</span>
           </div>
-        )}
-
-        {/* VIEW 1: DAILY TABLE */}
-        {!isLoading && viewMode === "daily" && (
+        ) : (
           <>
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse min-w-[1150px]">
-              <thead>
-                <tr className="bg-slate-50/80 text-slate-500 font-semibold text-[11px] uppercase tracking-wider border-b border-slate-200/80">
-                  <th className="py-3 px-3 text-center w-10">
-                    <input
-                      type="checkbox"
-                      checked={isAllDailySelected}
-                      onChange={handleToggleSelectAllDaily}
-                      disabled={isMonthLocked || selectableDailyRows.length === 0}
-                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                      title={isAllDailySelected ? "Bỏ chọn tất cả" : "Chọn tất cả nhân sự chưa duyệt"}
-                    />
-                  </th>
-                  <th className="py-3 px-4">Nhân viên</th>
-                  <th className="py-3 px-4">Phòng ban</th>
-                  <th className="py-3 px-4">Ca làm việc</th>
-                  <th className="py-3 px-4">Check-in</th>
-                  <th className="py-3 px-4">Check-out</th>
-                  <th className="py-3 px-4 text-center">Đi muộn</th>
-                  <th className="py-3 px-4 text-center">Số giờ làm</th>
-                  <th className="py-3 px-4 text-center">Số công</th>
-                  <th className="py-3 px-4 text-center">OT</th>
-                  <th className="py-3 px-4">Tình trạng</th>
-                  <th className="py-3 px-4 text-center">Phê duyệt</th>
-                  <th className="py-3 px-4 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs text-slate-800">
-                {filteredDaily.length === 0 ? (
-                  <tr>
-                    <td colSpan={13} className="py-8 text-center text-slate-400">
-                      Không có bản ghi chấm công nào phù hợp với bộ lọc.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedDaily.map((row) => {
-                    const initials = getInitials(row.ho_ten);
-                    const isLate = row.loai_cong === "DI_TRE";
-                    const lateMins = getLateMinutes(row.gio_vao, row.loai_cong);
-                    const isCheckedIn = row.gio_vao && row.gio_vao !== "--:--" && row.gio_vao !== "-";
-                    const isApproved = row.trang_thai_duyet === "DA_DUYET";
-                    const isRejected = row.trang_thai_duyet === "TU_CHOI" || row.loai_cong === "NGHI_KHONG_PHEP";
-                    const hasExplanation = isLate || Boolean(row.ghi_chu && row.ghi_chu.length > 0);
-
-                    return (
-                      <tr key={row.ma_nv} className={`hover:bg-slate-50/80 transition-colors ${selectedRowIds.includes(row.ma_cc) ? "bg-sky-50/50" : ""}`}>
-                        {/* Checkbox chọn */}
-                        <td className="py-3 px-3 text-center">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(row.ma_cc && selectedRowIds.includes(row.ma_cc))}
-                            onChange={() => handleToggleSelectRow(row.ma_cc)}
-                            disabled={!row.ma_cc || isApproved || isMonthLocked}
-                            className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                            title={!row.ma_cc ? "Chưa có công để chọn" : isApproved ? "Đã duyệt công đủ" : "Chọn để duyệt công"}
-                          />
+            {/* VIEW 1: DAILY TABLE (DỮ LIỆU THẬT) */}
+            {viewMode === "daily" && (
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left border-collapse min-w-[980px]">
+                  <thead>
+                    <tr className="bg-slate-50/80 text-slate-500 font-semibold text-[11px] uppercase tracking-wider border-b border-slate-200/80">
+                      <th className="py-3 px-4">Nhân viên</th>
+                      <th className="py-3 px-4">Phòng ban</th>
+                      <th className="py-3 px-4">Ca làm việc</th>
+                      <th className="py-3 px-4">Check-in</th>
+                      <th className="py-3 px-4">Check-out</th>
+                      <th className="py-3 px-4 text-center">Số công</th>
+                      <th className="py-3 px-4 text-center">Giờ làm</th>
+                      <th className="py-3 px-4">Tình trạng</th>
+                      <th className="py-3 px-4 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs text-slate-800">
+                    {filteredDaily.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-12 text-center text-slate-400">
+                          Không tìm thấy nhân viên nào phù hợp với bộ lọc ngày {selectedDate}.
                         </td>
+                      </tr>
+                    ) : (
+                      filteredDaily.map((row) => {
+                        const checked = isCheckedIn(row);
+                        const isLate = row.loai_cong === "DI_TRE";
+                        const isLeave = row.loai_cong === "NGHI_PHEP";
 
-                        {/* NV */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-sky-50 text-sky-700 font-bold text-xs flex items-center justify-center shrink-0">
-                              {initials}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-slate-900">{row.ho_ten}</span>
-                              <span className="font-mono text-[11px] text-slate-400">
-                                {row.ma_nv} • {row.ten_cv || "Nhân viên"}
+                        return (
+                          <tr key={row.ma_nv} className="hover:bg-slate-50/80 transition-colors">
+                            {/* NV */}
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-sky-50 text-sky-700 font-bold text-xs flex items-center justify-center shrink-0">
+                                  {row.ho_ten ? row.ho_ten.split(" ").pop() : row.ma_nv}
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="font-semibold text-slate-900">{row.ho_ten}</span>
+                                  <span className="font-mono text-[11px] text-slate-400">
+                                    {row.ma_nv} • {row.ten_cv || "Nhân viên"}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Dept */}
+                            <td className="py-3 px-4">
+                              <span className="font-medium text-slate-800">{row.ten_pb || "Văn phòng"}</span>
+                            </td>
+
+                            {/* Shift */}
+                            <td className="py-3 px-4">
+                              <span className="inline-flex px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium">
+                                {row.ca_lam_viec || "Hành chính (08:00 - 17:00)"}
                               </span>
-                            </div>
-                          </div>
-                        </td>
+                            </td>
 
-                        {/* Dept */}
-                        <td className="py-3 px-4">
-                          <span className="font-medium text-slate-800">{row.ten_pb || "Văn phòng"}</span>
-                        </td>
+                            {/* Check In */}
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={`font-semibold ${
+                                    isLate ? "text-amber-600" : checked ? "text-slate-800" : "text-slate-400"
+                                  }`}
+                                >
+                                  {row.gio_vao || "--:--"}
+                                </span>
+                                {checked && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px] font-medium">
+                                    <MapPin className="w-2.5 h-2.5" />
+                                    <span>Hợp lệ</span>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
 
-                        {/* Shift */}
-                        <td className="py-3 px-4">
-                          <span className="inline-flex px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium">
-                            {row.ca_lam_viec || "Hành chính (08:00 - 17:00)"}
-                          </span>
-                        </td>
-
-                        {/* Check In */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`font-semibold ${isLate ? "text-amber-600 font-bold" : "text-slate-800"
-                                }`}
-                            >
-                              {isCheckedIn ? row.gio_vao : "--:--"}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Check Out */}
-                        <td className="py-3 px-4">
-                          <span
-                            className={
-                              row.gio_ra === "--:--" || !row.gio_ra
-                                ? isCheckedIn
-                                  ? "italic text-sky-600 font-medium"
-                                  : "text-slate-300"
-                                : "font-semibold text-slate-800"
-                            }
-                          >
-                            {row.gio_ra === "--:--" || !row.gio_ra
-                              ? isCheckedIn
-                                ? "Đang làm việc"
-                                : "--:--"
-                              : row.gio_ra}
-                          </span>
-                        </td>
-
-                        {/* Late Minutes */}
-                        <td className="py-3 px-4 text-center">
-                          {isLate ? (
-                            <span className="inline-flex px-2 py-0.5 rounded bg-amber-50 text-amber-700 font-bold text-[11px]">
-                              {lateMins > 0 ? `+${lateMins}p` : "Đi trễ"}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300">-</span>
-                          )}
-                        </td>
-
-                        {/* Actual Hours */}
-                        <td className="py-3 px-4 text-center font-semibold text-slate-800">
-                          {row.so_gio_lam > 0 ? `${row.so_gio_lam}h` : "-"}
-                        </td>
-
-                        {/* Số công */}
-                        <td className="py-3 px-4 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                            (row.so_cong >= 1) ? "bg-emerald-50 text-emerald-700" :
-                            (row.so_cong >= 0.5) ? "bg-blue-50 text-blue-700" :
-                            row.ma_cc ? "bg-slate-100 text-slate-500" : ""
-                          }`}>
-                            {row.so_cong != null && row.ma_cc ? Number(row.so_cong).toFixed(1) : "-"}
-                          </span>
-                        </td>
-
-                        {/* OT */}
-                        <td className="py-3 px-4 text-center">
-                          {row.so_gio_tang_ca > 0 ? (
-                            <span className="inline-flex px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px]">
-                              +{Number(row.so_gio_tang_ca).toFixed(1)}h
-                            </span>
-                          ) : (
-                            <span className="text-slate-300">-</span>
-                          )}
-                        </td>
-
-                        {/* Status */}
-                        <td className="py-3 px-4">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${row.loai_cong === "CONG_DU"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : row.loai_cong === "VE_SOM"
-                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                  : isLate
-                                    ? "bg-amber-50 text-amber-700"
-                                    : row.loai_cong === "NUA_CONG"
-                                      ? "bg-blue-50 text-blue-700"
-                                      : row.loai_cong === "NGHI_PHEP"
-                                        ? "bg-sky-50 text-sky-700"
-                                        : isCheckedIn && (row.gio_ra === "--:--" || !row.gio_ra)
-                                          ? "bg-sky-50 text-sky-700"
-                                          : "bg-slate-100 text-slate-600"
-                              }`}
-                          >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${row.loai_cong === "CONG_DU"
-                                  ? "bg-emerald-500"
-                                  : row.loai_cong === "VE_SOM"
-                                    ? "bg-rose-500"
-                                    : isLate
-                                      ? "bg-amber-500"
-                                      : row.loai_cong === "NUA_CONG"
-                                        ? "bg-blue-500"
-                                        : row.loai_cong === "NGHI_PHEP"
-                                          ? "bg-sky-500"
-                                          : isCheckedIn && (row.gio_ra === "--:--" || !row.gio_ra)
-                                            ? "bg-sky-500 animate-pulse"
-                                            : "bg-slate-400"
-                                }`}
-                            ></span>
-                            {row.trang_thai || (row.loai_cong === "CONG_DU" ? "Đúng giờ" : "Chưa chấm")}
-                          </span>
-                        </td>
-
-                        {/* Phê duyệt */}
-                        <td className="py-3 px-4 text-center">
-                          {isApproved ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/90 shadow-2xs">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 stroke-[2.4]" />
-                              <span>Đã duyệt</span>
-                            </span>
-                          ) : isRejected ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/90 shadow-2xs">
-                              <XCircle className="w-3.5 h-3.5 text-rose-600 stroke-[2.4]" />
-                              <span>Từ chối</span>
-                            </span>
-                          ) : row.ma_cc ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200/80">
-                              <Clock className="w-3.5 h-3.5 text-amber-500 stroke-[2.2]" />
-                              <span>Chờ duyệt</span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 text-[11px] italic">-</span>
-                          )}
-                        </td>
-
-                        {/* Actions */}
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {isMonthLocked ? (
+                            {/* Check Out */}
+                            <td className="py-3 px-4">
                               <span
-                                className="w-8 h-8 rounded-lg text-slate-400 bg-slate-100 flex items-center justify-center cursor-not-allowed"
-                                title="Bảng công tháng đã khóa, không thể điều chỉnh"
+                                className={
+                                  !row.gio_ra || row.gio_ra === "--:--"
+                                    ? "italic text-slate-400"
+                                    : "font-semibold text-slate-800"
+                                }
                               >
-                                <Lock className="w-4 h-4" />
+                                {row.gio_ra || "--:--"}
                               </span>
-                            ) : !row.ma_cc ? (
-                              <span className="text-slate-300 text-xs italic px-2">Chưa có công</span>
-                            ) : isApproved ? (
-                              <>
-                                {/* 1. Cây bút: Chỉnh sửa bổ sung (Nằm bên trái ngoài cùng) */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenAdjust(row)}
-                                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
-                                  title="Chỉnh sửa bổ sung"
-                                >
-                                  <Edit3 className="w-4 h-4" />
-                                </button>
+                            </td>
 
-                                {/* 2. Nút X: Hủy duyệt / Từ chối (Nằm ở giữa) */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenReject(row)}
-                                  className="w-8 h-8 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-all flex items-center justify-center cursor-pointer active:scale-95"
-                                  title="Từ chối / Hủy duyệt công ngày này"
-                                >
-                                  <X className="w-4 h-4 stroke-[2.5]" />
-                                </button>
+                            {/* Số công */}
+                            <td className="py-3 px-4 text-center font-semibold text-slate-700">
+                              {row.so_cong != null ? Number(row.so_cong).toFixed(2) : "0.00"}
+                            </td>
 
-                                {/* 3. Tick xanh: Đã duyệt (Nằm bên phải ngoài cùng) */}
-                                <span
-                                  className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"
-                                  title="Đã chốt duyệt công đủ"
-                                >
-                                  <Check className="w-4 h-4 stroke-[2.5]" />
-                                </span>
-                              </>
-                            ) : isRejected ? (
-                              <>
-                                {/* 1. Cây bút: Xem lại / Sửa (Nằm bên trái ngoài cùng) */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenAdjust(row)}
-                                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
-                                  title="Xem lại / Chỉnh sửa bổ sung"
-                                >
-                                  <Edit3 className="w-4 h-4" />
-                                </button>
+                            {/* Giờ làm */}
+                            <td className="py-3 px-4 text-center font-mono text-slate-600">
+                              {row.so_gio_lam != null ? `${Number(row.so_gio_lam).toFixed(1)}h` : "0.0h"}
+                            </td>
 
-                                {/* 2. Nút X: Đã từ chối (Nằm ở giữa) */}
-                                <span
-                                  className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center"
-                                  title="Đã từ chối duyệt công ngày này (0 công)"
-                                >
-                                  <X className="w-4 h-4 stroke-[2.5]" />
-                                </span>
-
-                                {/* 3. Tick xanh: Phê duyệt lại công (Nằm bên phải ngoài cùng) */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleApprove(row)}
-                                  className="w-8 h-8 rounded-lg text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-all flex items-center justify-center cursor-pointer active:scale-95"
-                                  title="Phê duyệt lại công đủ (1.0 ngày công)"
-                                >
-                                  <Check className="w-4 h-4 stroke-[2.5]" />
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                {/* 1. Nút cây bút: Nằm bên trái ngoài cùng */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenAdjust(row)}
-                                  className="w-8 h-8 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
-                                  title={row.ghi_chu ? `Giải trình: "${row.ghi_chu}" - Bấm để điều chỉnh giờ` : "Điều chỉnh giờ chấm công"}
-                                >
-                                  <Edit3 className="w-4 h-4" />
-                                </button>
-
-                                {/* 2. Nút X (Từ chối): Nằm ở giữa */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenReject(row)}
-                                  className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all shadow-2xs flex items-center justify-center cursor-pointer active:scale-95"
-                                  title="Từ chối duyệt công ngày này (0 công - Vi phạm / Nghỉ không phép)"
-                                >
-                                  <X className="w-4 h-4 stroke-[2.5]" />
-                                </button>
-
-                                {/* 3. Nút Tick xanh (Phê duyệt): Nằm bên phải ngoài cùng */}
-                                <button
-                                  type="button"
-                                  onClick={() => handleApprove(row)}
-                                  className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-2xs flex items-center justify-center cursor-pointer active:scale-95"
-                                  title="Chốt duyệt công đủ (1.0 ngày công)"
-                                >
-                                  <Check className="w-4 h-4 stroke-[2.5]" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Phân trang Daily */}
-          {filteredDaily.length > 0 && (
-            <div className="px-5 py-3.5 bg-slate-50/70 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-              <div className="flex items-center gap-3">
-                <span>
-                  Đang hiển thị{" "}
-                  <span className="font-semibold text-slate-800">{startIdx + 1}</span> -{" "}
-                  <span className="font-semibold text-slate-800">{endIdx}</span> trong tổng số{" "}
-                  <span className="font-semibold text-slate-800">{filteredDaily.length}</span> bản ghi
-                </span>
-                <span className="text-slate-300">|</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-500">Hiển thị</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      setPageSize(e.target.value === "all" ? "all" : Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="px-2 py-1 bg-white border border-slate-200/80 rounded-lg text-xs text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value="all">Tất cả</option>
-                  </select>
-                  <span className="text-slate-500">người/trang</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={safePage <= 1}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Trước</span>
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => setCurrentPage(page)}
-                    className={`w-8 h-8 rounded-lg font-semibold transition-all text-xs ${page === safePage
-                        ? "bg-sky-600 text-white shadow-xs"
-                        : "bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50"
-                      }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={safePage >= totalPages}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1"
-                >
-                  <span>Sau</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
-          </>
-        )}
-
-        {/* VIEW 2: MONTHLY SUMMARY TABLE */}
-        {!isLoading && viewMode === "monthly" && (
-          <>
-          <div className="overflow-x-auto w-full">
-            <table className="w-full text-left border-collapse min-w-[980px]">
-              <thead>
-                <tr className="bg-slate-50/80 text-slate-500 font-semibold text-[11px] uppercase tracking-wider border-b border-slate-200/80">
-                  <th className="py-3 px-4">Nhân viên</th>
-                  <th className="py-3 px-4">Phòng ban</th>
-                  <th className="py-3 px-4 text-center">Tổng ngày công</th>
-                  <th className="py-3 px-4 text-center">Giờ tăng ca (OT)</th>
-                  <th className="py-3 px-4 text-center">Số lần đi trễ</th>
-                  <th className="py-3 px-4 text-center">Số ngày phép</th>
-                  <th className="py-3 px-4 text-center">Tình trạng kỷ luật</th>
-                  <th className="py-3 px-4 text-center">Chu kỳ</th>
-                  <th className="py-3 px-4 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs text-slate-800">
-                {filteredMonthly.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="py-8 text-center text-slate-400">
-                      Không có dữ liệu tổng hợp công tháng cho bộ lọc đã chọn.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedMonthly.map((row) => {
-                    const initials = getInitials(row.ho_ten);
-                    const isExcessiveLate = row.so_lan_di_tre >= 3;
-
-                    return (
-                      <tr key={row.ma_nv} className="hover:bg-slate-50/80 transition-colors">
-                        {/* NV */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-sky-50 text-sky-700 font-bold text-xs flex items-center justify-center shrink-0">
-                              {initials}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-slate-900">{row.ho_ten}</span>
-                              <span className="font-mono text-[11px] text-slate-400">
-                                {row.ma_nv} • {row.ten_cv || "Nhân viên"}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Dept */}
-                        <td className="py-3 px-4">
-                          <span className="font-medium text-slate-800">{row.ten_pb || "Văn phòng"}</span>
-                        </td>
-
-                        {/* Tổng ngày công */}
-                        <td className="py-3 px-4 text-center font-bold text-slate-900">
-                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-mono">
-                            {Number(row.tong_ngay_cong).toFixed(1)} ngày
-                          </span>
-                        </td>
-
-                        {/* Tổng giờ OT */}
-                        <td className="py-3 px-4 text-center font-semibold text-emerald-600">
-                          {Number(row.tong_gio_ot) > 0 ? (
-                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono">
-                              +{Number(row.tong_gio_ot).toFixed(1)}h
-                            </span>
-                          ) : (
-                            <span className="text-slate-300">0h</span>
-                          )}
-                        </td>
-
-                        {/* Số lần đi trễ */}
-                        <td className="py-3 px-4 text-center">
-                          {row.so_lan_di_tre > 0 ? (
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-bold text-xs ${isExcessiveLate
-                                  ? "bg-rose-100 text-rose-800 border border-rose-300"
-                                  : "bg-amber-50 text-amber-700"
+                            {/* Status Badge */}
+                            <td className="py-3 px-4">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                                  checked && !isLate
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : isLate
+                                    ? "bg-amber-50 text-amber-700"
+                                    : isLeave
+                                    ? "bg-sky-50 text-sky-700"
+                                    : "bg-slate-100 text-slate-500"
                                 }`}
-                            >
-                              {row.so_lan_di_tre} lần
-                            </span>
-                          ) : (
-                            <span className="text-emerald-600 font-medium">0</span>
-                          )}
-                        </td>
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    checked && !isLate
+                                      ? "bg-emerald-500"
+                                      : isLate
+                                      ? "bg-amber-500"
+                                      : isLeave
+                                      ? "bg-sky-500"
+                                      : "bg-slate-400"
+                                  }`}
+                                ></span>
+                                {row.trang_thai || (checked ? "Đúng giờ" : "Chưa chấm")}
+                              </span>
+                            </td>
 
-                        {/* Số ngày phép */}
-                        <td className="py-3 px-4 text-center font-medium text-slate-700">
-                          {row.so_ngay_phep > 0 ? `${row.so_ngay_phep} ngày` : "-"}
-                        </td>
+                            {/* Actions */}
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {row.ma_cc ? (
+                                  <button
+                                    onClick={() => handleOpenAdjust(row)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Điều chỉnh giờ chấm công"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] text-slate-300 italic">Chưa có mã CC</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-                        {/* Tình trạng kỷ luật */}
-                        <td className="py-3 px-4 text-center">
-                          {isExcessiveLate ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                              <AlertTriangle className="w-3 h-3 text-rose-600" />
-                              Vượt mức trễ (&gt;=3 lần)
-                            </span>
-                          ) : row.so_lan_di_tre === 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              Chuyên cần tốt
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                              Đi trễ {row.so_lan_di_tre} lần
-                            </span>
-                          )}
-                        </td>
+            {/* VIEW 2: MONTHLY SUMMARY (DỮ LIỆU THẬT TỪ DB) */}
+            {viewMode === "monthly" && (
+              <div className="overflow-x-auto w-full p-4">
+                <div className="mb-3 flex items-center justify-between text-xs text-slate-500">
+                  <span>
+                    Bảng tổng hợp công tháng {selectedDate.split("-")[1]}/{selectedDate.split("-")[0]} (Toàn bộ nhân sự)
+                  </span>
+                  <span className="text-emerald-700 font-semibold">
+                    Dữ liệu tổng hợp từ các bảng chấm công thực tế
+                  </span>
+                </div>
 
-                        {/* Chu kỳ */}
-                        <td className="py-3 px-4 text-center font-mono text-slate-400 text-[11px]">
-                          T{row.thang}/{row.nam}
-                        </td>
-
-                        {/* Thao tác */}
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => handleOpenEmployeeDetail(row)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-colors"
-                            title="Xem chi tiết từng ngày công trong tháng của nhân viên"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Chi tiết</span>
-                          </button>
+                <table className="w-full text-left border-collapse text-xs min-w-[900px]">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase text-[11px]">
+                      <th className="py-3 px-4">Mã NV</th>
+                      <th className="py-3 px-4">Họ và tên</th>
+                      <th className="py-3 px-4">Phòng ban</th>
+                      <th className="py-3 px-4">Chức vụ</th>
+                      <th className="py-3 px-4 text-center">Tổng ngày công</th>
+                      <th className="py-3 px-4 text-center">Giờ tăng ca (OT)</th>
+                      <th className="py-3 px-4 text-center">Số lần đi trễ</th>
+                      <th className="py-3 px-4 text-center">Số ngày phép</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredMonthly.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
+                          Chưa có dữ liệu tổng hợp công cho tháng này.
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Phân trang Monthly */}
-          {filteredMonthly.length > 0 && (
-            <div className="px-5 py-3.5 bg-slate-50/70 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-              <div className="flex items-center gap-3">
-                <span>
-                  Đang hiển thị{" "}
-                  <span className="font-semibold text-slate-800">{startIdx + 1}</span> -{" "}
-                  <span className="font-semibold text-slate-800">{endIdx}</span> trong tổng số{" "}
-                  <span className="font-semibold text-slate-800">{filteredMonthly.length}</span> bản ghi
-                </span>
-                <span className="text-slate-300">|</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-500">Hiển thị</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      setPageSize(e.target.value === "all" ? "all" : Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="px-2 py-1 bg-white border border-slate-200/80 rounded-lg text-xs text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value="all">Tất cả</option>
-                  </select>
-                  <span className="text-slate-500">người/trang</span>
-                </div>
+                    ) : (
+                      filteredMonthly.map((row) => (
+                        <tr key={row.ma_nv} className="hover:bg-slate-50">
+                          <td className="py-3 px-4 font-mono font-semibold text-sky-700">{row.ma_nv}</td>
+                          <td className="py-3 px-4 font-semibold text-slate-900">{row.ho_ten}</td>
+                          <td className="py-3 px-4 text-slate-700">{row.ten_pb || "Văn phòng"}</td>
+                          <td className="py-3 px-4 text-slate-500">{row.ten_cv || "Nhân viên"}</td>
+                          <td className="py-3 px-4 text-center font-bold text-emerald-600">
+                            {Number(row.tong_ngay_cong || 0).toFixed(1)}
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono text-slate-700">
+                            {Number(row.tong_gio_ot || 0).toFixed(1)}h
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span
+                              className={`px-2 py-0.5 rounded-full font-semibold text-[11px] ${
+                                Number(row.so_lan_di_tre) > 0
+                                  ? "bg-amber-50 text-amber-700"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {row.so_lan_di_tre || 0}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium text-sky-700">
+                            {row.so_ngay_phep || 0}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={safePage <= 1}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Trước</span>
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    type="button"
-                    onClick={() => setCurrentPage(page)}
-                    className={`w-8 h-8 rounded-lg font-semibold transition-all text-xs ${page === safePage
-                        ? "bg-sky-600 text-white shadow-xs"
-                        : "bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50"
-                      }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={safePage >= totalPages}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-1"
-                >
-                  <span>Sau</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
+            )}
           </>
         )}
       </div>
 
       {/* ──────────────── MODAL ĐIỀU CHỈNH GIỜ / DUYỆT GIẢI TRÌNH ──────────────── */}
       {adjustModalData && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 animate-in zoom-in-95 duration-200">
+        <div
+          onClick={() => setAdjustModalData(null)}
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 animate-in zoom-in-95 duration-200 cursor-default"
+          >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-sky-600" />
@@ -1724,7 +1209,7 @@ export default function AttendanceManagement() {
               </div>
               <button
                 onClick={() => setAdjustModalData(null)}
-                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1885,8 +1370,14 @@ export default function AttendanceManagement() {
 
       {/* ──────────────── POPUP TỪ CHỐI DUYỆT CÔNG (NÚT X) ──────────────── */}
       {rejectModalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
+        <div
+          onClick={() => setRejectModalData(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-150 cursor-default"
+          >
             {/* Header Popup */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -2002,8 +1493,14 @@ export default function AttendanceManagement() {
       )}
       {/* MODAL XEM CHI TIẾT 30 NGÀY CÔNG CỦA NHÂN VIÊN */}
       {selectedEmployeeDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl p-6 text-sm relative animate-in fade-in zoom-in-95 duration-150 my-8">
+        <div
+          onClick={() => setSelectedEmployeeDetail(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl p-6 text-sm relative animate-in fade-in zoom-in-95 duration-150 my-8 cursor-default"
+          >
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">

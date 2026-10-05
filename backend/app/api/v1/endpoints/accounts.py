@@ -6,10 +6,12 @@ from sqlalchemy.orm import Session
 import app.services.auth_service as account_service
 from app.db.session import get_db
 from app.schemas.auth_schemas import (
+    account_admin_update,
     account_create,
     account_response,
     account_update_status,
     change_password_request,
+    employee_without_account_response,
 )
 
 router = APIRouter()
@@ -25,6 +27,25 @@ def create_account_endpoint(
 ):
     try:
         return account_service.create_account(db, data)
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
+
+
+@router.put("/{ma_nv}", summary="Admin chỉnh sửa tài khoản (Đổi mật khẩu, vai trò, trạng thái)")
+def update_account_endpoint(
+    ma_nv: str,
+    data: account_admin_update,
+    db: DbSession,
+):
+    """Admin cập nhật thông tin tài khoản: đặt lại mật khẩu mới, đổi vai trò hoặc trạng thái."""
+    try:
+        return account_service.admin_update_account(
+            db,
+            ma_nv=ma_nv,
+            mat_khau_moi=data.mat_khau_moi,
+            ma_vai_tro=data.ma_vai_tro,
+            trang_thai=data.trang_thai,
+        )
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
 
@@ -56,6 +77,7 @@ def change_password_endpoint(
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
 
+
 @router.get(
     "/without_account",
     response_model=list[str],
@@ -67,6 +89,20 @@ def get_without_account_endpoint(db: DbSession):
         return account_service.get_without_account(db)
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err))
+
+
+@router.get(
+    "/without_account_details",
+    response_model=list[employee_without_account_response],
+    summary="Chi tiết danh sách nhân sự chưa có tài khoản",
+)
+def get_without_account_details_endpoint(db: DbSession):
+    """Lấy danh sách đầy đủ thông tin nhân sự (họ tên, phòng ban, chức vụ, email, sdt) chưa có tài khoản theo thứ tự."""
+    try:
+        return account_service.get_without_account_detailed(db)
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err))
+
 
 
 @router.get("", summary="Danh sách tài khoản hệ thống")

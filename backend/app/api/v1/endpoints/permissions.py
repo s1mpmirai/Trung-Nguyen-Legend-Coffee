@@ -122,4 +122,4 @@ def update_custom_permissions_endpoint(
     try:
         return permission_service.update_custom_permissions(db, ma_nv, data)
     except ValueError as err:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from error
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err

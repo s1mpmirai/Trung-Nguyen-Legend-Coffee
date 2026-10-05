@@ -28,6 +28,14 @@ class employee_profile(BaseModel):
     so_bhxh: Optional[str] = Field(None, description="Số sổ BHXH")
     ngay_tao: Optional[datetime] = Field(None, description="Ngày tạo bản ghi")
     ngay_cap_nhat: Optional[datetime] = Field(None, description="Ngày cập nhật gần nhất")
+    ten_pb: Optional[str] = Field(None, description="Tên phòng ban")
+    ten_cv: Optional[str] = Field(None, description="Tên chức vụ")
+    ten_cn: Optional[str] = Field(None, description="Tên chi nhánh")
+    muc_luong: Optional[float] = Field(None, description="Mức lương cơ bản / thực lĩnh")
+    trinh_do: Optional[str] = Field(None, description="Trình độ học vấn cao nhất")
+    chuyen_nganh: Optional[str] = Field(None, description="Chuyên ngành đào tạo")
+    noi_dao_tao: Optional[str] = Field(None, description="Nơi đào tạo / Trường tốt nghiệp")
+    nam_tot_nghiep: Optional[int] = Field(None, description="Năm tốt nghiệp")
 
     class Config:
         from_attributes = True

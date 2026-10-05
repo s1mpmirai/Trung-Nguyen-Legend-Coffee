@@ -738,8 +738,14 @@ export default function LeaveApprovals() {
 
       {/* ──────────────── POPUP XÁC NHẬN TỪ CHỐI & NÊU LÝ DO ──────────────── */}
       {rejectModalData && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+        <div
+          onClick={() => setRejectModalData(null)}
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200 cursor-default"
+          >
             {/* Header Popup */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5 text-rose-600">
@@ -870,8 +876,14 @@ export default function LeaveApprovals() {
 
       {/* ──────────────── DRAWER / MODAL XEM CHI TIẾT ĐƠN ──────────────── */}
       {selectedRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+        <div
+          onClick={() => setSelectedRequest(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200 cursor-default"
+          >
             {/* Header Popup: Hiển thị Mã đơn, Loại đơn và Thời gian gửi chi tiết (kèm giờ phút) trên đầu, không bỏ vào khung */}
             <div className="flex items-start justify-between pb-3 border-b border-slate-100">
               <div className="flex flex-col gap-1">

@@ -164,6 +164,7 @@ def review_profile_request_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
 
+
 @router.get(
     "/reports/monthly",
     response_model=employee_monthly_report_response,
@@ -230,5 +231,3 @@ def deactivate_employee_endpoint(
         return deactivate_employee(db, ma_nv, ly_do)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
-
-

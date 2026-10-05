@@ -104,7 +104,7 @@ def create(db: Session, employee: dict) -> dict:
 def get_employee_list(
     db: Session,
     page: int = 1,
-    page_size: int = 10,
+    page_size: int = 50,
 ) -> dict:
     offset = (page - 1) * page_size
 
@@ -114,7 +114,7 @@ def get_employee_list(
         SELECT 
             nv.ma_nv, nv.ho_ten, nv.ngay_sinh, nv.gioi_tinh, nv.cccd, nv.dia_chi, nv.sdt, nv.email,
             nv.so_nguoi_pt, nv.ma_pb, nv.ma_cv, nv.ngay_nghi_viec,
-            nv.trang_thai, nv.hinh_thuc_lam_viec,
+            nv.trang_thai, COALESCE(nv.hinh_thuc_lam_viec, 'FULL_TIME') AS hinh_thuc_lam_viec,
             hd.ngay_bat_dau AS ngay_vao_lam,
             hd.so_tai_khoan,
             hd.ngan_hang,

@@ -15,9 +15,7 @@ class payroll_month_response(BaseModel):
     he_so_luong: float = 1.0
     so_cong_chuan: float = 26.0
     so_cong_thuc_te: float = 0
-    so_gio_tang_ca: float = 0
     luong_theo_cong: float = 0
-    tien_tang_ca: float = 0
     tong_phu_cap: float = 0
     tien_thuong: float = 0
     luong_gross: float = 0
@@ -74,9 +72,7 @@ class payroll_summary_item(BaseModel):
     he_so_luong: Optional[float] = 1.0
     so_cong_chuan: Optional[float] = 26.0
     so_cong_thuc_te: float = 0
-    so_gio_tang_ca: float = 0
     luong_theo_cong: Optional[float] = 0
-    tien_tang_ca: Optional[float] = 0
     tong_phu_cap: Optional[float] = 0
     tien_thuong: Optional[float] = 0
     luong_gross: float = 0
@@ -117,7 +113,6 @@ class payroll_year_summary_response(BaseModel):
     tong_bhtn: float = 0
     tong_thue_tncn: float = 0
     tong_cong_thuc_te: float = 0
-    tong_gio_tang_ca: float = 0
     chi_tiet_thang: List[payroll_month_response] = Field(default_factory=list)
 
     class Config:
