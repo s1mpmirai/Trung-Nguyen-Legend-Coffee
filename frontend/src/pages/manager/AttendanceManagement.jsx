@@ -764,17 +764,16 @@ export default function AttendanceManagement() {
             </div>
           </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Monthly Card 1 */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Tổng ngày công tích lũy</span>
-              <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600">
-                <CalendarDays className="w-4 h-4" />
-              </div>
+        {/* Card 2: Đúng giờ */}
+        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-emerald-300 transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-500">Đi đúng giờ</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <Clock className="w-4 h-4" />
             </div>
-            <div className="mt-4 flex items-baseline gap-2">
+          </div>
+          <div className="mt-4 flex flex-col gap-1">
+            <div className="flex items-baseline gap-2">
               <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-slate-900">
                 {onTimeCount}
               </span>
@@ -791,6 +790,7 @@ export default function AttendanceManagement() {
               <span>{disciplineRate}% đúng hạn</span>
             </div>
           </div>
+        </div>
 
         {/* Card 3: Đi muộn */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-amber-300 transition-all">
@@ -800,16 +800,8 @@ export default function AttendanceManagement() {
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-
-          {/* Monthly Card 3 */}
-          <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Lượt đi trễ trong tháng</span>
-              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-                <AlertTriangle className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-4 flex items-baseline gap-2">
+          <div className="mt-4 flex flex-col gap-1">
+            <div className="flex items-baseline gap-2">
               <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-amber-600">
                 {lateCount}
               </span>
@@ -828,6 +820,7 @@ export default function AttendanceManagement() {
               <span className="text-amber-600 font-semibold">{lateCount} cần chú ý</span>
             </div>
           </div>
+        </div>
 
         {/* Card 4: Vắng mặt */}
         <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-rose-300 transition-all">
@@ -856,7 +849,7 @@ export default function AttendanceManagement() {
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* ──────────────── MAIN CONTAINER CARD ──────────────── */}
       <div className="rounded-2xl bg-white border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
