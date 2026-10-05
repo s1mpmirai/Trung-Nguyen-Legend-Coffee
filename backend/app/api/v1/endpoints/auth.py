@@ -19,15 +19,16 @@ def admin_login(
     request: request_login,
     db: DbSession,
 ):
-    result = login_for_portal(
-        db,
-        request.ma_nv,
-        request.mat_khau,
-        allowed_roles={"ADMIN"},
-    )
-    if result is None:
-        raise HTTPException(status_code=401, detail="Thông tin đăng nhập không hợp lệ hoặc tài khoản không có quyền Quản trị viên")
-    return result
+    from app.services.auth_service import authenticate_user
+    user = authenticate_user(db, request.ma_nv, request.mat_khau)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Mã tài khoản hoặc mật khẩu không chính xác")
+
+    role = str(user.get("ma_vai_tro") or "").upper()
+    if role != "ADMIN":
+        raise HTTPException(status_code=403, detail="Tài khoản không có quyền Quản trị viên tối cao")
+
+    return user
 
 @router.post("/manager-login")
 @router.post("/login-manager")
@@ -36,15 +37,22 @@ def management_login(
     request: request_login,
     db: DbSession,
 ):
-    result = login_for_portal(
-        db,
-        request.ma_nv,
-        request.mat_khau,
-        allowed_roles={"ADMIN", "QUAN_LY", "TRUONG_NHOM"},
-    )
-    if result is None:
-        raise HTTPException(status_code=401, detail="Thông tin đăng nhập không hợp lệ hoặc tài khoản không có quyền Quản lý")
-    return result
+    from app.services.auth_service import authenticate_user
+    user = authenticate_user(db, request.ma_nv, request.mat_khau)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Mã tài khoản hoặc mật khẩu không chính xác")
+
+    role = str(user.get("ma_vai_tro") or "").upper()
+    if role == "NHAN_VIEN":
+        raise HTTPException(
+            status_code=403,
+            detail="Tài khoản Nhân viên vui lòng đăng nhập tại Cổng Nhân Viên (/login)"
+        )
+
+    if role not in {"ADMIN", "QUAN_LY", "TRUONG_NHOM"}:
+        raise HTTPException(status_code=403, detail="Tài khoản không có quyền Quản lý")
+
+    return user
 
 
 @router.post("/employee-login")
@@ -53,15 +61,23 @@ def employee_login(
     request: request_login,
     db: DbSession,
 ):
-    result = login_for_portal(
-        db,
-        request.ma_nv,
-        request.mat_khau,
-        allowed_roles={"ADMIN", "QUAN_LY", "TRUONG_NHOM", "NHAN_VIEN"},
-    )
-    if result is None:
-        raise HTTPException(status_code=401, detail="Thông tin đăng nhập không hợp lệ")
-    return result
+    from app.services.auth_service import authenticate_user
+    user = authenticate_user(db, request.ma_nv, request.mat_khau)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Mã nhân viên hoặc mật khẩu không chính xác")
+
+    role = str(user.get("ma_vai_tro") or "").upper()
+    # Chặn hoàn toàn Admin, Quản lý, Trưởng nhóm đăng nhập từ Cổng nhân viên
+    if role in {"ADMIN", "QUAN_LY", "TRUONG_NHOM"}:
+        raise HTTPException(
+            status_code=403,
+            detail="Tài khoản Quản lý / Quản trị viên không được phép đăng nhập tại đây. Vui lòng sử dụng Cổng Điều Hành (/login-manage)"
+        )
+
+    if role != "NHAN_VIEN":
+        raise HTTPException(status_code=403, detail="Tài khoản không có quyền truy cập Cổng nhân viên")
+
+    return user
 
 
 class FirstTimePasswordRequest(BaseModel):

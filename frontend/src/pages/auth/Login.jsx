@@ -53,7 +53,15 @@ export default function Login({ onLoginSuccess }) {
       }
 
       const data = await response.json();
-      const role = data.ma_vai_tro || 'NHAN_VIEN';
+      const role = String(data.ma_vai_tro || 'NHAN_VIEN').toUpperCase();
+
+      // Chặn tài khoản Quản lý / Admin đăng nhập tại cổng nhân viên
+      if (['ADMIN', 'QUAN_LY', 'TRUONG_NHOM'].includes(role)) {
+        setErrorMessage('Tài khoản Quản lý / Quản trị viên không được phép đăng nhập tại đây. Vui lòng sử dụng Cổng Điều Hành (/login-manage).');
+        setIsLoading(false);
+        return;
+      }
+
       localStorage.setItem('user_role', role);
       localStorage.setItem('user_ma_nv', data.ma_nv);
       localStorage.setItem('ma_nv', data.ma_nv);
@@ -146,7 +154,7 @@ export default function Login({ onLoginSuccess }) {
                   type="text"
                   value={employeeId}
                   onChange={(e) => setEmployeeId(e.target.value)}
-                  placeholder="Ví dụ: NV10, NV02, NV01..."
+                  placeholder="Ví dụ: NV10, NV11, NV12..."
                   required
                   className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] focus:border-transparent focus:bg-white transition-all shadow-sm"
                 />
