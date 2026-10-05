@@ -61,6 +61,8 @@ def authenticate_user(db: Session, ma_nv: str, mat_khau: str) -> dict[str, str] 
     if account.trang_thai != "HOAT_DONG":
         return None
 
+    access_token = create_access_token(str(account.ma_tk or account.ma_nv))
+
     from app.repositories.permission_repository import get_employee_permissions
     emp_perms = get_employee_permissions(db, account.ma_nv)
     effective_perms = emp_perms.get("effective_permissions", []) if emp_perms else []
