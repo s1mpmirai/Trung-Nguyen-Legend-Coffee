@@ -224,6 +224,21 @@ export default function Login({ onLoginSuccess }) {
                 <span>Đăng nhập</span>
               )}
             </button>
+
+            {/* Chuyển hướng sang Cổng Quản lý / Admin */}
+            <div className="mt-3 text-center">
+              <a
+                href="/login-manage"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.history.pushState(null, '', '/login-manage');
+                  window.dispatchEvent(new Event('app-route-change'));
+                }}
+                className="inline-flex items-center space-x-1.5 text-xs font-medium text-slate-500 hover:text-[#0EA5E9] transition-colors py-1.5 px-3 rounded-lg hover:bg-sky-50"
+              >
+                <span>Bạn là Quản lý / Admin? Đăng nhập Cổng Điều Hành →</span>
+              </a>
+            </div>
           </form>
         </div>
 
