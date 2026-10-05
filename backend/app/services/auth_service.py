@@ -61,7 +61,9 @@ def authenticate_user(db: Session, ma_nv: str, mat_khau: str) -> dict[str, str] 
     if account.trang_thai != "HOAT_DONG":
         return None
 
-    access_token = create_access_token(str(account.ma_tk))
+    from app.repositories.permission_repository import get_employee_permissions
+    emp_perms = get_employee_permissions(db, account.ma_nv)
+    effective_perms = emp_perms.get("effective_permissions", []) if emp_perms else []
 
     # BỎ HOÀN TOÀN BẮT BUỘC ĐỔI MẬT KHẨU LẦN ĐẦU THEO YÊU CẦU CỦA USER:
     return {
@@ -69,6 +71,7 @@ def authenticate_user(db: Session, ma_nv: str, mat_khau: str) -> dict[str, str] 
         "token_type": "bearer",
         "ma_nv": account.ma_nv,
         "ma_vai_tro": account.ma_vai_tro,
+        "permissions": effective_perms,
         "must_change_password": False,
     }
 

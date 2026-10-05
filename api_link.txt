@@ -1,7 +1,7 @@
 # ==============================================================================
 # TRUNG NGUYEN LEGEND COFFEE - DANH MỤC API BACKEND (API LINKS)
 # Tự động cập nhật mỗi khi có API mới hoặc thay đổi endpoint
-# Cập nhật lần cuối: 2026-10-04 12:47:00 (UTC+7)
+# Cập nhật lần cuối: 2026-10-05 18:30:00 (UTC+7)
 # ==============================================================================
 
 [AUTH - XÁC THỰC & ĐĂNG NHẬP]
@@ -58,27 +58,9 @@
 - PUT  /api/v1/contracts/{ma_hd}/liquidate  | [Admin/HR] Thanh lý / Kết thúc hợp đồng lao động
 - DELETE /api/v1/contracts/{ma_hd}          | [Admin] Xóa hợp đồng khỏi hệ thống
 
-[SUPPLIERS - NHÀ CUNG CẤP NGUYÊN VẬT LIỆU]
-- GET  /api/v1/suppliers                    | [Admin/QL] Danh sách nhà cung cấp (tìm kiếm, lọc loại hàng, trạng thái hợp tác)
-- GET  /api/v1/suppliers/{ma_ncc}           | [Admin/QL] Chi tiết nhà cung cấp kèm danh sách sản phẩm cung cấp
-- POST /api/v1/suppliers                    | [Admin] Thêm nhà cung cấp mới
-- PUT  /api/v1/suppliers/{ma_ncc}           | [Admin] Cập nhật thông tin nhà cung cấp
-- PUT  /api/v1/suppliers/{ma_ncc}/status    | [Admin] Bật / Tắt trạng thái hợp tác (1: Hoạt động, 0: Ngừng hợp tác)
-- DELETE /api/v1/suppliers/{ma_ncc}         | [Admin] Xóa nhà cung cấp (khi chưa có sản phẩm liên kết)
-
-[PRODUCTS - SẢN PHẨM & KHO HÀNG]
-- GET  /api/v1/products                     | [Admin/QL] Danh sách sản phẩm (tìm kiếm, lọc loại SP, nhà cung cấp, tồn kho, giá)
-- GET  /api/v1/products/categories/list     | [Admin/QL] Danh sách các nhóm loại sản phẩm phục vụ bộ lọc dropdown
-- GET  /api/v1/products/{ma_sp}             | [Admin/QL] Chi tiết sản phẩm kèm thông tin nhà cung cấp & quản lý
-- POST /api/v1/products                     | [Admin] Thêm sản phẩm mới vào kho
-- PUT  /api/v1/products/{ma_sp}             | [Admin] Cập nhật thông tin sản phẩm, giá bán, giá nhập, quy cách
-- PUT  /api/v1/products/{ma_sp}/stock       | [Admin/QL] Nhập kho, xuất kho hoặc điều chỉnh số lượng tồn kho
-- PUT  /api/v1/products/{ma_sp}/status      | [Admin] Bật / Tắt trạng thái kinh doanh (1: Đang bán, 0: Tạm ngưng)
-- DELETE /api/v1/products/{ma_sp}           | [Admin] Xóa sản phẩm khỏi kho hàng
-
-[EMPLOYEES - HỒ SƠ NHÂN SỰ]
+[EMPLOYEES - HỒ SƠ NHÂN SỰ & TÌM KIẾM NÂNG CAO]
 - POST /api/v1/employees/create_employee    | [Admin/QL] Thêm mới hồ sơ nhân sự (tự động tạo đồng thời HĐ khởi tạo)
-- GET  /api/v1/employees/get_employee_list  | [Admin/QL] Lấy danh sách nhân sự (lọc, tìm kiếm, phân trang)
+- GET  /api/v1/employees/get_employee_list  | [Admin/QL] Lấy danh sách nhân sự (tìm kiếm từ khóa q, lọc phòng ban, chức vụ, trạng thái, hình thức LV, giới tính, loại HĐ, khoảng lương, khoảng ngày vào làm, sắp xếp động đa tiêu chí, phân trang)
 - GET  /api/v1/employees/profile/{ma_nv}    | [Admin/QL/NV] Lấy chi tiết hồ sơ cá nhân nhân viên
 - PUT  /api/v1/employees/profile/{ma_nv}    | [Admin/QL] Cập nhật thông tin hồ sơ nhân viên trực tiếp
 - PUT  /api/v1/employees/{ma_nv}/status     | [Admin/QL] Khóa hoặc cập nhật trạng thái làm việc (DA_NGHI_VIEC, TAM_HOAN_HD, DANG_LAM...)

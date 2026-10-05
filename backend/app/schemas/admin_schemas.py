@@ -15,6 +15,12 @@ class RoleDistributionItem(BaseModel):
     so_tai_khoan: int
 
 
+class PositionStatItem(BaseModel):
+    ma_cv: str
+    ten_cv: str
+    so_luong_nv: int
+
+
 class ExpiringContractItem(BaseModel):
     ma_hd: str
     ma_nv: str
@@ -37,8 +43,15 @@ class AdminDashboardStatsResponse(BaseModel):
     tai_khoan_hoat_dong: int = Field(0, description="Số tài khoản đang hoạt động")
     tai_khoan_khoa: int = Field(0, description="Số tài khoản bị khóa")
     nhan_su_chua_co_tai_khoan: int = Field(0, description="Nhân sự chưa được cấp tài khoản")
+
+    # Nhân sự nâng cao: Giới tính & Hình thức làm việc
+    nhan_su_nam: int = Field(0, description="Số nhân sự nam")
+    nhan_su_nu: int = Field(0, description="Số nhân sự nữ")
+    nhan_su_khac: int = Field(0, description="Số nhân sự khác")
+    nhan_su_full_time: int = Field(0, description="Số nhân sự toàn thời gian")
+    nhan_su_part_time: int = Field(0, description="Số nhân sự bán thời gian")
     
-    # Kho & Nhà cung cấp
+    # Kho & Nhà cung cấp (tương thích ngược)
     tong_nha_cung_cap: int = Field(0, description="Tổng số nhà cung cấp")
     ncc_dang_hop_tac: int = Field(0, description="Số NCC đang hợp tác")
     tong_san_pham: int = Field(0, description="Tổng số mặt hàng sản phẩm")
@@ -52,9 +65,11 @@ class AdminDashboardStatsResponse(BaseModel):
     hop_dong_hieu_luc: int = Field(0, description="Số hợp đồng đang hiệu lực")
     hop_dong_sap_het_han_30_ngay: int = Field(0, description="Số hợp đồng sắp hết hạn trong 30 ngày")
 
-    # Phân bố theo phòng ban & vai trò
+    # Phân bố theo phòng ban, chức vụ & vai trò
     phan_bo_phong_ban: list[DepartmentStatItem] = []
+    phan_bo_chuc_vu: list[PositionStatItem] = []
     phan_bo_vai_tro: list[RoleDistributionItem] = []
     danh_sach_hd_sap_het_han: list[ExpiringContractItem] = []
     
     thoi_gian_cap_nhat: Optional[datetime] = None
+

@@ -6,6 +6,7 @@ import {
   Clock,
   CreditCard,
   Shield,
+  ShieldCheck,
   ArrowLeftRight,
   FileBarChart2,
   PanelLeftClose,
@@ -22,6 +23,7 @@ export default function ManagerSidebar({
   collapsed = false,
   onToggleCollapse,
   onClose,
+  userSession,
 }) {
   const sidebarRef = useRef(null);
 
@@ -45,13 +47,46 @@ export default function ManagerSidebar({
     };
   }, [collapsed, onToggleCollapse, onClose]);
 
-  const navItems = [
+  const userRole = String(userSession?.role || localStorage.getItem("user_role") || "").toUpperCase();
+  const userPerms = userSession?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
+  const isSuperAdminOrManager = userRole === "ADMIN" || userRole === "QUAN_LY";
+  const isLeader = userRole === "TRUONG_NHOM";
+
+  const allNavItems = [
     { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
-    { id: "employees", label: "Quản lý nhân sự", icon: Users },
-    { id: "leaves", label: "Duyệt đơn", icon: ClipboardCheck },
-    { id: "attendance", label: "Chấm công & Ca làm", icon: Clock },
-    { id: "payroll", label: "Bảng tính lương", icon: CreditCard },
+    {
+      id: "employees",
+      label: "Quản lý nhân sự",
+      icon: Users,
+      allowed: isSuperAdminOrManager || isLeader || userPerms.includes("EMPLOYEE_VIEW"),
+    },
+    {
+      id: "leaves",
+      label: "Duyệt đơn",
+      icon: ClipboardCheck,
+      allowed: isSuperAdminOrManager || isLeader || userPerms.includes("LEAVE_APPROVE"),
+    },
+    {
+      id: "attendance",
+      label: "Chấm công & Ca làm",
+      icon: Clock,
+      allowed: isSuperAdminOrManager || isLeader || userPerms.includes("ATTENDANCE_MANAGE"),
+    },
+    {
+      id: "payroll",
+      label: "Bảng tính lương",
+      icon: CreditCard,
+      allowed: isSuperAdminOrManager || isLeader || userPerms.includes("PAYROLL_MANAGE") || userPerms.includes("PAYROLL_VIEW"),
+    },
+    {
+      id: "permissions",
+      label: "Cấp quyền sử dụng web",
+      icon: ShieldCheck,
+      allowed: isSuperAdminOrManager || userPerms.includes("PERMISSION_ASSIGN"),
+    },
   ];
+
+  const navItems = allNavItems.filter((item) => item.allowed === undefined || item.allowed);
 
   return (
     <aside

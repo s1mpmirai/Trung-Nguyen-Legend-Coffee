@@ -105,22 +105,87 @@ def get_employee_list(
     db: Session,
     page: int = 1,
     page_size: int = 50,
+    q: str | None = None,
+    ma_pb: str | None = None,
+    ma_cv: str | None = None,
+    trang_thai: str | None = None,
+    hinh_thuc_lam_viec: str | None = None,
+    gioi_tinh: str | None = None,
+    loai_hd: str | None = None,
+    luong_tu: float | None = None,
+    luong_den: float | None = None,
+    ngay_vao_tu: str | None = None,
+    ngay_vao_den: str | None = None,
+    sort_by: str = "ma_nv",
+    sort_order: str = "asc",
 ) -> dict:
+    page = max(1, page or 1)
+    page_size = max(1, min(200, page_size or 50))
     offset = (page - 1) * page_size
 
-    total = db.execute(text("SELECT COUNT(*) FROM nhan_vien")).scalar() or 0
+    conditions = []
+    params: dict = {}
 
-    query = """
-        SELECT 
-            nv.ma_nv, nv.ho_ten, nv.ngay_sinh, nv.gioi_tinh, nv.cccd, nv.dia_chi, nv.sdt, nv.email,
-            nv.so_nguoi_pt, nv.ma_pb, nv.ma_cv, nv.ngay_nghi_viec,
-            nv.trang_thai, COALESCE(nv.hinh_thuc_lam_viec, 'FULL_TIME') AS hinh_thuc_lam_viec,
-            hd.ngay_bat_dau AS ngay_vao_lam,
-            hd.so_tai_khoan,
-            hd.ngan_hang,
-            hd.ma_so_thue,
-            hd.so_bhxh
+    if q and q.strip():
+        search_term = f"%{q.strip()}%"
+        conditions.append(
+            "(nv.ma_nv LIKE :q OR nv.ho_ten LIKE :q OR nv.email LIKE :q OR nv.sdt LIKE :q OR nv.cccd LIKE :q)"
+        )
+        params["q"] = search_term
+
+    if ma_pb and ma_pb.strip():
+        conditions.append("nv.ma_pb = :ma_pb")
+        params["ma_pb"] = ma_pb.strip()
+
+    if ma_cv and ma_cv.strip():
+        conditions.append("nv.ma_cv = :ma_cv")
+        params["ma_cv"] = ma_cv.strip()
+
+    if trang_thai and trang_thai.strip():
+        conditions.append("nv.trang_thai = :trang_thai")
+        params["trang_thai"] = trang_thai.strip()
+
+    if hinh_thuc_lam_viec and hinh_thuc_lam_viec.strip():
+        conditions.append("nv.hinh_thuc_lam_viec = :hinh_thuc_lam_viec")
+        params["hinh_thuc_lam_viec"] = hinh_thuc_lam_viec.strip()
+
+    if gioi_tinh and gioi_tinh.strip():
+        gt = gioi_tinh.strip()
+        if gt in ["Nữ", "Nu", "nu", "FEMALE", "Female"]:
+            gt = "Nu"
+        elif gt in ["Nam", "nam", "MALE", "Male"]:
+            gt = "Nam"
+        conditions.append("nv.gioi_tinh = :gioi_tinh")
+        params["gioi_tinh"] = gt
+
+    if loai_hd and loai_hd.strip():
+        conditions.append("hd.loai_hd = :loai_hd")
+        params["loai_hd"] = loai_hd.strip()
+
+    if luong_tu is not None:
+        conditions.append("hd.luong_co_ban >= :luong_tu")
+        params["luong_tu"] = luong_tu
+
+    if luong_den is not None:
+        conditions.append("hd.luong_co_ban <= :luong_den")
+        params["luong_den"] = luong_den
+
+    if ngay_vao_tu and ngay_vao_tu.strip():
+        conditions.append("hd.ngay_bat_dau >= :ngay_vao_tu")
+        params["ngay_vao_tu"] = ngay_vao_tu.strip()
+
+    if ngay_vao_den and ngay_vao_den.strip():
+        conditions.append("hd.ngay_bat_dau <= :ngay_vao_den")
+        params["ngay_vao_den"] = ngay_vao_den.strip()
+
+    where_clause = ""
+    if conditions:
+        where_clause = "WHERE " + " AND ".join(conditions)
+
+    from_joins = """
         FROM nhan_vien nv
+        LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
+        LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
         LEFT JOIN (
             SELECT hd1.*
             FROM hop_dong_lao_dong hd1
@@ -130,20 +195,67 @@ def get_employee_list(
                 GROUP BY ma_nv
             ) latest ON hd1.ma_nv = latest.ma_nv AND hd1.ngay_bat_dau = latest.max_ngay
         ) hd ON hd.ma_nv = nv.ma_nv
-        ORDER BY nv.ma_nv ASC
+        LEFT JOIN (
+            SELECT bc1.ma_nv, bc1.trinh_do, bc1.chuyen_nganh, bc1.noi_dao_tao, bc1.nam_tot_nghiep
+            FROM bang_cap bc1
+            INNER JOIN (
+                SELECT ma_nv, MAX(ma_bc) AS max_bc
+                FROM bang_cap
+                GROUP BY ma_nv
+            ) latest_bc ON bc1.ma_bc = latest_bc.max_bc
+        ) bc ON bc.ma_nv = nv.ma_nv
+    """
+
+    count_query = f"SELECT COUNT(*) {from_joins} {where_clause}"
+    total = db.execute(text(count_query), params).scalar() or 0
+
+    sort_column_map = {
+        "ma_nv": "nv.ma_nv",
+        "ho_ten": "nv.ho_ten",
+        "ngay_sinh": "nv.ngay_sinh",
+        "ngay_vao_lam": "hd.ngay_bat_dau",
+        "luong_co_ban": "hd.luong_co_ban",
+        "muc_luong": "hd.luong_co_ban",
+        "ten_pb": "pb.ten_pb",
+        "ten_cv": "cv.ten_cv",
+        "trang_thai": "nv.trang_thai",
+    }
+    col = sort_column_map.get(sort_by.lower() if sort_by else "ma_nv", "nv.ma_nv")
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_clause = f"ORDER BY {col} {order}, nv.ma_nv ASC"
+
+    data_params = dict(params)
+    data_params["limit"] = page_size
+    data_params["offset"] = offset
+
+    data_query = f"""
+        SELECT 
+            nv.ma_nv, nv.ho_ten, nv.ngay_sinh, nv.gioi_tinh, nv.cccd, nv.dia_chi, nv.sdt, nv.email,
+            nv.so_nguoi_pt, nv.ma_pb, pb.ten_pb, nv.ma_cv, cv.ten_cv, nv.ma_bac, nv.ma_nql,
+            nv.ngay_nghi_viec, nv.trang_thai, COALESCE(nv.hinh_thuc_lam_viec, 'FULL_TIME') AS hinh_thuc_lam_viec,
+            nv.ngay_tao, nv.ngay_cap_nhat,
+            hd.ma_hd, hd.loai_hd,
+            hd.ngay_bat_dau AS ngay_vao_lam,
+            hd.ngay_ket_thuc,
+            hd.luong_co_ban AS muc_luong,
+            hd.so_tai_khoan, hd.ngan_hang, hd.ma_so_thue, hd.so_bhxh,
+            bc.trinh_do, bc.chuyen_nganh, bc.noi_dao_tao, bc.nam_tot_nghiep
+        {from_joins}
+        {where_clause}
+        {order_clause}
         LIMIT :limit OFFSET :offset
     """
-    rows = db.execute(
-        text(query),
-        {
-            "limit": page_size,
-            "offset": offset,
-        },
-    ).mappings().all()
+
+    rows = db.execute(text(data_query), data_params).mappings().all()
+
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
 
     return {
         "total": total,
-        "items": [dict(row) for row in rows]
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+        "items": [dict(row) for row in rows],
     }
 
 

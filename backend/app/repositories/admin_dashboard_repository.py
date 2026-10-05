@@ -51,32 +51,45 @@ def get_admin_dashboard_stats(db: Session) -> dict:
         WHERE tk.ma_nv IS NULL AND nv.trang_thai = 'DANG_LAM'
     """)).scalar() or 0
 
-    # 4. Thống kê nhà cung cấp & kho sản phẩm
-    ncc_stats = db.execute(text("""
+    # 4. Thống kê nhân sự nâng cao: Giới tính & Hình thức làm việc
+    hr_demo = db.execute(text("""
         SELECT 
-            COUNT(*) AS tong_ncc,
-            SUM(CASE WHEN trang_thai = 1 THEN 1 ELSE 0 END) AS dang_hop_tac
-        FROM nha_cung_cap
+            SUM(CASE WHEN gioi_tinh = 'Nam' THEN 1 ELSE 0 END) AS so_nam,
+            SUM(CASE WHEN gioi_tinh = 'Nu' THEN 1 ELSE 0 END) AS so_nu,
+            SUM(CASE WHEN gioi_tinh = 'Khac' THEN 1 ELSE 0 END) AS so_khac,
+            SUM(CASE WHEN hinh_thuc_lam_viec = 'FULL_TIME' THEN 1 ELSE 0 END) AS so_full_time,
+            SUM(CASE WHEN hinh_thuc_lam_viec = 'PART_TIME' THEN 1 ELSE 0 END) AS so_part_time
+        FROM nhan_vien
+        WHERE trang_thai = 'DANG_LAM'
     """)).mappings().first()
 
-    tong_nha_cung_cap = ncc_stats["tong_ncc"] or 0
-    ncc_dang_hop_tac = ncc_stats["dang_hop_tac"] or 0
+    nhan_su_nam = hr_demo["so_nam"] or 0
+    nhan_su_nu = hr_demo["so_nu"] or 0
+    nhan_su_khac = hr_demo["so_khac"] or 0
+    nhan_su_full_time = hr_demo["so_full_time"] or 0
+    nhan_su_part_time = hr_demo["so_part_time"] or 0
 
-    sp_stats = db.execute(text("""
+    # Phân bố nhân sự theo chức vụ
+    pos_rows = db.execute(text("""
         SELECT 
-            COUNT(*) AS tong_sp,
-            SUM(CASE WHEN trang_thai = 1 THEN 1 ELSE 0 END) AS dang_ban,
-            COALESCE(SUM(ton_kho), 0) AS tong_ton,
-            COALESCE(SUM(ton_kho * gia_nhap), 0) AS tong_gia_tri,
-            SUM(CASE WHEN ton_kho < 500 THEN 1 ELSE 0 END) AS canh_bao_ton_it
-        FROM san_pham
-    """)).mappings().first()
+            cv.ma_cv,
+            cv.ten_cv,
+            COUNT(nv.ma_nv) AS so_luong_nv
+        FROM chuc_vu cv
+        LEFT JOIN nhan_vien nv ON cv.ma_cv = nv.ma_cv AND nv.trang_thai = 'DANG_LAM'
+        GROUP BY cv.ma_cv, cv.ten_cv
+        ORDER BY so_luong_nv DESC, cv.ma_cv ASC
+    """)).mappings().all()
+    phan_bo_chuc_vu = [dict(r) for r in pos_rows]
 
-    tong_san_pham = sp_stats["tong_sp"] or 0
-    san_pham_dang_ban = sp_stats["dang_ban"] or 0
-    tong_so_luong_ton_kho = sp_stats["tong_ton"] or 0
-    tong_gia_tri_kho = float(sp_stats["tong_gia_tri"] or 0)
-    san_pham_canh_bao_ton_it = sp_stats["canh_bao_ton_it"] or 0
+    # Các giá trị mặc định cho module sản phẩm / nhà cung cấp đã loại bỏ
+    tong_nha_cung_cap = 0
+    ncc_dang_hop_tac = 0
+    tong_san_pham = 0
+    san_pham_dang_ban = 0
+    tong_so_luong_ton_kho = 0
+    tong_gia_tri_kho = 0.0
+    san_pham_canh_bao_ton_it = 0
 
     # 5. Thống kê hợp đồng
     hd_stats = db.execute(text("""
@@ -160,7 +173,13 @@ def get_admin_dashboard_stats(db: Session) -> dict:
         "tong_hop_dong": tong_hop_dong,
         "hop_dong_hieu_luc": hop_dong_hieu_luc,
         "hop_dong_sap_het_han_30_ngay": hop_dong_sap_het_han_30_ngay,
+        "nhan_su_nam": nhan_su_nam,
+        "nhan_su_nu": nhan_su_nu,
+        "nhan_su_khac": nhan_su_khac,
+        "nhan_su_full_time": nhan_su_full_time,
+        "nhan_su_part_time": nhan_su_part_time,
         "phan_bo_phong_ban": phan_bo_phong_ban,
+        "phan_bo_chuc_vu": phan_bo_chuc_vu,
         "phan_bo_vai_tro": phan_bo_vai_tro,
         "danh_sach_hd_sap_het_han": danh_sach_hd_sap_het_han,
         "thoi_gian_cap_nhat": now_vn,

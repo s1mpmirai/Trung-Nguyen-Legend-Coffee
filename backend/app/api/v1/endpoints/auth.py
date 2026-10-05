@@ -43,14 +43,29 @@ def management_login(
         raise HTTPException(status_code=401, detail="Mã tài khoản hoặc mật khẩu không chính xác")
 
     role = str(user.get("ma_vai_tro") or "").upper()
-    if role == "NHAN_VIEN":
+    perms = user.get("permissions") or []
+    has_mgmt_perm = any(
+        p in perms
+        for p in (
+            "ACCOUNT_MANAGE",
+            "PERMISSION_ASSIGN",
+            "ATTENDANCE_MANAGE",
+            "LEAVE_APPROVE",
+            "PAYROLL_MANAGE",
+            "EMPLOYEE_VIEW",
+            "EMPLOYEE_CREATE",
+            "EMPLOYEE_UPDATE",
+        )
+    )
+
+    if role == "NHAN_VIEN" and not has_mgmt_perm:
         raise HTTPException(
             status_code=403,
             detail="Tài khoản Nhân viên vui lòng đăng nhập tại Cổng Nhân Viên (/login)"
         )
 
-    if role not in {"ADMIN", "QUAN_LY", "TRUONG_NHOM"}:
-        raise HTTPException(status_code=403, detail="Tài khoản không có quyền Quản lý")
+    if role not in {"ADMIN", "QUAN_LY", "TRUONG_NHOM"} and not has_mgmt_perm:
+        raise HTTPException(status_code=403, detail="Tài khoản không có quyền Quản lý hoặc Quản trị chức năng")
 
     return user
 

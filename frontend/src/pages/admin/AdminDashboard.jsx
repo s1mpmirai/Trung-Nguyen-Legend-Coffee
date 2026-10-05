@@ -7,7 +7,6 @@ import AdminPermissionsTab from "./tabs/AdminPermissionsTab";
 import AdminDepartmentsTab from "./tabs/AdminDepartmentsTab";
 import AdminPositionsTab from "./tabs/AdminPositionsTab";
 import AdminContractsTab from "./tabs/AdminContractsTab";
-import AdminWarehouseTab from "./tabs/AdminWarehouseTab";
 import EmployeeManagement from "../manager/EmployeeManagement";
 
 export default function AdminDashboard({
@@ -16,13 +15,24 @@ export default function AdminDashboard({
   onSwitchToManager,
   onSwitchToEmployee,
 }) {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const rawRole = userSession?.role || localStorage.getItem("user_role") || "";
+  const isAdmin = rawRole.toUpperCase() === "ADMIN" || userSession?.ma_nv === "NV01";
+  const userPerms = userSession?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
+
+  // Nếu là NV IT có quyền ACCOUNT_MANAGE nhưng không phải Admin tối cao -> mặc định mở Quản lý tài khoản
+  const [activeTab, setActiveTab] = useState(() => {
+    if (!isAdmin && userPerms.includes("ACCOUNT_MANAGE")) {
+      return "accounts";
+    }
+    return "dashboard";
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 antialiased font-['Be_Vietnam_Pro',sans-serif] selection:bg-sky-100 selection:text-sky-900">
       {/* ───────────────── LEFT SIDEBAR ───────────────── */}
       <AdminSidebar
+        userSession={userSession}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onSwitchToManager={onSwitchToManager}
@@ -65,9 +75,6 @@ export default function AdminDashboard({
 
             {/* 7. TAB: Quản lý nhân sự */}
             {activeTab === "employees" && <EmployeeManagement />}
-
-            {/* 8. TAB: Kho & Nhà cung cấp */}
-            {activeTab === "warehouse" && <AdminWarehouseTab />}
           </div>
         </main>
       </div>

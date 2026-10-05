@@ -50,8 +50,39 @@ def create_employee(
 def get_employee_list(
     db: DbSession,
     page: int = Query(1, ge=1, description="Số trang (bắt đầu từ 1)"),
+    page_size: int = Query(50, ge=1, le=200, description="Số lượng nhân viên trên mỗi trang"),
+    q: Optional[str] = Query(None, description="Từ khóa tìm kiếm (mã NV, họ tên, email, sđt, CCCD)"),
+    ma_pb: Optional[str] = Query(None, description="Lọc theo mã phòng ban"),
+    ma_cv: Optional[str] = Query(None, description="Lọc theo mã chức vụ"),
+    trang_thai: Optional[str] = Query(None, description="Lọc theo trạng thái làm việc (DANG_LAM, NGHI_PHEP, DA_NGHI_VIEC...)"),
+    hinh_thuc_lam_viec: Optional[str] = Query(None, description="Lọc theo hình thức làm việc (FULL_TIME, PART_TIME)"),
+    gioi_tinh: Optional[str] = Query(None, description="Lọc theo giới tính (Nam, Nu, Khac)"),
+    loai_hd: Optional[str] = Query(None, description="Lọc theo loại hợp đồng (THU_VIEC, XAC_DINH_1_NAM...)"),
+    luong_tu: Optional[float] = Query(None, ge=0, description="Mức lương cơ bản từ (VNĐ)"),
+    luong_den: Optional[float] = Query(None, ge=0, description="Mức lương cơ bản đến (VNĐ)"),
+    ngay_vao_tu: Optional[str] = Query(None, description="Ngày vào làm từ (YYYY-MM-DD)"),
+    ngay_vao_den: Optional[str] = Query(None, description="Ngày vào làm đến (YYYY-MM-DD)"),
+    sort_by: Optional[str] = Query("ma_nv", description="Trường sắp xếp: ma_nv, ho_ten, ngay_vao_lam, luong_co_ban, ten_pb, ten_cv, trang_thai"),
+    sort_order: Optional[str] = Query("asc", description="Thứ tự sắp xếp: asc hoặc desc"),
 ):
-    return employee_list(db, page)
+    return employee_list(
+        db=db,
+        page=page,
+        page_size=page_size,
+        q=q,
+        ma_pb=ma_pb,
+        ma_cv=ma_cv,
+        trang_thai=trang_thai,
+        hinh_thuc_lam_viec=hinh_thuc_lam_viec,
+        gioi_tinh=gioi_tinh,
+        loai_hd=loai_hd,
+        luong_tu=luong_tu,
+        luong_den=luong_den,
+        ngay_vao_tu=ngay_vao_tu,
+        ngay_vao_den=ngay_vao_den,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
 
 @router.get("/profile/{ma_nv}", response_model=employee_detail_response)
 def get_profile(

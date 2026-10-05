@@ -23,6 +23,7 @@ import {
   assignRoleToEmployee,
   getEmployeePermissions,
   getAccountsList,
+  updateCustomPermissions,
 } from "../../../services/adminService";
 
 // ────────────────── BẢNG DỊCH QUYỀN HẠN SANG TIẾNG VIỆT TỰ NHIÊN DỄ HIỂU ──────────────────
@@ -244,6 +245,10 @@ export default function AdminPermissionsTab() {
     }
   };
 
+  // Cấp quyền riêng cho tài khoản
+  const [customPermsState, setCustomPermsState] = useState({});
+  const [isSavingCustomPerms, setIsSavingCustomPerms] = useState(false);
+
   const handleInspectSubmit = async (e, forcedId) => {
     if (e) e.preventDefault();
     const targetId = forcedId || inspectEmployeeId;
@@ -253,11 +258,73 @@ export default function AdminPermissionsTab() {
     try {
       const res = await getEmployeePermissions(targetId);
       setInspectResult(res);
+
+      const effective = res?.effective_permissions || [];
+      const initCustom = {};
+      [
+        "ACCOUNT_MANAGE",
+        "PERMISSION_ASSIGN",
+        "EMPLOYEE_VIEW",
+        "EMPLOYEE_CREATE",
+        "EMPLOYEE_UPDATE",
+        "EMPLOYEE_DELETE",
+      ].forEach((pk) => {
+        initCustom[pk] = effective.includes(pk);
+      });
+      setCustomPermsState(initCustom);
     } catch (err) {
       showToast(err.message || `Không tìm thấy quyền của nhân sự ${targetId}`, "error");
       setInspectResult(null);
     } finally {
       setInspectLoading(false);
+    }
+  };
+
+  const handleToggleCustomPerm = (maQuyen) => {
+    setCustomPermsState((prev) => ({
+      ...prev,
+      [maQuyen]: !prev[maQuyen],
+    }));
+  };
+
+  const handlePresetITAccount = () => {
+    setCustomPermsState((prev) => ({
+      ...prev,
+      ACCOUNT_MANAGE: true,
+    }));
+    showToast("Đã kích hoạt thiết lập: Cấp quyền Quản lý Tài khoản (ACCOUNT_MANAGE) cho nhân viên IT!", "info");
+  };
+
+  const handleSaveCustomPermissions = async () => {
+    if (!inspectResult?.ma_nv) return;
+    setIsSavingCustomPerms(true);
+    try {
+      const rolePerms = inspectResult.vai_tro_quyen || [];
+      const batch = [];
+      Object.keys(customPermsState).forEach((pk) => {
+        const isChecked = Boolean(customPermsState[pk]);
+        const inRole = rolePerms.includes(pk);
+        if (isChecked && !inRole) {
+          batch.push({ ma_quyen: pk, duoc_cap: true });
+        } else if (!isChecked && inRole) {
+          batch.push({ ma_quyen: pk, duoc_cap: false });
+        } else if (isChecked && inRole && (inspectResult.custom_quyen_thu_hoi || []).includes(pk)) {
+          batch.push({ ma_quyen: pk, duoc_cap: true });
+        }
+      });
+      if (batch.length === 0) {
+        showToast("Không có thay đổi nào so với quyền hiện tại.", "info");
+        setIsSavingCustomPerms(false);
+        return;
+      }
+      await updateCustomPermissions(inspectResult.ma_nv, { permissions: batch });
+      showToast(`Đã lưu thiết lập quyền tài khoản cho ${inspectResult.ho_ten} (${inspectResult.ma_nv})!`);
+      await handleInspectSubmit(null, inspectResult.ma_nv);
+      await loadEmployeeList();
+    } catch (err) {
+      showToast(err.message || "Lưu quyền tài khoản thất bại", "error");
+    } finally {
+      setIsSavingCustomPerms(false);
     }
   };
 
@@ -543,11 +610,24 @@ export default function AdminPermissionsTab() {
                   </span>
                 </div>
 
+                {/* Danh sách quyền hiệu lực hiện tại */}
                 <div>
-                  <span className="font-semibold text-slate-700">
-                    Quyền hạn có hiệu lực ({((inspectResult.effective_permissions || inspectResult.quyen_hieu_luc) || []).length}/16 quyền):
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2 max-h-48 overflow-y-auto pr-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700">
+                      Quyền hạn có hiệu lực ({((inspectResult.effective_permissions || inspectResult.quyen_hieu_luc) || []).length}/16 quyền):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handlePresetITAccount}
+                      className="px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-[10px] font-bold transition cursor-pointer flex items-center gap-1"
+                      title="Tự động bật quyền Quản lý tài khoản cho nhân viên IT"
+                    >
+                      <Sparkles size={11} />
+                      <span>Cấp quyền IT Quản lý Tài khoản (ACCOUNT_MANAGE)</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2 max-h-36 overflow-y-auto pr-1">
                     {((inspectResult.effective_permissions || inspectResult.quyen_hieu_luc) || []).map((q) => {
                       const pInfo = PERMISSION_MAP[q] || { label: q, group: "Chung" };
                       return (
@@ -562,6 +642,111 @@ export default function AdminPermissionsTab() {
                           <span className="text-[9px] font-semibold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100 shrink-0 ml-1">
                             {pInfo.group}
                           </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* KHỐI CẤP QUYỀN RIÊNG CHO TÀI KHOẢN (FINE-GRAINED PERMISSIONS) */}
+                <div className="pt-3 border-t border-slate-200 mt-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="font-bold text-slate-900 text-xs">
+                        Thiết lập Quyền riêng cho Tài khoản
+                      </span>
+                      <p className="text-[10px] text-slate-500">
+                        Admin cấp quyền Thêm/sửa account cho IT hoặc phân quyền nhân sự
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSaveCustomPermissions}
+                      disabled={isSavingCustomPerms}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                    >
+                      {isSavingCustomPerms ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin" />
+                          <span>Đang lưu...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={13} />
+                          <span>Lưu quyền tài khoản</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                    {[
+                      {
+                        key: "ACCOUNT_MANAGE",
+                        label: "Quản lý & Cấp tài khoản (IT Admin)",
+                        desc: "Thêm, khóa, cấp quyền account người dùng",
+                        highlight: true,
+                      },
+                      {
+                        key: "PERMISSION_ASSIGN",
+                        label: "Cấp quyền & Bổ nhiệm vai trò",
+                        desc: "Thăng chức và điều chỉnh ma trận quyền",
+                      },
+                      {
+                        key: "EMPLOYEE_VIEW",
+                        label: "Xem danh sách nhân sự",
+                        desc: "Tra cứu danh bạ và hồ sơ nhân viên",
+                      },
+                      {
+                        key: "EMPLOYEE_CREATE",
+                        label: "Thêm nhân sự mới",
+                        desc: "Tạo mới hồ sơ nhân sự vào hệ thống",
+                      },
+                      {
+                        key: "EMPLOYEE_UPDATE",
+                        label: "Cập nhật hồ sơ nhân sự",
+                        desc: "Chỉnh sửa chức vụ, phòng ban, liên hệ",
+                      },
+                      {
+                        key: "EMPLOYEE_DELETE",
+                        label: "Xóa / Cho thôi việc nhân sự",
+                        desc: "Khóa hoặc xóa hồ sơ nhân sự",
+                      },
+                    ].map((item) => {
+                      const isChecked = Boolean(customPermsState[item.key]);
+                      return (
+                        <div
+                          key={item.key}
+                          onClick={() => handleToggleCustomPerm(item.key)}
+                          className={`p-2.5 rounded-xl border text-[11px] cursor-pointer transition select-none flex items-start justify-between gap-2 ${
+                            isChecked
+                              ? item.highlight
+                                ? "bg-purple-50/70 border-purple-300 shadow-2xs"
+                                : "bg-sky-50/70 border-sky-300 shadow-2xs"
+                              : "bg-white border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="truncate">
+                            <div className="font-bold text-slate-900 truncate flex items-center gap-1">
+                              {item.label}
+                              {item.highlight && (
+                                <span className="px-1 py-0.2 bg-purple-100 text-purple-700 rounded text-[9px]">
+                                  IT
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                              {item.desc}
+                            </div>
+                          </div>
+
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {}}
+                            className="mt-0.5 rounded text-sky-600 focus:ring-sky-500 cursor-pointer shrink-0"
+                          />
                         </div>
                       );
                     })}

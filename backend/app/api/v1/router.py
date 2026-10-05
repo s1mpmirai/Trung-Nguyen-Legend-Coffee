@@ -12,8 +12,6 @@ from app.api.v1.endpoints import (
     payroll,
     permissions,
     positions,
-    products,
-    suppliers,
 )
 
 api_router = APIRouter()
@@ -24,8 +22,6 @@ api_router.include_router(employees.router, prefix="/employees", tags=["employee
 api_router.include_router(leaves.router, prefix="/leaves", tags=["leaves"])
 api_router.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
 api_router.include_router(payroll.router, prefix="/payroll", tags=["payroll"])
-api_router.include_router(products.router, prefix="/products", tags=["products"])
-api_router.include_router(suppliers.router, prefix="/suppliers", tags=["suppliers"])
 api_router.include_router(departments.router, prefix="/departments", tags=["departments"])
 api_router.include_router(positions.router, prefix="/positions", tags=["positions"])
 api_router.include_router(contracts.router, prefix="/contracts", tags=["contracts"])

@@ -45,8 +45,39 @@ def create_employee(db: Session, data: employee_profile_create) -> dict:
 def employee_list(
     db: Session,
     page: int = 1,
+    page_size: int = 50,
+    q: str | None = None,
+    ma_pb: str | None = None,
+    ma_cv: str | None = None,
+    trang_thai: str | None = None,
+    hinh_thuc_lam_viec: str | None = None,
+    gioi_tinh: str | None = None,
+    loai_hd: str | None = None,
+    luong_tu: float | None = None,
+    luong_den: float | None = None,
+    ngay_vao_tu: str | None = None,
+    ngay_vao_den: str | None = None,
+    sort_by: str = "ma_nv",
+    sort_order: str = "asc",
 ) -> dict:
-    return get_employee_list(db, page)
+    return get_employee_list(
+        db=db,
+        page=page,
+        page_size=page_size,
+        q=q,
+        ma_pb=ma_pb,
+        ma_cv=ma_cv,
+        trang_thai=trang_thai,
+        hinh_thuc_lam_viec=hinh_thuc_lam_viec,
+        gioi_tinh=gioi_tinh,
+        loai_hd=loai_hd,
+        luong_tu=luong_tu,
+        luong_den=luong_den,
+        ngay_vao_tu=ngay_vao_tu,
+        ngay_vao_den=ngay_vao_den,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
 
 def get_employee_profile(db: Session, ma_nv: str) -> dict:
     profile = get_by_ma_nv(db, ma_nv)

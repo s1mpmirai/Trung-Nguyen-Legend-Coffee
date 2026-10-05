@@ -66,6 +66,9 @@ export default function Login({ onLoginSuccess }) {
       localStorage.setItem('user_ma_nv', data.ma_nv);
       localStorage.setItem('ma_nv', data.ma_nv);
       localStorage.setItem('auth_portal', 'employee');
+      if (data.permissions) {
+        localStorage.setItem('user_permissions', JSON.stringify(data.permissions));
+      }
       if (data.access_token) {
         localStorage.setItem('auth_token', data.access_token);
         localStorage.setItem('access_token', data.access_token);
@@ -77,6 +80,7 @@ export default function Login({ onLoginSuccess }) {
           ma_nv: data.ma_nv,
           token: data.access_token,
           role: role,
+          permissions: data.permissions || [],
           must_change_password: Boolean(data.must_change_password),
         }, 'employee');
       }

@@ -1,7 +1,7 @@
 -- =================================================================================
 -- HỆ THỐNG QUẢN LÝ NHÂN SỰ TRUNG NGUYÊN COFFEE (HRM LITE - CHUẨN HÓA 3NF)
 -- HQTCSDL: MySQL 8.0+ / MariaDB 10.6+
--- ĐÃ ĐỒNG BỘ ĐẦY ĐỦ ngay_tao & ngay_cap_nhat TRÊN TẤT CẢ 19 BẢNG
+-- ĐÃ ĐỒNG BỘ ĐẦY ĐỦ ngay_tao & ngay_cap_nhat TRÊN TẤT CẢ 16 BẢNG
 -- =================================================================================
 
 SET NAMES utf8mb4;
@@ -12,7 +12,7 @@ CREATE DATABASE trungnguyen_hrm_lite CHARACTER SET utf8mb4 COLLATE utf8mb4_unico
 USE trungnguyen_hrm_lite;
 
 -- =====================================================================
--- PHẦN 1: CẤU TRÚC CƠ SỞ DỮ LIỆU (DDL - 18 BẢNG)
+-- PHẦN 1: CẤU TRÚC CƠ SỞ DỮ LIỆU (DDL - 16 BẢNG)
 -- =====================================================================
 
 -- 1. Phòng ban
@@ -310,44 +310,6 @@ CREATE TABLE tai_khoan_quyen (
     CONSTRAINT fk_tkq_quyen FOREIGN KEY (ma_quyen) REFERENCES quyen(ma_quyen) ON UPDATE CASCADE ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 17. Nhà cung cấp
-CREATE TABLE nha_cung_cap (
-    ma_ncc VARCHAR(10) PRIMARY KEY,
-    ten_ncc VARCHAR(180) NOT NULL,
-    dia_chi VARCHAR(255),
-    tinh_thanh VARCHAR(80),
-    sdt VARCHAR(20),
-    email VARCHAR(100),
-    nguoi_lien_he VARCHAR(100),
-    loai_hang VARCHAR(100),
-    ma_nv_phu_trach VARCHAR(10) NULL,
-    trang_thai TINYINT(1) NOT NULL DEFAULT 1,
-    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_ncc_nhanvien FOREIGN KEY (ma_nv_phu_trach) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL
-) ENGINE=InnoDB COMMENT='Nhà cung cấp nguyên vật liệu';
-
--- 18. Sản phẩm
-CREATE TABLE san_pham (
-    ma_sp VARCHAR(15) PRIMARY KEY,
-    ten_sp VARCHAR(180) NOT NULL,
-    loai_sp VARCHAR(50) NOT NULL,
-    ma_ncc VARCHAR(10) NULL,
-    ma_nv_quan_ly VARCHAR(10) NULL,
-    don_vi_tinh VARCHAR(20) NOT NULL DEFAULT 'Hộp',
-    quy_cach VARCHAR(80),
-    gia_nhap DECIMAL(12,0) NOT NULL DEFAULT 0,
-    gia_ban DECIMAL(12,0) NOT NULL DEFAULT 0,
-    ton_kho INT NOT NULL DEFAULT 0,
-    mo_ta VARCHAR(500),
-    trang_thai TINYINT(1) NOT NULL DEFAULT 1,
-    ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sp_ncc FOREIGN KEY (ma_ncc) REFERENCES nha_cung_cap(ma_ncc) ON UPDATE CASCADE ON DELETE SET NULL,
-    CONSTRAINT fk_sp_nhanvien FOREIGN KEY (ma_nv_quan_ly) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL,
-    CONSTRAINT ck_sp_gia CHECK (gia_ban >= 0 AND gia_nhap >= 0)
-) ENGINE=InnoDB COMMENT='Sản phẩm cà phê Trung Nguyên';
-
 -- Khóa ngoại vòng
 ALTER TABLE phong_ban
 ADD CONSTRAINT fk_pb_truong_pb 
@@ -549,22 +511,20 @@ INSERT INTO quyen (ma_quyen, ten_quyen, nhom_quyen, mo_ta) VALUES
 ('ATTENDANCE_MANAGE', 'Quản lý chấm công',   'CHAM_CONG',  'Xem và cập nhật chấm công'),
 ('PAYROLL_VIEW',      'Xem bảng lương',      'LUONG',      'Xem bảng lương cá nhân hoặc nhân sự'),
 ('PAYROLL_MANAGE',    'Tính và duyệt lương', 'LUONG',      'Tính, cập nhật và duyệt bảng lương'),
-('PRODUCT_VIEW',      'Xem sản phẩm',        'KHO',        'Xem, tìm kiếm và lọc sản phẩm'),
-('PRODUCT_MANAGE',    'Quản lý sản phẩm',    'KHO',        'Thêm, sửa và xóa sản phẩm'),
-('SUPPLIER_VIEW',     'Xem nhà cung cấp',    'KHO',        'Xem, tìm kiếm và lọc nhà cung cấp'),
-('SUPPLIER_MANAGE',   'Quản lý nhà cung cấp','KHO',        'Thêm, sửa và xóa nhà cung cấp'),
 ('ACCOUNT_MANAGE',    'Quản lý tài khoản',   'PHAN_QUYEN', 'Thêm, khóa, mở khóa tài khoản'),
 ('PERMISSION_ASSIGN', 'Cấp quyền tài khoản', 'PHAN_QUYEN', 'Gán hoặc thu hồi quyền cho tài khoản');
 
 -- 14. Phân quyền theo vai trò
-INSERT INTO vai_tro_quyen (ma_vai_tro, ma_quyen)
-SELECT 'ADMIN', ma_quyen FROM quyen;
-
 INSERT INTO vai_tro_quyen (ma_vai_tro, ma_quyen) VALUES
+('ADMIN', 'ACCOUNT_MANAGE'),
+('ADMIN', 'PERMISSION_ASSIGN'),
+('ADMIN', 'EMPLOYEE_VIEW'),
+('ADMIN', 'EMPLOYEE_CREATE'),
+('ADMIN', 'EMPLOYEE_UPDATE'),
+('ADMIN', 'EMPLOYEE_DELETE'),
 ('QUAN_LY', 'EMPLOYEE_VIEW'), ('QUAN_LY', 'EMPLOYEE_CREATE'), ('QUAN_LY', 'EMPLOYEE_UPDATE'),
 ('QUAN_LY', 'LEAVE_VIEW'), ('QUAN_LY', 'LEAVE_APPROVE'), ('QUAN_LY', 'ATTENDANCE_MANAGE'),
-('QUAN_LY', 'PAYROLL_VIEW'), ('QUAN_LY', 'PAYROLL_MANAGE'), ('QUAN_LY', 'PRODUCT_VIEW'),
-('QUAN_LY', 'PRODUCT_MANAGE'), ('QUAN_LY', 'SUPPLIER_VIEW'), ('QUAN_LY', 'SUPPLIER_MANAGE'),
+('QUAN_LY', 'PAYROLL_VIEW'), ('QUAN_LY', 'PAYROLL_MANAGE'),
 ('TRUONG_NHOM', 'EMPLOYEE_VIEW'), ('TRUONG_NHOM', 'LEAVE_VIEW'), ('TRUONG_NHOM', 'LEAVE_APPROVE'),
 ('TRUONG_NHOM', 'ATTENDANCE_MANAGE'), ('TRUONG_NHOM', 'PAYROLL_VIEW'),
 ('NHAN_VIEN', 'LEAVE_VIEW'), ('NHAN_VIEN', 'LEAVE_CREATE'), ('NHAN_VIEN', 'PAYROLL_VIEW');
@@ -579,33 +539,17 @@ INSERT INTO tai_khoan (ma_nv, mat_khau, ma_vai_tro, trang_thai) VALUES
 ('NV06', '1', 'QUAN_LY',     'HOAT_DONG'),
 ('NV08', '1', 'QUAN_LY',     'HOAT_DONG'),
 ('NV09', '1', 'TRUONG_NHOM', 'HOAT_DONG'),
-('NV10', '1', 'NHAN_VIEN',   'HOAT_DONG');
+('NV10', '1', 'NHAN_VIEN',   'HOAT_DONG'),
+('NV14', '1', 'NHAN_VIEN',   'HOAT_DONG');
 
 -- 16. Quyền riêng theo tài khoản
+-- Admin cấp quyền Quản lý tài khoản (ACCOUNT_MANAGE) cho nhân viên IT (NV14 - Đinh Thị Mai)
 INSERT INTO tai_khoan_quyen (ma_tk, ma_quyen, duoc_cap)
-SELECT ma_tk, 'PRODUCT_VIEW', 1 FROM tai_khoan WHERE ma_nv = 'NV09';
+SELECT ma_tk, 'ACCOUNT_MANAGE', 1 FROM tai_khoan WHERE ma_nv = 'NV14';
 
--- 17. Nhà cung cấp
-INSERT INTO nha_cung_cap (ma_ncc, ten_ncc, dia_chi, tinh_thanh, sdt, email, nguoi_lien_he, loai_hang, ma_nv_phu_trach) VALUES
-('NCC01', 'Hợp tác xã Cà phê Cư M''gar',          'Huyện Cư M''gar', 'Đắk Lắk',        '0262 387 1122', 'cumgar_coffee@gmail.com', 'Y Dăm Niê',        'Cà phê nhân Robusta',         'NV07'),
-('NCC02', 'Công ty Cổ phần Bao bì Đồng Nai',       'KCN Biên Hòa 2',  'Đồng Nai',        '0251 383 6789', 'contact@dongnaipack.vn',  'Nguyễn Văn Thành', 'Hộp giấy, thùng carton',       'NV05'),
-('NCC03', 'Công ty TNHH Cà phê Arabica Lâm Đồng',  'TP. Đà Lạt',      'Lâm Đồng',        '0263 382 9988', 'arabica_dalat@lamdong.vn', 'Trần Thị Mai',     'Cà phê nhân Arabica Cầu Đất', 'NV07'),
-('NCC04', 'Công ty CP Thiết bị Rang xay Đức Phát', 'Quận Tân Bình',   'TP. Hồ Chí Minh', '028 3844 5566', 'ducphat_tech@gmail.com',  'Lê Đức Phát',      'Máy móc chế biến',            'NV06'),
-('NCC05', 'Công ty Nhựa Rạng Đông',                'Quận 11',         'TP. Hồ Chí Minh', '028 3855 7788', 'sales@rangdongplastic.com','Phạm Minh Trí',   'Màng ghép phức hợp, ly nhựa', 'NV05'),
-('NCC06', 'Hợp tác xã Nông nghiệp Ea Tu',          'TP. Buôn Ma Thuột','Đắk Lắk',        '0262 381 4455', 'eatu_coop@gmail.com',     'H''Nhi Kbuôr',     'Cà phê hữu cơ đạt chuẩn',     'NV15');
-
--- 18. Sản phẩm
-INSERT INTO san_pham (ma_sp, ten_sp, loai_sp, ma_ncc, ma_nv_quan_ly, don_vi_tinh, quy_cach, gia_nhap, gia_ban, ton_kho, mo_ta) VALUES
-('SP01', 'Cà phê G7 3in1 (Hộp 18 gói)',                                'Cà phê hòa tan', 'NCC02', 'NV04', 'Hộp',  'Hộp 18 gói x 16g',         38000,  52000, 1500, 'Cà phê hòa tan hương vị đậm đà được ưa chuộng nhất'),
-('SP02', 'Cà phê G7 3in1 (Bịch 50 gói)',                               'Cà phê hòa tan', 'NCC02', 'NV04', 'Bịch', 'Bịch 50 gói x 16g',        95000, 135000, 2200, 'Cà phê hòa tan dạng bịch tiết kiệm gia đình'),
-('SP03', 'Cà phê G7 Đen đá (Hộp 15 gói)',                              'Cà phê hòa tan', 'NCC02', 'NV12', 'Hộp',  'Hộp 15 gói x 16g',         28000,  42000,  850, 'Cà phê đen nguyên chất không đường'),
-('SP04', 'Cà phê Chế Phin 1 (500g)',                                   'Cà phê rang xay', 'NCC01', 'NV07', 'Gói',  'Gói 500g',                 55000,  78000,  950, 'Thành phần Culi Robusta nguyên chất, nước nâu cánh gián'),
-('SP05', 'Cà phê Chế Phin 4 (500g)',                                   'Cà phê rang xay', 'NCC01', 'NV07', 'Gói',  'Gói 500g',                 72000, 105000, 1100, 'Hỗn hợp Culi Arabica, Robusta đặc trưng'),
-('SP06', 'Cà phê Sáng Tạo 8 (500g)',                                  'Cà phê rang xay', 'NCC03', 'NV15', 'Hộp',  'Hộp 500g',                180000, 260000,  400, 'Được mệnh danh là Cà phê của Nguyên thủ & Ngoại giao'),
-('SP07', 'Cà phê Hạt Mộc Robusta (1kg)',                              'Cà phê hạt',     'NCC01', 'NV07', 'Túi',  'Túi 1kg có van 1 chiều',  140000, 210000,  600, 'Cà phê hạt rang mộc nguyên chất'),
-('SP08', 'Cà phê Hạt Mộc Arabica Cầu Đất (1kg)',                      'Cà phê hạt',     'NCC03', 'NV15', 'Túi',  'Túi 1kg có van 1 chiều',  220000, 320000,  350, 'Arabica vùng Cầu Đất Đà Lạt hương thơm thanh tao'),
-('SP09', 'Cà phê Năng Lượng Trung Nguyên Legend Classic (Hộp 12 gói)', 'Cà phê hòa tan', 'NCC02', 'NV04', 'Hộp',  'Hộp 12 gói',               45000,  68000, 1200, 'Dòng sản phẩm cao cấp Trung Nguyên Legend'),
-('SP10', 'Phin Cà Phê Nhôm Trung Nguyên In Hoa Văn',                   'Dụng cụ pha chế','NCC04', 'NV13', 'Cái',  'Phin nhôm cao cấp',        22000,  35000,  750, 'Phin nhôm truyền thống chuẩn hương vị');
+-- Cấp thêm quyền Thêm nhân sự cho Trưởng nhóm NV09
+INSERT INTO tai_khoan_quyen (ma_tk, ma_quyen, duoc_cap)
+SELECT ma_tk, 'EMPLOYEE_CREATE', 1 FROM tai_khoan WHERE ma_nv = 'NV09';
 
 COMMIT;
 

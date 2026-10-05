@@ -194,9 +194,8 @@ def assign_role_to_employee(
             {"ma_vai_tro": ma_vai_tro, "now": now_vn, "ma_nv": ma_nv},
         )
     else:
-        # Nếu chưa có tài khoản, tự động tạo tài khoản với mật khẩu mặc định (123456)
-        import hashlib
-        default_pwd = hashlib.sha256("123456".encode("utf-8")).hexdigest()
+        # Nếu chưa có tài khoản, tự động tạo tài khoản với mật khẩu mặc định là '1'
+        default_pwd = "1"
         db.execute(
             text("""
                 INSERT INTO tai_khoan (ma_nv, mat_khau, ma_vai_tro, trang_thai, ngay_tao)

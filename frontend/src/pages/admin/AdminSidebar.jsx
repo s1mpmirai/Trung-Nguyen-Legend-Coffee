@@ -15,6 +15,7 @@ import {
 import logoImg from "../../assets/logo/Logo Trung Nguyên_black.png";
 
 export default function AdminSidebar({
+  userSession,
   activeTab = "dashboard",
   onTabChange,
   onSwitchToManager,
@@ -45,16 +46,27 @@ export default function AdminSidebar({
     };
   }, [collapsed, onToggleCollapse, onClose]);
 
-  const navItems = [
+  const rawRole = userSession?.role || localStorage.getItem("user_role") || "";
+  const isAdmin = rawRole.toUpperCase() === "ADMIN" || userSession?.ma_nv === "NV01";
+  const userPerms = userSession?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
+
+  const allNavItems = [
     { id: "dashboard", label: "Tổng quan hệ thống", icon: LayoutDashboard },
-    { id: "accounts", label: "Quản lý tài khoản", icon: KeyRound, badge: "Admin" },
-    { id: "permissions", label: "Phân quyền & RBAC", icon: Shield, badge: "Admin" },
+    { id: "accounts", label: "Quản lý tài khoản", icon: KeyRound, badge: "Admin", permission: "ACCOUNT_MANAGE" },
+    { id: "permissions", label: "Phân quyền & RBAC", icon: Shield, badge: "Admin", permission: "PERMISSION_ASSIGN" },
     { id: "departments", label: "Cơ cấu phòng ban", icon: Building2 },
     { id: "positions", label: "Chức vụ & Bậc lương", icon: Briefcase },
     { id: "contracts", label: "Hợp đồng lao động", icon: FileText },
     { id: "employees", label: "Quản lý nhân sự", icon: Users },
-    { id: "warehouse", label: "Kho & Nhà cung cấp", icon: Package },
   ];
+
+  // Nếu là Admin tối cao -> xem tất cả; nếu là NV IT được cấp ACCOUNT_MANAGE -> xem Dashboard và Tài khoản
+  const navItems = allNavItems.filter((item) => {
+    if (isAdmin) return true;
+    if (item.id === "dashboard") return true;
+    if (item.permission && userPerms.includes(item.permission)) return true;
+    return false;
+  });
 
   return (
     <aside

@@ -11,6 +11,7 @@ import LeaveApprovals from "./LeaveApprovals";
 import AttendanceManagement from "./AttendanceManagement";
 import PayrollManagement from "./PayrollManagement";
 import PersonnelReport from "./PersonnelReport";
+import RolePermissions from "./RolePermissions";
 import { getManagerDashboardStats } from "../../services/managerService";
 
 export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmployee, onSwitchToAdmin }) {
@@ -52,6 +53,7 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         onClose={() => setSidebarCollapsed(true)}
+        userSession={userSession}
       />
 
       {/* ───────────────── TOP HEADER BAR ───────────────── */}
@@ -78,10 +80,12 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
             {/* 4. TAB: Bảng tính lương */}
             {activeTab === "payroll" && <PayrollManagement />}
 
+            {/* 5. TAB: Cấp quyền sử dụng web & Bổ nhiệm chức danh */}
+            {(activeTab === "permissions" || activeTab === "role-permissions") && (
+              <RolePermissions userSession={userSession} />
+            )}
 
-
-
-            {/* 7. TAB: Tổng quan (Default) */}
+            {/* 6. TAB: Tổng quan (Default) */}
             {activeTab === "dashboard" && (
               <>
                 {/* Header Tiêu đề trang */}

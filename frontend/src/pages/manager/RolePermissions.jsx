@@ -1,695 +1,744 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
-  Save,
-  Check,
-  Minus,
-  Search,
-  UserCheck,
+  Shield,
   ShieldCheck,
-  CheckCircle2,
-  UserPlus,
+  Award,
+  Users,
+  Check,
   X,
-  Trash2,
+  KeyRound,
+  ArrowRight,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  ClipboardCheck,
+  CreditCard,
+  UserCheck,
   Sparkles,
+  RefreshCw,
+  Search,
+  ChevronDown,
+  Info,
+  HelpCircle,
 } from "lucide-react";
+import apiClient from "../../services/apiClient";
+import {
+  getRoleMatrix,
+  getRoles,
+  getEmployeePermissions,
+  assignRoleToEmployee,
+  updateCustomPermissions,
+} from "../../services/adminService";
 
-export default function RolePermissions() {
-  const [filterType, setFilterType] = useState("all");
-  const [toast, setToast] = useState("");
-  const [memberSearch, setMemberSearch] = useState("");
+// Danh mục các quyền sử dụng web mà Quản lý có thể cấp cho nhân sự
+const WEB_OPERATIONAL_PERMISSIONS = [
+  {
+    ma_quyen: "ATTENDANCE_MANAGE",
+    label: "Quản lý Chấm công & Ca làm việc",
+    group: "Chấm công & Ca kíp",
+    icon: Clock,
+    color: "amber",
+    desc: "Theo dõi bảng công hàng ngày toàn chuỗi, sửa giờ vào/ra, phê duyệt công và chốt bảng công tháng.",
+    defaultFor: ["QUAN_LY", "TRUONG_NHOM"],
+  },
+  {
+    ma_quyen: "LEAVE_APPROVE",
+    label: "Phê duyệt Đơn từ Nghỉ phép & Đổi ca",
+    group: "Đơn từ & Phép",
+    icon: ClipboardCheck,
+    color: "emerald",
+    desc: "Ký duyệt hoặc từ chối các đơn xin nghỉ phép, đơn xin thôi việc của nhân viên trong đội ngũ.",
+    defaultFor: ["QUAN_LY", "TRUONG_NHOM"],
+  },
+  {
+    ma_quyen: "PAYROLL_MANAGE",
+    label: "Tính toán & Phê duyệt Bảng lương",
+    group: "Lương bổng & Đãi ngộ",
+    icon: CreditCard,
+    color: "purple",
+    desc: "Xem tổng quỹ lương, tính toán thưởng phạt, kiểm tra phiếu lương và phê duyệt chi trả lương tháng.",
+    defaultFor: ["QUAN_LY"],
+  },
+  {
+    ma_quyen: "EMPLOYEE_VIEW",
+    label: "Xem Danh sách & Hồ sơ Nhân sự",
+    group: "Quản lý Nhân sự",
+    icon: Users,
+    color: "sky",
+    desc: "Tra cứu danh bạ nhân sự, lý lịch công tác, hợp đồng lao động và thông tin liên lạc.",
+    defaultFor: ["QUAN_LY", "TRUONG_NHOM"],
+  },
+  {
+    ma_quyen: "EMPLOYEE_CREATE",
+    label: "Thêm Nhân sự mới vào hệ thống",
+    group: "Quản lý Nhân sự",
+    icon: UserCheck,
+    color: "indigo",
+    desc: "Tiếp nhận và tạo mới hồ sơ nhân sự, đăng ký chức vụ và phòng ban trực thuộc.",
+    defaultFor: ["QUAN_LY"],
+  },
+  {
+    ma_quyen: "EMPLOYEE_UPDATE",
+    label: "Cập nhật Hồ sơ & Duyệt chỉnh sửa",
+    group: "Quản lý Nhân sự",
+    icon: Shield,
+    color: "blue",
+    desc: "Phê duyệt các yêu cầu thay đổi thông tin cá nhân và cập nhật chức danh cho nhân viên.",
+    defaultFor: ["QUAN_LY"],
+  },
+];
 
-  // Modal Thêm nhân sự
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newMember, setNewMember] = useState({
-    id: "",
-    name: "",
-    currentJob: "",
-    statusTag: "Đang công tác",
-    tagType: "active",
-    role: "staff",
-  });
-  const [addError, setAddError] = useState("");
+const ROLE_LABELS = {
+  ADMIN: "Quản trị viên tối cao",
+  QUAN_LY: "Quản lý / Trưởng phòng",
+  TRUONG_NHOM: "Trưởng nhóm / Giám sát",
+  NHAN_VIEN: "Nhân viên tiêu chuẩn",
+};
 
-  const getInitials = (fullName) => {
-    if (!fullName) return "NV";
-    const parts = fullName.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+export default function RolePermissions({ userSession }) {
+  const [activeSubTab, setActiveSubTab] = useState("configure"); // 'configure' | 'matrix'
+  const [employees, setEmployees] = useState([]);
+  const [isLoadingList, setIsLoadingList] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Nhân sự được chọn để cấu hình quyền
+  const [selectedMaNv, setSelectedMaNv] = useState("NV10"); // Mặc định chọn nhân viên NV10 hoặc người đầu tiên
+  const [empDetail, setEmpDetail] = useState(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
+  // Trạng thái toggles các quyền (checkbox/switch)
+  const [permsState, setPermsState] = useState({});
+  const [isSavingPerms, setIsSavingPerms] = useState(false);
+
+  // Bổ nhiệm vai trò
+  const [promoteRole, setPromoteRole] = useState("TRUONG_NHOM");
+  const [isPromoting, setIsPromoting] = useState(false);
+
+  // Ma trận quyền
+  const [matrixData, setMatrixData] = useState(null);
+  const [isLoadingMatrix, setIsLoadingMatrix] = useState(false);
+
+  // Toast
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState("success");
+
+  const showToast = (msg, type = "success") => {
+    setToastMessage(msg);
+    setToastType(type);
+    setTimeout(() => setToastMessage(""), 4000);
   };
 
-  const presetCandidates = [
-    { id: "TN-1558", name: "Đặng Thùy Dương", currentJob: "Thu ngân & Bán hàng", statusTag: "Đang công tác", tagType: "active", role: "staff" },
-    { id: "TN-2204", name: "Phạm Quốc Bảo", currentJob: "Kỹ thuật máy rang xay", statusTag: "Đề xuất thăng chức", tagType: "promote", role: "leader" },
-    { id: "TN-3112", name: "Ngô Mai Trang", currentJob: "Chăm sóc khách hàng", statusTag: "Thử việc", tagType: "probation", role: "staff" },
-    { id: "TN-1088", name: "Hoàng Văn Tuấn", currentJob: "Giám sát cửa hàng", statusTag: "Đang công tác", tagType: "active", role: "leader" },
-  ];
-
-  const handlePickCandidate = (candidate) => {
-    setNewMember({
-      id: candidate.id,
-      name: candidate.name,
-      currentJob: candidate.currentJob,
-      statusTag: candidate.statusTag,
-      tagType: candidate.tagType,
-      role: candidate.role,
-    });
-    setAddError("");
-  };
-
-  const handleAddMember = (e) => {
-    e?.preventDefault();
-    if (!newMember.name.trim()) {
-      setAddError("Vui lòng nhập họ và tên nhân sự");
-      return;
+  // 1. Tải danh sách nhân viên
+  const loadEmployees = async () => {
+    setIsLoadingList(true);
+    try {
+      const res = await apiClient.get("/employees/get_employee_list", {
+        params: { page: 1, page_size: 200 },
+      });
+      const items = res?.items || res?.data?.items || (Array.isArray(res) ? res : []);
+      setEmployees(items);
+      if (items.length > 0 && !selectedMaNv) {
+        setSelectedMaNv(items[0].ma_nv);
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải danh sách nhân viên:", err);
+      showToast("Không thể tải danh sách nhân viên", "error");
+    } finally {
+      setIsLoadingList(false);
     }
-    const finalId = newMember.id.trim() || `TN-${Math.floor(1000 + Math.random() * 9000)}`;
-    if (members.some((m) => m.id.toLowerCase() === finalId.toLowerCase())) {
-      setAddError(`Mã nhân viên ${finalId} đã tồn tại trong danh sách!`);
-      return;
-    }
-
-    const added = {
-      ...newMember,
-      id: finalId,
-      name: newMember.name.trim(),
-      initials: getInitials(newMember.name),
-      currentJob: newMember.currentJob.trim() || "Nhân viên vận hành",
-    };
-
-    setMembers((prev) => [added, ...prev]);
-    setIsAddModalOpen(false);
-    setNewMember({
-      id: "",
-      name: "",
-      currentJob: "",
-      statusTag: "Đang công tác",
-      tagType: "active",
-      role: "staff",
-    });
-    setAddError("");
-    setToast(`Đã thêm nhân sự ${added.name} (${added.id}) vào danh sách phân quyền!`);
-    setTimeout(() => setToast(""), 3500);
   };
 
-  const handleRemoveMember = (id, name) => {
-    if (window.confirm(`Bạn có chắc muốn bỏ nhân sự ${name} khỏi danh sách phân quyền?`)) {
-      setMembers((prev) => prev.filter((m) => m.id !== id));
-      setToast(`Đã xóa ${name} khỏi danh sách phân quyền!`);
-      setTimeout(() => setToast(""), 3000);
+  // 2. Tải chi tiết quyền của nhân viên đang chọn
+  const loadEmployeeDetail = async (maNv) => {
+    if (!maNv) return;
+    setIsLoadingDetail(true);
+    try {
+      const data = await getEmployeePermissions(maNv);
+      setEmpDetail(data);
+      setPromoteRole(data.ma_vai_tro === "TRUONG_NHOM" ? "NHAN_VIEN" : "TRUONG_NHOM");
+
+      // Cập nhật trạng thái switch cho từng quyền
+      const effective = data.effective_permissions || [];
+      const initialPerms = {};
+      WEB_OPERATIONAL_PERMISSIONS.forEach((p) => {
+        initialPerms[p.ma_quyen] = effective.includes(p.ma_quyen);
+      });
+      setPermsState(initialPerms);
+    } catch (err) {
+      console.error("Lỗi khi tải quyền nhân viên:", err);
+      showToast(err.message || `Không thể tải quyền của nhân sự ${maNv}`, "error");
+    } finally {
+      setIsLoadingDetail(false);
     }
   };
 
-  // Danh sách nhân sự gán vai trò (Từ Stitch Screen a9037f27)
-  const [members, setMembers] = useState([
-    {
-      id: "TN-2041",
-      name: "Trần Nhật Nam",
-      initials: "TN",
-      currentJob: "Barista Chuẩn",
-      statusTag: "Đề xuất thăng chức",
-      tagType: "promote",
-      role: "leader",
-    },
-    {
-      id: "TN-1893",
-      name: "Lê Hoàng Lan",
-      initials: "LH",
-      currentJob: "Thu ngân ca sáng",
-      statusTag: "Đang công tác",
-      tagType: "active",
-      role: "staff",
-    },
-    {
-      id: "TN-1402",
-      name: "Võ Tuấn Kiệt",
-      initials: "VT",
-      currentJob: "Quản lý kho rang xay",
-      statusTag: "Leader hiện tại",
-      tagType: "leader",
-      role: "leader",
-    },
-    {
-      id: "TN-3029",
-      name: "Hà Mỹ Linh",
-      initials: "HM",
-      currentJob: "Nhân viên thử việc",
-      statusTag: "Thử việc",
-      tagType: "probation",
-      role: "staff",
-    },
-  ]);
-
-  const matrix = [
-    {
-      module: "Chấm công & Ca làm",
-      action: "Xem ca / Check-in cá nhân",
-      staff: true,
-      lead: true,
-      manager: true,
-      admin: true,
-    },
-    {
-      module: "Chấm công & Ca làm",
-      action: "Bảng công & Lịch trực nhóm",
-      staff: false,
-      lead: true,
-      manager: true,
-      admin: true,
-      isNewForLead: true,
-    },
-    {
-      module: "Nộp đơn",
-      action: "Gửi đơn cá nhân",
-      staff: true,
-      lead: true,
-      manager: true,
-      admin: true,
-    },
-    {
-      module: "Duyệt đơn",
-      action: "Duyệt đơn nghỉ phép nhóm (< 3 ngày)",
-      staff: false,
-      lead: true,
-      manager: true,
-      admin: true,
-      isNewForLead: true,
-    },
-    {
-      module: "Quản lý đơn thôi việc, dài hạn",
-      action: "Duyệt đơn thôi việc & phép dài hạn",
-      staff: false,
-      lead: false,
-      manager: true,
-      admin: true,
-    },
-    {
-      module: "Quản lý nhân sự",
-      action: "Xem danh sách nhân sự",
-      staff: false,
-      lead: true,
-      manager: true,
-      admin: true,
-    },
-    {
-      module: "Quản lý nhân sự",
-      action: "Thêm / Sửa hồ sơ nhân sự",
-      staff: false,
-      lead: false,
-      manager: true,
-      admin: true,
-    },
-    {
-      module: "Bảng tính lương",
-      action: "Xem phiếu lương cá nhân",
-      staff: true,
-      lead: true,
-      manager: true,
-      admin: true,
-    },
-    {
-      module: "Bảng tính lương",
-      action: "Khóa bảng lương & Duyệt chi",
-      staff: false,
-      lead: false,
-      manager: true,
-      admin: true,
-    },
-    {
-      module: "Báo cáo & Thống kê",
-      action: "Xuất Excel / PDF tổng hợp",
-      staff: false,
-      lead: true,
-      manager: true,
-      admin: true,
+  // 3. Tải ma trận phân quyền
+  const loadMatrix = async () => {
+    setIsLoadingMatrix(true);
+    try {
+      const matrix = await getRoleMatrix();
+      setMatrixData(matrix);
+    } catch (err) {
+      console.error("Lỗi khi tải ma trận quyền:", err);
+    } finally {
+      setIsLoadingMatrix(false);
     }
-  ];
-
-  const handleSave = () => {
-    setToast("Đã lưu ma trận phân quyền RBAC thành công!");
-    setTimeout(() => setToast(""), 3500);
   };
 
-  const handleRoleChange = (memberId, newRole) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
+  useEffect(() => {
+    loadEmployees();
+    loadMatrix();
+  }, []);
+
+  useEffect(() => {
+    if (selectedMaNv) {
+      loadEmployeeDetail(selectedMaNv);
+    }
+  }, [selectedMaNv]);
+
+  // Toggle switch quyền
+  const handleTogglePerm = (maQuyen) => {
+    setPermsState((prev) => ({
+      ...prev,
+      [maQuyen]: !prev[maQuyen],
+    }));
+  };
+
+  // 4. Lưu phân quyền web vào CSDL (tai_khoan_quyen)
+  const handleSavePermissions = async () => {
+    if (!selectedMaNv || !empDetail) return;
+    setIsSavingPerms(true);
+    try {
+      const rolePerms = empDetail.vai_tro_quyen || [];
+      const batch = [];
+
+      WEB_OPERATIONAL_PERMISSIONS.forEach((p) => {
+        const isChecked = Boolean(permsState[p.ma_quyen]);
+        const hasInRole = rolePerms.includes(p.ma_quyen);
+
+        if (isChecked && !hasInRole) {
+          // Bật quyền mà vai trò chưa có -> Cấp thêm
+          batch.push({ ma_quyen: p.ma_quyen, duoc_cap: true });
+        } else if (!isChecked && hasInRole) {
+          // Tắt quyền mà vai trò đã có -> Thu hồi
+          batch.push({ ma_quyen: p.ma_quyen, duoc_cap: false });
+        } else if (isChecked && hasInRole) {
+          // Khôi phục quyền vai trò nếu trước đó bị thu hồi
+          if ((empDetail.custom_quyen_thu_hoi || []).includes(p.ma_quyen)) {
+            batch.push({ ma_quyen: p.ma_quyen, duoc_cap: true });
+          }
+        }
+      });
+
+      if (batch.length === 0) {
+        showToast("Không có thay đổi nào so với phân quyền hiện tại.", "info");
+        setIsSavingPerms(false);
+        return;
+      }
+
+      await updateCustomPermissions(selectedMaNv, { permissions: batch });
+      showToast(`Đã lưu thiết lập quyền sử dụng web cho nhân sự ${empDetail.ho_ten} (${selectedMaNv})!`);
+      await loadEmployeeDetail(selectedMaNv);
+    } catch (err) {
+      console.error("Lỗi khi lưu phân quyền:", err);
+      showToast(err.message || "Lưu phân quyền thất bại", "error");
+    } finally {
+      setIsSavingPerms(false);
+    }
+  };
+
+  // 5. Bổ nhiệm vai trò / Thăng chức Trưởng nhóm
+  const handleAssignRole = async () => {
+    if (!selectedMaNv) return;
+    setIsPromoting(true);
+    try {
+      await assignRoleToEmployee(selectedMaNv, { ma_vai_tro: promoteRole });
+      showToast(`Đã cập nhật vai trò ${ROLE_LABELS[promoteRole]} cho nhân sự ${selectedMaNv}!`);
+      await loadEmployeeDetail(selectedMaNv);
+      await loadEmployees();
+    } catch (err) {
+      console.error("Lỗi khi bổ nhiệm vai trò:", err);
+      showToast(err.message || "Bổ nhiệm vai trò thất bại", "error");
+    } finally {
+      setIsPromoting(false);
+    }
+  };
+
+  // Lọc danh sách nhân viên theo từ khóa tìm kiếm
+  const filteredEmployees = useMemo(() => {
+    if (!searchTerm.trim()) return employees;
+    const q = searchTerm.toLowerCase();
+    return employees.filter(
+      (e) =>
+        (e.ma_nv && e.ma_nv.toLowerCase().includes(q)) ||
+        (e.ho_ten && e.ho_ten.toLowerCase().includes(q)) ||
+        (e.ten_pb && e.ten_pb.toLowerCase().includes(q)) ||
+        (e.ten_cv && e.ten_cv.toLowerCase().includes(q))
     );
-    const member = members.find((m) => m.id === memberId);
-    const roleName =
-      newRole === "staff"
-        ? "Nhân viên tiêu chuẩn"
-        : newRole === "leader"
-          ? "Trưởng nhóm / Leader"
-          : "Trưởng phòng / Quản lý";
-
-    setToast(
-      `Đã cập nhật vai trò cho ${member?.name} thành "${roleName}"! Quyền hạn có hiệu lực ngay trong phiên đăng nhập tới.`
-    );
-    setTimeout(() => setToast(""), 4000);
-  };
-
-  const filteredMatrix = matrix.filter((row) => {
-    if (filterType === "approval") return row.action.toLowerCase().includes("duyệt");
-    return true;
-  });
-
-  const filteredMembers = members.filter(
-    (m) =>
-      m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-      m.id.toLowerCase().includes(memberSearch.toLowerCase()) ||
-      m.currentJob.toLowerCase().includes(memberSearch.toLowerCase())
-  );
+  }, [employees, searchTerm]);
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1520px] mx-auto py-2 animate-in fade-in duration-300">
-      {/* ──────────────── HEADER ──────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex flex-col gap-6">
+      {/* Toast thông báo */}
+      {toastMessage && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 p-4 rounded-xl border shadow-xl flex items-center gap-3 text-xs font-semibold animate-slide-up ${
+            toastType === "error"
+              ? "bg-rose-50 border-rose-200 text-rose-700"
+              : toastType === "info"
+              ? "bg-sky-50 border-sky-200 text-sky-800"
+              : "bg-emerald-50 border-emerald-200 text-emerald-800"
+          }`}
+        >
+          {toastType === "error" ? (
+            <AlertCircle size={16} />
+          ) : toastType === "info" ? (
+            <Info size={16} />
+          ) : (
+            <CheckCircle2 size={16} />
+          )}
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* ───────────────── HEADER TIÊU ĐỀ & CHUYỂN TAB ───────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-1 font-['Plus_Jakarta_Sans',sans-serif]">
-            PHÂN QUYỀN & VAI TRÒ NHÂN SỰ
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-sky-50 text-sky-700 border border-sky-200 mb-2">
+            <ShieldCheck size={12} className="text-sky-600" />
+            <span>Phân quyền vận hành & Cấp quyền sử dụng Web</span>
+          </div>
+          <h1 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight uppercase">
+            CẤP QUYỀN SỬ DỤNG WEB & BỔ NHIỆM CHỨC DANH
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Thiết lập phạm vi quyền hạn theo vị trí công tác và thăng tiến cấp bậc tức thời
+            Quản lý thiết lập quyền vận hành (Chấm công, Duyệt lương, Phê duyệt đơn từ) cho nhân sự trong đội ngũ
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Nút chuyển đổi Sub-tab */}
+        <div className="flex items-center bg-slate-100 p-1 rounded-xl self-start sm:self-auto">
           <button
             type="button"
-            onClick={handleSave}
-            className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95"
+            onClick={() => setActiveSubTab("configure")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              activeSubTab === "configure"
+                ? "bg-white text-sky-700 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
           >
-            <Save className="w-4 h-4" />
-            <span>Lưu thay đổi phân quyền</span>
+            Cấp quyền Web theo Nhân sự
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("matrix")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+              activeSubTab === "matrix"
+                ? "bg-white text-sky-700 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Ma trận phân quyền RBAC
           </button>
         </div>
       </div>
 
-      {toast && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>{toast}</span>
-        </div>
-      )}
-
-      {/* ──────────────── 1. MA TRẬN ĐỐI CHIẾU PHÂN QUYỀN (MATRIX RBAC) ──────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col p-6 gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-          <div>
-            <h2 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-base text-slate-900">
-              Ma trận đối chiếu phân quyền
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Chi tiết thẩm quyền thao tác trên 6 phân hệ lõi của tập đoàn Trung Nguyên Legend
-            </p>
-          </div>
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-            <button
-              onClick={() => setFilterType("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${filterType === "all" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700"
-                }`}
-            >
-              Tất cả chức năng
-            </button>
-            <button
-              onClick={() => setFilterType("approval")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${filterType === "approval" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-700"
-                }`}
-            >
-              Chỉ quyền duyệt
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4">Phân hệ chức năng</th>
-                <th className="py-3 px-4 text-center">Hành vi thao tác</th>
-                <th className="py-3 px-3 text-center">Nhân viên</th>
-                <th className="py-3 px-3 text-center bg-emerald-50/50 text-emerald-800">
-                  Trưởng nhóm
-                </th>
-                <th className="py-3 px-3 text-center">Quản lý</th>
-                <th className="py-3 px-3 text-center">Admin</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredMatrix.map((row, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="py-3 px-4 font-semibold text-slate-800">{row.module}</td>
-                  <td className="py-3 px-4 text-center text-slate-600 font-medium">{row.action}</td>
-                  <td className="py-3 px-3 text-center">
-                    {row.staff ? (
-                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center mx-auto">
-                        <Check className="w-3.5 h-3.5" />
-                      </span>
-                    ) : (
-                      <Minus className="w-4 h-4 text-slate-300 mx-auto" />
-                    )}
-                  </td>
-                  <td className="py-3 px-3 text-center bg-emerald-50/30">
-                    {row.lead ? (
-                      <span
-                        className={`w-5 h-5 rounded-full inline-flex items-center justify-center mx-auto ${row.isNewForLead
-                          ? "bg-emerald-600 text-white shadow-xs font-bold"
-                          : "bg-emerald-100 text-emerald-700"
-                          }`}
-                        title={row.isNewForLead ? "Quyền mới mở khi nâng bậc" : ""}
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </span>
-                    ) : (
-                      <Minus className="w-4 h-4 text-slate-300 mx-auto" />
-                    )}
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    {row.manager ? (
-                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center mx-auto">
-                        <Check className="w-3.5 h-3.5" />
-                      </span>
-                    ) : (
-                      <Minus className="w-4 h-4 text-slate-300 mx-auto" />
-                    )}
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    {row.admin ? (
-                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center mx-auto">
-                        <Check className="w-3.5 h-3.5" />
-                      </span>
-                    ) : (
-                      <Minus className="w-4 h-4 text-slate-300 mx-auto" />
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Matrix Legend */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs text-slate-500 border-t border-slate-100">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded-full bg-emerald-600 text-white inline-flex items-center justify-center text-[10px] font-bold">
-                ✓
-              </span>
-              Quyền mở rộng khi thăng cấp
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 inline-flex items-center justify-center text-[10px] font-bold">
-                ✓
-              </span>
-              Được cấp mặc định
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="text-slate-400 font-bold">-</span>
-              Không có quyền
-            </span>
-          </div>
-          <span className="font-mono text-slate-400 text-[11px]">Chính sách bảo mật ISO 27001</span>
-        </div>
-      </div>
-
-      {/* ──────────────── 2. GÁN VAI TRÒ NHÂN SỰ (KHUNG NẰM DÀI Ở GIỮA TRANG) ──────────────── */}
-      <div className="rounded-2xl bg-white p-6 border border-slate-200/80 shadow-xs flex flex-col gap-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                <UserCheck className="w-5 h-5" />
-              </div>
-              <h2 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-base text-slate-900">
-                Gán vai trò nhân sự
-              </h2>
-              <span className="px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 font-mono text-xs font-bold border border-sky-200/60">
-                {members.length} Thành viên
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Đổi vai trò lập tức bằng dropdown để áp dụng ngay bộ quyền phân cấp tương ứng cho từng nhân sự.
-            </p>
-          </div>
-
-          {/* Search Input, Thêm nhân sự Button & Quick Info */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative min-w-[240px]">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                value={memberSearch}
-                onChange={(e) => setMemberSearch(e.target.value)}
-                placeholder="Tìm theo tên hoặc mã nhân viên..."
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-500 focus:outline-none transition-all shadow-2xs"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAddError("");
-                setIsAddModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow transition-all cursor-pointer active:scale-95"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Thêm nhân sự</span>
-            </button>
-
-            <div className="hidden xl:flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/60 text-slate-600 text-xs">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span className="font-medium text-[11px]">Đồng bộ tức thời trên 140+ chi nhánh</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Member Grid - Multi-column responsive layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {filteredMembers.map((m) => (
-            <div
-              key={m.id}
-              className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/70 hover:border-sky-300 hover:bg-white hover:shadow-xs transition-all flex flex-col justify-between gap-3 group relative"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-sky-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
-                    {m.initials}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-xs">{m.name}</h3>
-                    <p className="font-mono text-[10px] text-slate-400 mt-0.5">
-                      {m.id} • {m.currentJob}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider ${m.tagType === "promote"
-                      ? "bg-sky-100 text-sky-800 border border-sky-200"
-                      : m.tagType === "leader"
-                        ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                        : m.tagType === "probation"
-                          ? "bg-amber-100 text-amber-800 border border-amber-200"
-                          : "bg-slate-200 text-slate-700"
-                      }`}
-                  >
-                    {m.statusTag}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveMember(m.id, m.name)}
-                    title="Xóa khỏi danh sách phân quyền"
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
-                <span className="text-[11px] text-slate-500 font-medium">Vai trò gán:</span>
-                <select
-                  value={m.role}
-                  onChange={(e) => handleRoleChange(m.id, e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg bg-white text-slate-800 font-semibold text-xs border border-slate-200 shadow-2xs focus:border-sky-500 focus:outline-none cursor-pointer"
-                >
-                  <option value="staff">Nhân viên tiêu chuẩn</option>
-                  <option value="leader">Trưởng nhóm / Leader</option>
-                  <option value="manager">Trưởng phòng / Quản lý</option>
-                </select>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ──────────────── MODAL THÊM NHÂN SỰ VÀO PHÂN QUYỀN ──────────────── */}
-      {isAddModalOpen && (
-        <div
-          onClick={() => setIsAddModalOpen(false)}
-          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl border border-slate-200/80 shadow-2xl max-w-lg w-full overflow-hidden animate-fadeIn cursor-default"
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                  <UserPlus className="w-5 h-5" />
+      {/* ───────────────── VIEW 1: CẤP QUYỀN SỬ DỤNG WEB THEO NHÂN SỰ ───────────────── */}
+      {activeSubTab === "configure" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* CỘT TRÁI (4 CỘT): DANH SÁCH NHÂN SỰ ĐỂ CHỌN */}
+          <div className="lg:col-span-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-sky-50 text-sky-600 rounded-xl">
+                  <Users size={16} />
                 </div>
                 <div>
-                  <h3 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-base text-slate-900">
-                    Thêm nhân sự vào phân quyền
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Gán vai trò và kích hoạt quyền thao tác cho nhân sự mới
-                  </p>
+                  <h3 className="font-bold text-xs text-slate-900 uppercase">Danh sách Nhân sự</h3>
+                  <span className="text-[11px] text-slate-400">
+                    {filteredEmployees.length} nhân sự
+                  </span>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsAddModalOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                onClick={loadEmployees}
+                className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition"
+                title="Làm mới danh sách"
               >
-                <X className="w-5 h-5" />
+                <RefreshCw size={14} className={isLoadingList ? "animate-spin text-sky-600" : ""} />
               </button>
             </div>
 
-            {/* Quick Suggestions from System */}
-            <div className="bg-slate-50/70 p-4 border-b border-slate-100">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-sky-600" />
-                  Gợi ý nhanh nhân sự từ hệ thống:
-                </span>
-                <span className="text-[10px] text-slate-400">Bấm để điền nhanh</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {presetCandidates.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => handlePickCandidate(c)}
-                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-sky-400 hover:bg-sky-50 text-slate-700 text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <span className="font-bold text-slate-900">{c.name}</span>
-                    <span className="text-[10px] font-mono text-slate-400">({c.id})</span>
-                  </button>
-                ))}
-              </div>
+            {/* Ô tìm kiếm */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm mã NV, họ tên, phòng ban..."
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
             </div>
 
-            {/* Form Content */}
-            <form onSubmit={handleAddMember} className="p-5 flex flex-col gap-4">
-              {addError && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
-                  {addError}
+            {/* Danh sách cuộn */}
+            <div className="flex flex-col gap-1.5 max-h-[580px] overflow-y-auto pr-1">
+              {isLoadingList ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400 text-xs">
+                  <Loader2 className="w-6 h-6 animate-spin text-sky-600" />
+                  <span>Đang tải danh sách nhân sự...</span>
                 </div>
+              ) : filteredEmployees.length === 0 ? (
+                <div className="py-10 text-center text-xs text-slate-400">
+                  Không tìm thấy nhân viên nào phù hợp
+                </div>
+              ) : (
+                filteredEmployees.map((emp) => {
+                  const isSelected = selectedMaNv === emp.ma_nv;
+                  return (
+                    <button
+                      key={emp.ma_nv}
+                      type="button"
+                      onClick={() => setSelectedMaNv(emp.ma_nv)}
+                      className={`w-full text-left p-3 rounded-xl border text-xs transition-all cursor-pointer flex items-center justify-between ${
+                        isSelected
+                          ? "bg-sky-50/80 border-sky-300 shadow-xs ring-1 ring-sky-400/30"
+                          : "bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                            isSelected ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {(emp.ho_ten || emp.ma_nv || "").substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="truncate">
+                          <div className="font-bold text-slate-900 truncate">{emp.ho_ten}</div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <span className="font-mono font-bold text-sky-700">{emp.ma_nv}</span>
+                            <span>•</span>
+                            <span className="truncate">{emp.ten_pb || "Chưa phân bổ"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            emp.ma_vai_tro === "QUAN_LY"
+                              ? "bg-sky-100 text-sky-800"
+                              : emp.ma_vai_tro === "TRUONG_NHOM"
+                              ? "bg-purple-100 text-purple-800"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {emp.ma_vai_tro === "TRUONG_NHOM"
+                            ? "Trưởng nhóm"
+                            : emp.ma_vai_tro === "QUAN_LY"
+                            ? "Quản lý"
+                            : "Nhân viên"}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
               )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Mã nhân viên <span className="text-slate-400 font-normal">(để trống tự tạo)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newMember.id}
-                    onChange={(e) => setNewMember({ ...newMember, id: e.target.value })}
-                    placeholder="VD: TN-2045"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-500 focus:outline-none transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Họ và tên <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newMember.name}
-                    onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
-                    placeholder="VD: Nguyễn Văn An"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-500 focus:outline-none transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Chức danh / Vị trí công tác
-                </label>
-                <input
-                  type="text"
-                  value={newMember.currentJob}
-                  onChange={(e) => setNewMember({ ...newMember, currentJob: e.target.value })}
-                  placeholder="VD: Barista Chuẩn, Thu ngân ca chiều..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-500 focus:outline-none transition-all"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Trạng thái công tác
-                  </label>
-                  <select
-                    value={newMember.statusTag}
-                    onChange={(e) => {
-                      const tag = e.target.value;
-                      let type = "active";
-                      if (tag.includes("thăng")) type = "promote";
-                      else if (tag.includes("Leader")) type = "leader";
-                      else if (tag.includes("việc")) type = "probation";
-                      setNewMember({ ...newMember, statusTag: tag, tagType: type });
-                    }}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium focus:bg-white focus:border-sky-500 focus:outline-none cursor-pointer"
-                  >
-                    <option value="Đang công tác">Đang công tác</option>
-                    <option value="Đề xuất thăng chức">Đề xuất thăng chức</option>
-                    <option value="Thử việc">Thử việc</option>
-                    <option value="Leader hiện tại">Leader hiện tại</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Vai trò khởi tạo <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={newMember.role}
-                    onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:bg-white focus:border-sky-500 focus:outline-none cursor-pointer"
-                  >
-                    <option value="staff">Nhân viên tiêu chuẩn</option>
-                    <option value="leader">Trưởng nhóm / Leader</option>
-                    <option value="manager">Trưởng phòng / Quản lý</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white shadow-xs hover:shadow transition-all cursor-pointer active:scale-95"
-                >
-                  Xác nhận thêm nhân sự
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
+
+          {/* CỘT PHẢI (8 CỘT): CHI TIẾT VÀ BẢNG THIẾT LẬP QUYỀN SỬ DỤNG WEB */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            {isLoadingDetail ? (
+              <div className="bg-white p-12 rounded-2xl border border-slate-200/80 flex flex-col items-center justify-center gap-3 text-slate-400">
+                <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
+                <span className="text-xs font-medium">Đang tải thông tin quyền của nhân sự...</span>
+              </div>
+            ) : !empDetail ? (
+              <div className="bg-white p-12 rounded-2xl border border-slate-200/80 text-center text-slate-400 text-xs">
+                Vui lòng chọn một nhân sự từ danh sách bên trái để cấu hình quyền
+              </div>
+            ) : (
+              <>
+                {/* 1. THẺ THÔNG TIN NHÂN SỰ ĐƯỢC CHỌN & THĂNG CHỨC TRƯỞNG NHÓM */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
+                      {(empDetail.ho_ten || empDetail.ma_nv || "").substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-bold text-base text-slate-900">{empDetail.ho_ten}</h2>
+                        <span className="px-2 py-0.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 font-mono font-bold text-xs">
+                          {empDetail.ma_nv}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
+                        <span>Phòng ban: <strong>{empDetail.ten_pb || "Chưa phân bổ"}</strong></span>
+                        <span>•</span>
+                        <span>Chức vụ: <strong>{empDetail.ten_cv || "Nhân viên"}</strong></span>
+                        <span>•</span>
+                        <span>
+                          Vai trò:{" "}
+                          <span className="font-bold text-sky-700">
+                            {ROLE_LABELS[empDetail.ma_vai_tro] || empDetail.ten_vai_tro || empDetail.ma_vai_tro}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Nút Bổ nhiệm vai trò / Thăng chức */}
+                  <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200/80 shrink-0">
+                    <select
+                      value={promoteRole}
+                      onChange={(e) => setPromoteRole(e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+                    >
+                      <option value="TRUONG_NHOM">Bổ nhiệm: TRƯỞNG NHÓM</option>
+                      <option value="NHAN_VIEN">Hạ về: NHÂN VIÊN</option>
+                      <option value="QUAN_LY">Thăng chức: QUẢN LÝ</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAssignRole}
+                      disabled={isPromoting || promoteRole === empDetail.ma_vai_tro}
+                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                    >
+                      {isPromoting ? <Loader2 size={13} className="animate-spin" /> : <Award size={13} />}
+                      <span>Đổi vai trò</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. KHỐI THIẾT LẬP CÁC QUYỀN SỬ DỤNG WEB (CHẤM CÔNG, DUYỆT LƯƠNG, DUYỆT ĐƠN...) */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-5">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900 uppercase">
+                        Thiết lập Quyền Vận Hành Web
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Bật hoặc tắt các quyền cho nhân sự sử dụng các tính năng trên website Quản lý
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSavePermissions}
+                      disabled={isSavingPerms}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-xs"
+                    >
+                      {isSavingPerms ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          <span>Đang lưu vào hệ thống...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={15} />
+                          <span>LƯU PHÂN QUYỀN WEB</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Danh sách 6 quyền sử dụng web */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {WEB_OPERATIONAL_PERMISSIONS.map((perm) => {
+                      const Icon = perm.icon;
+                      const isChecked = Boolean(permsState[perm.ma_quyen]);
+                      const isDefaultInRole = (empDetail.vai_tro_quyen || []).includes(perm.ma_quyen);
+                      const isCustomGranted = (empDetail.custom_quyen_cap || []).includes(perm.ma_quyen);
+                      const isCustomRevoked = (empDetail.custom_quyen_thu_hoi || []).includes(perm.ma_quyen);
+
+                      return (
+                        <div
+                          key={perm.ma_quyen}
+                          onClick={() => handleTogglePerm(perm.ma_quyen)}
+                          className={`p-4 rounded-xl border transition-all cursor-pointer select-none flex flex-col justify-between gap-3 ${
+                            isChecked
+                              ? "bg-slate-50/80 border-sky-300 shadow-2xs"
+                              : "bg-white border-slate-200 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div
+                                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                  isChecked
+                                    ? "bg-sky-600 text-white"
+                                    : "bg-slate-100 text-slate-400"
+                                }`}
+                              >
+                                <Icon size={18} />
+                              </div>
+                              <div>
+                                <div className="font-bold text-xs text-slate-900 leading-tight">
+                                  {perm.label}
+                                </div>
+                                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
+                                  {perm.group}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Switch bật / tắt */}
+                            <div className="relative inline-flex items-center cursor-pointer shrink-0">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {}} // Đã xử lý ở onClick của thẻ cha
+                                className="sr-only peer"
+                              />
+                              <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-600"></div>
+                            </div>
+                          </div>
+
+                          <p className="text-[11px] text-slate-500 leading-relaxed">
+                            {perm.desc}
+                          </p>
+
+                          {/* Status Badge */}
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[10px]">
+                            {isCustomGranted ? (
+                              <span className="text-purple-600 font-bold flex items-center gap-1">
+                                <Sparkles size={11} />
+                                Quyền riêng được cấp thêm
+                              </span>
+                            ) : isCustomRevoked ? (
+                              <span className="text-rose-600 font-bold flex items-center gap-1">
+                                <X size={11} />
+                                Đã bị Quản lý thu hồi
+                              </span>
+                            ) : isDefaultInRole ? (
+                              <span className="text-sky-700 font-semibold flex items-center gap-1">
+                                <CheckCircle2 size={11} />
+                                Quyền mặc định theo vai trò
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">Chưa được cấp</span>
+                            )}
+
+                            <span className="font-mono text-slate-400">{perm.ma_quyen}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Ghi chú hướng dẫn cho Quản lý */}
+                  <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-amber-800 text-[11px] flex items-start gap-2.5">
+                    <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Cơ chế hiệu lực quyền:</strong> Khi Quản lý bật hoặc tắt quyền và bấm{" "}
+                      <strong>"LƯU PHÂN QUYỀN WEB"</strong>, hệ thống tự động ghi nhận vào CSDL bảng{" "}
+                      <code>tai_khoan_quyen</code>. Nhân sự đó khi đăng nhập vào website sẽ có quyền sử dụng các
+                      tab chức năng tương ứng ngay tức thì.
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────── VIEW 2: MA TRẬN PHÂN QUYỀN RBAC (ĐỐI CHIẾU VAI TRÒ) ───────────────── */}
+      {activeSubTab === "matrix" && (
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-6">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 uppercase">
+                Ma Trận Phân Quyền Vai Trò Hệ Thống (RBAC Matrix)
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Bảng đối chiếu quyền mặc định giữa 4 cấp bậc vai trò trong doanh nghiệp
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadMatrix}
+              className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCw size={13} className={isLoadingMatrix ? "animate-spin text-sky-600" : ""} />
+              <span>Làm mới ma trận</span>
+            </button>
+          </div>
+
+          {isLoadingMatrix ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400 text-xs">
+              <Loader2 className="w-7 h-7 animate-spin text-sky-600" />
+              <span>Đang tải ma trận phân quyền...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                    <th className="py-3 px-4">Quyền chức năng</th>
+                    <th className="py-3 px-4">Nhóm quyền</th>
+                    <th className="py-3 px-4 text-center">Nhân viên</th>
+                    <th className="py-3 px-4 text-center">Trưởng nhóm</th>
+                    <th className="py-3 px-4 text-center">Quản lý</th>
+                    <th className="py-3 px-4 text-center">Admin</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-800">
+                  {(matrixData?.permissions || []).map((perm) => {
+                    const matrixMap = matrixData?.matrix || {};
+                    const hasStaff = (matrixMap["NHAN_VIEN"] || []).includes(perm.ma_quyen);
+                    const hasLead = (matrixMap["TRUONG_NHOM"] || []).includes(perm.ma_quyen);
+                    const hasMgr = (matrixMap["QUAN_LY"] || []).includes(perm.ma_quyen);
+                    const hasAdmin = (matrixMap["ADMIN"] || []).includes(perm.ma_quyen);
+
+                    return (
+                      <tr key={perm.ma_quyen} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-900">{perm.ten_quyen}</div>
+                          <div className="text-[10px] font-mono text-slate-400">{perm.ma_quyen}</div>
+                        </td>
+                        <td className="py-3 px-4 text-[11px] text-slate-500 font-semibold">
+                          {perm.nhom_quyen}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {hasStaff ? (
+                            <CheckCircle2 size={16} className="text-emerald-600 inline" />
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {hasLead ? (
+                            <CheckCircle2 size={16} className="text-emerald-600 inline" />
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {hasMgr ? (
+                            <CheckCircle2 size={16} className="text-emerald-600 inline" />
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {hasAdmin ? (
+                            <CheckCircle2 size={16} className="text-emerald-600 inline" />
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

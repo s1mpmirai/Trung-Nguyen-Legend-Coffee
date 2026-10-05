@@ -38,6 +38,28 @@ const isManagerRole = (role) => {
   return upper === "ADMIN" || upper === "QUAN_LY" || upper === "TRUONG_NHOM";
 };
 
+// Kiểm tra quyền truy cập Cổng Quản lý (Vai trò Quản lý / Trưởng nhóm hoặc nhân sự được cấp quyền nghiệp vụ web)
+const canAccessManagerPortal = (role, permissions = []) => {
+  if (isManagerRole(role)) return true;
+  const perms = Array.isArray(permissions) ? permissions : [];
+  const managerPerms = [
+    "ATTENDANCE_MANAGE",
+    "LEAVE_APPROVE",
+    "PAYROLL_MANAGE",
+    "EMPLOYEE_VIEW",
+    "EMPLOYEE_CREATE",
+    "EMPLOYEE_UPDATE",
+  ];
+  return perms.some((p) => managerPerms.includes(p));
+};
+
+// Kiểm tra quyền truy cập Cổng Quản trị / Quản lý tài khoản (Admin tối cao hoặc NV IT có quyền ACCOUNT_MANAGE)
+const canAccessAdminPortal = (role, ma_nv, permissions = []) => {
+  if (isAdminRole(role, ma_nv)) return true;
+  const perms = Array.isArray(permissions) ? permissions : [];
+  return perms.includes("ACCOUNT_MANAGE") || perms.includes("PERMISSION_ASSIGN");
+};
+
 // Kiểm tra route đăng nhập quản lý & admin (Thống nhất 1 đường dẫn: login-manage)
 const isManagerLoginRoute = (route) => {
   return route === "login-manage" || route === "login-manager" || route === "login-admin";
@@ -61,11 +83,11 @@ function App() {
   const [mustChangePassword, setMustChangePassword] = useState(false);
 
   // Điều hướng người dùng vào đúng cổng theo phân quyền vai trò (dùng cho cổng Quản lý/Admin)
-  const routeUserToPortal = (role, maNv) => {
+  const routeUserToPortal = (role, maNv, permissions = []) => {
     let target = "attendance";
-    if (isAdminRole(role, maNv)) {
+    if (canAccessAdminPortal(role, maNv, permissions)) {
       target = "admin";
-    } else if (isManagerRole(role)) {
+    } else if (canAccessManagerPortal(role, permissions)) {
       target = "manager";
     }
     window.history.replaceState({ inApp: true, page: target }, "", `/${target}`);
@@ -104,25 +126,34 @@ function App() {
     // NẾU ĐÃ ĐĂNG NHẬP:
     const savedRole = localStorage.getItem("user_role");
     const savedPortal = localStorage.getItem("auth_portal");
+    const savedPerms = JSON.parse(localStorage.getItem("user_permissions") || "[]");
 
-    // Nếu thuộc Cổng Quản lý / Admin
-    if (savedPortal === "manage" || isAdminRole(savedRole, savedMaNv) || isManagerRole(savedRole)) {
+    // Nếu thuộc Cổng Quản lý / Admin hoặc có quyền quản trị tài khoản / quyền quản lý web
+    if (
+      savedPortal === "manage" ||
+      canAccessAdminPortal(savedRole, savedMaNv, savedPerms) ||
+      canAccessManagerPortal(savedRole, savedPerms)
+    ) {
       if (route && route.startsWith("admin")) {
-        if (isAdminRole(savedRole, savedMaNv)) return route;
-        if (isManagerRole(savedRole)) {
+        if (canAccessAdminPortal(savedRole, savedMaNv, savedPerms)) return route;
+        if (canAccessManagerPortal(savedRole, savedPerms)) {
           navigateClean("manager");
           return "manager";
         }
       }
       if (route && route.startsWith("manager")) {
-        if (isManagerRole(savedRole)) return route;
+        if (canAccessManagerPortal(savedRole, savedPerms)) return route;
       }
-      if (isAdminRole(savedRole, savedMaNv)) return "admin";
-      if (isManagerRole(savedRole)) return "manager";
+      if (canAccessAdminPortal(savedRole, savedMaNv, savedPerms)) return "admin";
+      if (canAccessManagerPortal(savedRole, savedPerms)) return "manager";
     }
 
-    // Nếu là Cổng Nhân viên: Không cho truy cập route admin/manager
-    if (route && (route.startsWith("admin") || route.startsWith("manager"))) {
+    // Nếu là Cổng Nhân viên: Không cho truy cập route admin/manager (trừ khi có quyền tài khoản / quản lý)
+    if (route && route.startsWith("admin") && !canAccessAdminPortal(savedRole, savedMaNv, savedPerms)) {
+      navigateClean("attendance");
+      return "attendance";
+    }
+    if (route && route.startsWith("manager") && !canAccessManagerPortal(savedRole, savedPerms)) {
       navigateClean("attendance");
       return "attendance";
     }
@@ -136,6 +167,7 @@ function App() {
     const savedToken = localStorage.getItem("auth_token") || localStorage.getItem("access_token");
     const savedRole = localStorage.getItem("user_role");
     const savedPortal = localStorage.getItem("auth_portal");
+    const savedPerms = JSON.parse(localStorage.getItem("user_permissions") || "[]");
     const route = getCleanRoute();
 
     // Nếu URL còn dấu #, chuẩn hóa ngay thành clean pathname
@@ -150,6 +182,7 @@ function App() {
         token: savedToken,
         role: savedRole,
         portal: savedPortal,
+        permissions: savedPerms,
       });
       localStorage.setItem("user_ma_nv", savedMaNv);
       localStorage.setItem("ma_nv", savedMaNv);
@@ -262,14 +295,20 @@ function App() {
       const savedRole = localStorage.getItem("user_role");
       const savedPortal = localStorage.getItem("auth_portal");
 
-      // Nếu thuộc Cổng Quản lý / Admin
-      if (savedPortal === "manage" || isAdminRole(savedRole, savedMaNv) || isManagerRole(savedRole)) {
+      const savedPerms = JSON.parse(localStorage.getItem("user_permissions") || "[]");
+
+      // Nếu thuộc Cổng Quản lý / Admin hoặc có quyền quản trị tài khoản / quyền quản lý web
+      if (
+        savedPortal === "manage" ||
+        canAccessAdminPortal(savedRole, savedMaNv, savedPerms) ||
+        canAccessManagerPortal(savedRole, savedPerms)
+      ) {
         // Chặn nếu không có quyền admin truy cập /admin
         if (route && route.startsWith("admin")) {
-          if (isAdminRole(savedRole, savedMaNv)) {
+          if (canAccessAdminPortal(savedRole, savedMaNv, savedPerms)) {
             setCurrentPage(route);
-          } else if (isManagerRole(savedRole)) {
-            alert("Khu vực Cổng Admin Tối Cao chỉ dành cho Quản trị viên (NV01).");
+          } else if (canAccessManagerPortal(savedRole, savedPerms)) {
+            alert("Khu vực Cổng Admin Tối Cao chỉ dành cho Quản trị viên.");
             navigateClean("manager");
             setCurrentPage("manager");
           } else {
@@ -282,7 +321,7 @@ function App() {
 
         // Chặn nhân viên không có quyền quản lý truy cập /manager
         if (route && route.startsWith("manager")) {
-          if (isManagerRole(savedRole)) {
+          if (canAccessManagerPortal(savedRole, savedPerms)) {
             setCurrentPage(route);
           } else {
             alert("Bạn không có quyền truy cập vào khu vực Quản lý.");
@@ -337,6 +376,10 @@ function App() {
     }
     localStorage.setItem("auth_portal", portalOrigin);
 
+    if (userData?.permissions) {
+      localStorage.setItem("user_permissions", JSON.stringify(userData.permissions));
+    }
+
     // BẮT BUỘC: Nếu là tài khoản vừa tạo/dùng mật khẩu khởi tạo mặc định -> Đổi mật khẩu đầu tiên
     if (userData?.must_change_password) {
       setMustChangePassword(true);
@@ -344,10 +387,11 @@ function App() {
     }
 
     // TÁCH BIỆT HOÀN TOÀN 2 LUỒNG ĐĂNG NHẬP:
+    const userPerms = userData?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
     if (portalOrigin === "manage") {
       // Đăng nhập từ Cổng Quản lý & Admin: Vô đúng của admin và ql
       let target = "manager";
-      if (isAdminRole(userData?.role, userData?.ma_nv)) {
+      if (canAccessAdminPortal(userData?.role, userData?.ma_nv, userPerms)) {
         target = "admin";
       } else if (isManagerRole(userData?.role)) {
         target = "manager";
@@ -459,7 +503,8 @@ function App() {
   if (currentPage.startsWith("admin")) {
     const role = userSession?.role || localStorage.getItem("user_role");
     const maNv = userSession?.ma_nv || localStorage.getItem("user_ma_nv");
-    if (isAdminRole(role, maNv)) {
+    const perms = userSession?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
+    if (canAccessAdminPortal(role, maNv, perms)) {
       return (
         <AdminDashboard
           userSession={userSession}
@@ -475,8 +520,8 @@ function App() {
         />
       );
     }
-    // Nếu không phải admin, kiểm tra có phải manager không
-    if (isManagerRole(role)) {
+    // Nếu không phải admin hoặc không có quyền tài khoản, kiểm tra có phải manager không
+    if (canAccessManagerPortal(role, perms)) {
       navigateClean("manager");
       setCurrentPage("manager");
     } else {
@@ -485,11 +530,12 @@ function App() {
     }
   }
 
-  // 3. Nếu vào Cổng Quản lý (/manager), kiểm tra quyền quản lý
+  // 3. Nếu vào Cổng Quản lý (/manager), kiểm tra quyền quản lý hoặc quyền web
   if (currentPage.startsWith("manager")) {
     const role = userSession?.role || localStorage.getItem("user_role");
     const maNv = userSession?.ma_nv || localStorage.getItem("user_ma_nv");
-    if (isManagerRole(role)) {
+    const perms = userSession?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
+    if (canAccessManagerPortal(role, perms)) {
       return (
         <ManagerDashboard
           userSession={userSession}

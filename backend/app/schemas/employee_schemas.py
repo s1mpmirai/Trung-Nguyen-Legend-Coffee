@@ -52,8 +52,11 @@ class employee_profile_response(employee_profile):
 
 
 class employee_list_response(BaseModel):
-    """Schema danh sách nhân viên phân trang."""
-    total: int = Field(..., description="Tổng số nhân viên")
+    """Schema danh sách nhân viên phân trang và tìm kiếm nâng cao."""
+    total: int = Field(..., description="Tổng số nhân viên thỏa mãn điều kiện")
+    page: Optional[int] = Field(1, description="Số trang hiện tại")
+    page_size: Optional[int] = Field(50, description="Kích thước mỗi trang")
+    total_pages: Optional[int] = Field(1, description="Tổng số trang")
     items: list[employee_profile_response] = Field(..., description="Danh sách nhân viên")
 
 
