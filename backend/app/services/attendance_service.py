@@ -742,10 +742,12 @@ def adjust_attendance_by_manager(
     effective_hours = fields.get("so_gio_lam") if fields.get("so_gio_lam") is not None else float(record.get("so_gio_lam") or 0.0)
     std_hours = float(shift.get("so_gio_chuan") or 8.0)
 
-    if not is_late and effective_hours >= (std_hours - 0.5):
-        if fields.get("loai_cong") in ["VE_SOM", "DI_TRE", None, ""]:
+    if "loai_cong" not in fields or fields["loai_cong"] is None:
+        if not is_late and effective_hours >= (std_hours - 0.5):
             fields["loai_cong"] = "CONG_DU"
             fields["so_cong"] = 1.0
+        elif is_late:
+            fields["loai_cong"] = "DI_TRE"
 
     user_note = fields.get("ghi_chu") or ""
     if not is_late and ("Đi muộn" in user_note or "Về sớm" in user_note or "Chưa đủ" in user_note or not user_note):
