@@ -11,7 +11,7 @@ import {
   ArrowRight,
   Building2
 } from 'lucide-react';
-import logoImg from '../../assets/logo/logo.png';
+import logoImg from '../../assets/logo/Logo Trung Nguyên_black.png';
 
 /**
  * AdminManagerLogin – Cổng Đăng Nhập Dành Riêng Cho Quản Trị Viên (Admin) & Quản Lý
@@ -121,18 +121,11 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
               className="h-12 w-auto object-contain"
             />
           </div>
-          <div className="flex justify-center mb-2">
-            <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-sky-50 text-sky-700 border border-sky-200/80 rounded-full text-xs font-bold uppercase tracking-wider">
-              <Building2 size={13} className="text-[#0EA5E9]" />
-              <span>Quản Trị Viên & Quản Lý</span>
-            </div>
-          </div>
+
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
             Đăng Nhập Cổng Điều Hành
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-normal">
-            Nhập thông tin xác thực để truy cập bảng điều khiển quản trị hệ thống.
-          </p>
+  
         </div>
 
         {/* Thông báo lỗi */}
@@ -171,12 +164,6 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 Mật khẩu bảo mật
               </label>
-              <span className="text-xs text-slate-400">
-                Mặc định:{' '}
-                <code className="text-[#0EA5E9] font-mono font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100">
-                  1
-                </code>
-              </span>
             </div>
             <div className="relative flex items-center">
               <div className="absolute left-3.5 text-slate-400">
@@ -255,7 +242,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
             ) : (
               <>
                 <ShieldCheck size={18} />
-                <span>Đăng Nhập Quản Trị & Quản Lý</span>
+                <span>Đăng Nhập</span>
                 <ArrowRight size={16} />
               </>
             )}
