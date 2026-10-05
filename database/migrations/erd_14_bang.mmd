@@ -1,5 +1,5 @@
 ---
-title: "LƯỢC ĐỒ QUAN HỆ THỰC THỂ (ERD) — CSDL HRM TRUNG NGUYÊN (14 BẢNG)"
+title: "LƯỢC ĐỒ QUAN HỆ THỰC THỂ (ERD) — CSDL HRM TRUNG NGUYÊN (13 BẢNG)"
 config:
   theme: base
   themeVariables:
@@ -21,8 +21,7 @@ erDiagram
     %% BỐ TRÍ MỐI QUAN HỆ THEO TẦNG HỢP LÝ (TOP-DOWN) ĐỂ DÂY NỐI KHÔNG BỊ ĐÈ
     %% =========================================================================
 
-    %% TẦNG 1 XUỐNG TẦNG 2 (Tổ chức sang Chi nhánh & Bậc lương)
-    chi_nhanh ||--o{ phong_ban : "truc_thuoc"
+    %% TẦNG 1: CHỨC VỤ VÀ BẬC LƯƠNG
     chuc_vu ||--o{ bac_luong : "thang_bac"
 
     %% TẦNG 2 VÀO TÂM ĐIỂM NHÂN VIÊN
@@ -44,27 +43,18 @@ erDiagram
     nhan_vien ||--o{ bang_cham_cong : "cham_cong"
     don_tu ||--o{ bang_cham_cong : "nghi_co_don"
 
-    %% CỤM ADMIN: SẢN PHẨM & NHÀ CUNG CẤP (Liên kết gọn gàng, không vắt ngang)
+    %% CỤM ADMIN: SẢN PHẨM & NHÀ CUNG CẤP
     nhan_vien ||--o{ nha_cung_cap : "phu_trach"
     nha_cung_cap ||--o{ san_pham : "cung_cap"
-    chi_nhanh ||--o{ san_pham : "kho_san_xuat"
 
 
     %% =========================================================================
     %% ĐỊNH NGHĨA CÁC THUỘC TÍNH (Gọn gàng: Khóa chính PK, Khóa ngoại FK, Cột chính)
     %% =========================================================================
 
-    chi_nhanh {
-        varchar ma_cn PK "Mã chi nhánh"
-        varchar ten_cn "Tên chi nhánh/nhà máy"
-        varchar loai_cn "TRU_SO, NHA_MAY..."
-        varchar tinh_thanh "Tỉnh thành"
-    }
-
     phong_ban {
         varchar ma_pb PK "Mã phòng ban"
         varchar ten_pb "Tên phòng ban"
-        varchar ma_cn FK "Thuộc chi nhánh"
         varchar ma_truong_pb FK "Mã trưởng phòng"
     }
 
@@ -91,7 +81,6 @@ erDiagram
         varchar cccd UK "CCCD"
         varchar ma_pb FK "Phòng ban"
         varchar ma_cv FK "Chức vụ"
-        varchar ma_cn FK "Chi nhánh"
         varchar trang_thai "DANG_LAM, DA_NGHI..."
     }
 
@@ -107,8 +96,12 @@ erDiagram
         varchar ma_hd PK "Mã hợp đồng"
         varchar ma_nv FK "Mã nhân viên"
         varchar loai_hd "1 năm, 3 năm, VTH..."
-        date ngay_bat_dau "Ngày bắt đầu"
+        date ngay_bat_dau "Ngày bắt đầu (vào làm)"
         decimal luong_co_ban "Lương cơ bản"
+        varchar so_tai_khoan "Số tài khoản"
+        varchar ngan_hang "Ngân hàng"
+        varchar ma_so_thue "Mã số thuế"
+        varchar so_bhxh "Số BHXH"
     }
 
     don_tu {
@@ -164,7 +157,6 @@ erDiagram
         varchar ma_sp PK "Mã sản phẩm"
         varchar ten_sp "Tên sản phẩm G7..."
         varchar ma_ncc FK "Cung cấp bởi"
-        varchar ma_cn FK "Kho/Xưởng lưu trữ"
         decimal gia_ban "Giá bán"
         int ton_kho "Tồn kho"
     }

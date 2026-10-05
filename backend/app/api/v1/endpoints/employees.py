@@ -8,17 +8,22 @@ from app.schemas.employee_schemas import (
     employee_contact_update,
     employee_detail_response,
     employee_list_response,
+    employee_monthly_report_response,
     employee_profile_create,
     employee_profile_response,
+    employee_status_update,
     profile_update_request_create,
     profile_update_request_response,
     profile_update_review_request,
 )
 from app.services.employee_service import (
     cancel_profile_update,
+    change_employee_status,
     create_employee as create_employee_service,
+    deactivate_employee,
     employee_list,
     get_employee_profile,
+    get_monthly_personnel_report,
     get_pending_profile_update,
     get_profile_requests_manager,
     request_profile_update,
@@ -159,3 +164,70 @@ def review_profile_request_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
 
+
+@router.get(
+    "/reports/monthly",
+    response_model=employee_monthly_report_response,
+    summary="[Quản lý] Báo cáo thống kê tình hình nhân sự theo tháng",
+)
+def get_monthly_personnel_report_endpoint(
+    db: DbSession,
+    thang: int = Query(..., ge=1, le=12, description="Tháng cần báo cáo (1-12)"),
+    nam: int = Query(..., ge=2000, description="Năm cần báo cáo (>= 2000)"),
+    ma_pb: Optional[str] = Query(None, description="Lọc theo mã phòng ban"),
+):
+    """
+    Báo cáo biến động và tình hình nhân sự theo tháng:
+    - Thống kê tổng số nhân sự, số nhân sự đang làm việc, số nhân sự nghỉ phép, số nhân sự đã nghỉ việc / thôi việc.
+    - Danh sách nhân sự mới tuyển dụng trong tháng và tỷ lệ biến động nhân sự.
+    """
+    try:
+        return get_monthly_personnel_report(db, thang, nam, ma_pb)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+
+@router.put(
+    "/{ma_nv}/status",
+    response_model=employee_detail_response,
+    summary="[Quản lý] Khóa hoặc Cập nhật trạng thái làm việc của nhân sự",
+)
+def update_employee_status_endpoint(
+    ma_nv: str,
+    data: employee_status_update,
+    db: DbSession,
+):
+    """
+    Quản lý cập nhật trạng thái làm việc của nhân viên:
+    - DA_NGHI_VIEC: Cho thôi việc (ngừng hợp đồng), tự động khóa tài khoản đăng nhập (xóa mềm an toàn).
+    - TAM_HOAN_HD: Tạm hoãn hợp đồng lao động, tự động khóa tài khoản đăng nhập.
+    - DANG_LAM: Khôi phục trạng thái làm việc bình thường, tự động mở khóa tài khoản.
+    - NGHI_PHEP / NGHI_THAI_SAN: Cập nhật trạng thái nghỉ phép/thai sản dài ngày.
+    """
+    try:
+        return change_employee_status(db, ma_nv, data)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+
+@router.put(
+    "/{ma_nv}/deactivate",
+    response_model=employee_detail_response,
+    summary="[Quản lý] Khóa tài khoản và cho thôi việc nhân sự (Xóa mềm một chạm)",
+)
+def deactivate_employee_endpoint(
+    ma_nv: str,
+    db: DbSession,
+    ly_do: Optional[str] = Query(None, description="Lý do cho thôi việc / khóa nhân sự"),
+):
+    """
+    Thực hiện thôi việc / khóa nhân viên một chạm:
+    - Chuyển trạng thái nhân sự thành 'DA_NGHI_VIEC'.
+    - Gán ngày nghỉ việc là ngày hiện tại.
+    - Tự động khóa tài khoản đăng nhập tương ứng trong bảng tai_khoan.
+    - Giữ nguyên toàn bộ lịch sử chấm công, bảng lương và hợp đồng trong CSDL.
+    """
+    try:
+        return deactivate_employee(db, ma_nv, ly_do)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error

@@ -30,7 +30,7 @@ export default function Login({ onLoginSuccess }) {
     try {
       const cleanId = employeeId.trim().toUpperCase().replace('-', '');
 
-      let response = await fetch('/api/v1/auth/login/employee-login', {
+      let response = await fetch('/api/v1/auth/employee-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -38,17 +38,6 @@ export default function Login({ onLoginSuccess }) {
           mat_khau: password === '••••••••••••' ? 'password' : password,
         }),
       });
-
-      if (response.status === 404) {
-        response = await fetch('/api/v1/auth/employee-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ma_nv: cleanId,
-            mat_khau: password === '••••••••••••' ? 'password' : password,
-          }),
-        });
-      }
 
       if (!response.ok) {
         let errorMsg = 'Mã nhân viên hoặc mật khẩu không chính xác';
@@ -79,6 +68,7 @@ export default function Login({ onLoginSuccess }) {
           ma_nv: data.ma_nv,
           token: data.access_token,
           role: role,
+          must_change_password: Boolean(data.must_change_password),
         });
       }
     } catch (err) {

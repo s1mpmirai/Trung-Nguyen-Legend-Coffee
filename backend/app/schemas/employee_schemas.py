@@ -17,9 +17,8 @@ class employee_profile(BaseModel):
     so_nguoi_pt: Optional[int] = Field(0, description="Số người phụ thuộc")
     ma_pb: str = Field(..., description="Mã phòng ban")
     ma_cv: str = Field(..., description="Mã chức vụ")
-    ma_cn: Optional[str] = Field(None, description="Mã chi nhánh")
     ma_ngl: Optional[str] = Field(None, description="Mã ngạch lương")
-    ngay_vao_lam: date = Field(..., description="Ngày vào làm")
+    ngay_vao_lam: Optional[date] = Field(None, description="Ngày vào làm / bắt đầu HĐ (từ hợp đồng lao động)")
     ngay_nghi_viec: Optional[date] = Field(None, description="Ngày nghỉ việc")
     trang_thai: str = Field("DANG_LAM", description="Trạng thái: DANG_LAM, NGHI_PHEP, DA_NGHI_VIEC")
     hinh_thuc_lam_viec: Optional[str] = Field("FULL_TIME", description="Hình thức: FULL_TIME hoặc PART_TIME")
@@ -139,4 +138,45 @@ class profile_update_request_response(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class employee_status_update(BaseModel):
+    """Schema cho Quản lý khóa hoặc cập nhật trạng thái nhân viên."""
+    trang_thai: str = Field(..., description="Trạng thái: DANG_LAM, DA_NGHI_VIEC, TAM_HOAN_HD, NGHI_PHEP, NGHI_THAI_SAN")
+    ngay_nghi_viec: Optional[date] = Field(None, description="Ngày thôi việc (mặc định hôm nay nếu trạng thái là DA_NGHI_VIEC)")
+    khoa_tai_khoan: bool = Field(True, description="Tự động khóa tài khoản đăng nhập nếu cho thôi việc hoặc tạm hoãn")
+    ly_do: Optional[str] = Field(None, description="Lý do khóa / thay đổi trạng thái nhân sự")
+
+
+class employee_summary_item(BaseModel):
+    """Tóm tắt thông tin nhân sự trong báo cáo."""
+    ma_nv: str
+    ho_ten: str
+    ma_pb: Optional[str] = None
+    ten_pb: Optional[str] = None
+    ma_cv: Optional[str] = None
+    ten_cv: Optional[str] = None
+    trang_thai: str
+    ngay_vao_lam: Optional[date] = None
+    ngay_nghi_viec: Optional[date] = None
+    so_ngay_nghi_thang: Optional[float] = 0.0
+
+
+class employee_monthly_report_response(BaseModel):
+    """Báo cáo biến động và tình hình nhân sự theo tháng (đang làm, nghỉ phép, nghỉ việc)."""
+    thang: int
+    nam: int
+    ma_pb: Optional[str] = None
+    ten_pb: Optional[str] = None
+    tong_nhan_su: int
+    so_dang_lam: int
+    so_nghi_phep: int
+    so_da_nghi_viec: int
+    so_moi_vao_lam: int
+    ty_le_bien_dong: float = Field(..., description="Tỷ lệ biến động/nghỉ việc (%)")
+    danh_sach_dang_lam: list[employee_summary_item]
+    danh_sach_nghi_phep: list[employee_summary_item]
+    danh_sach_da_nghi_viec: list[employee_summary_item]
+    danh_sach_moi_vao_lam: list[employee_summary_item]
+
 

@@ -46,6 +46,8 @@ export async function request(endpoint, options = {}) {
     headers,
   };
 
+
+
   try {
     const response = await fetch(url, config);
 

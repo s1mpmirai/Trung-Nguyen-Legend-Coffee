@@ -17,6 +17,12 @@ DbSession = Annotated[Session, Depends(get_db)]
     status_code=status.HTTP_201_CREATED,
     summary="[Nhân viên] Nộp đơn xin nghỉ phép/nghỉ việc",
 )
+@router.post(
+    "/request",
+    response_model=leave_response,
+    status_code=status.HTTP_201_CREATED,
+    summary="[Nhân viên] Nộp đơn xin nghỉ phép/nghỉ việc (alias)",
+)
 def create_leave_endpoint(
     data: leave_create,
     db: DbSession = None,
@@ -38,6 +44,11 @@ def create_leave_endpoint(
     response_model=list[leave_response],
     summary="[Nhân viên] Xem lịch sử đơn từ của chính mình",
 )
+@router.get(
+    "/my-history/{ma_nv}",
+    response_model=list[leave_response],
+    summary="[Nhân viên] Xem lịch sử đơn từ của chính mình (alias)",
+)
 def get_leaves_by_employee_endpoint(
     ma_nv: str,
     db: DbSession = None,
@@ -50,6 +61,11 @@ def get_leaves_by_employee_endpoint(
     "/{ma_don}/cancel",
     response_model=leave_response,
     summary="[Nhân viên] Hủy đơn xin nghỉ (khi đơn đang Chờ duyệt)",
+)
+@router.put(
+    "/cancel/{ma_don}",
+    response_model=leave_response,
+    summary="[Nhân viên] Hủy đơn xin nghỉ (khi đơn đang Chờ duyệt - alias)",
 )
 def cancel_leave_endpoint(
     ma_don: str,

@@ -1,18 +1,19 @@
 import React from "react";
 import { Clock, FileText, DollarSign, User } from "lucide-react";
+import { navigateClean } from "../../../utils/navigation";
 
 /**
  * BottomNavBar – Thanh điều hướng dưới cùng dùng chung cho cả 4 trang:
- * 1. Chấm công (#/attendance)
- * 2. Đơn từ (#/requests)
- * 3. Bảng lương (#/payroll)
- * 4. Cá nhân (#/profile)
+ * 1. Chấm công (/attendance)
+ * 2. Đơn từ (/requests)
+ * 3. Bảng lương (/payroll)
+ * 4. Cá nhân (/profile)
  */
 const NAV_ITEMS = [
-  { key: "attendance", label: "Chấm công", icon: Clock, hash: "#/attendance" },
-  { key: "requests", label: "Đơn từ", icon: FileText, hash: "#/requests" },
-  { key: "payroll", label: "Bảng lương", icon: DollarSign, hash: "#/payroll" },
-  { key: "profile", label: "Cá nhân", icon: User, hash: "#/profile" },
+  { key: "attendance", label: "Chấm công", icon: Clock },
+  { key: "requests", label: "Đơn từ", icon: FileText },
+  { key: "payroll", label: "Bảng lương", icon: DollarSign },
+  { key: "profile", label: "Cá nhân", icon: User },
 ];
 
 export default function BottomNavBar({ activeTab = "attendance" }) {
@@ -31,7 +32,7 @@ export default function BottomNavBar({ activeTab = "attendance" }) {
             key={item.key}
             type="button"
             onClick={() => {
-              window.location.hash = item.hash;
+              navigateClean(item.key);
             }}
             className={`flex flex-col items-center space-y-1 py-1 px-3 rounded-xl transition-all ${
               isActive ? "text-[#0EA5E9]" : "text-slate-400 hover:text-slate-600"

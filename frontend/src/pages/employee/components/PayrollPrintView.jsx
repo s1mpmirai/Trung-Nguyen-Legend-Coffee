@@ -58,12 +58,11 @@ function PayrollPrintView({ printMode, payroll, yearSummary, month, year }) {
             <thead>
               <tr>
                 <th style={{ width: "8%" }}>Tháng</th>
-                <th style={{ width: "10%" }}>Số công</th>
-                <th style={{ width: "10%" }}>Tăng ca (h)</th>
-                <th style={{ width: "18%" }}>Tổng Gross</th>
-                <th style={{ width: "18%" }}>Tổng khấu trừ</th>
-                <th style={{ width: "20%" }}>Thực nhận (NET)</th>
-                <th style={{ width: "16%" }}>Trạng thái</th>
+                <th style={{ width: "12%" }}>Số công</th>
+                <th style={{ width: "20%" }}>Tổng Gross</th>
+                <th style={{ width: "20%" }}>Tổng khấu trừ</th>
+                <th style={{ width: "22%" }}>Thực nhận (NET)</th>
+                <th style={{ width: "18%" }}>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
@@ -74,7 +73,6 @@ function PayrollPrintView({ printMode, payroll, yearSummary, month, year }) {
                     <tr key={item.thang}>
                       <td className="text-center font-bold">Tháng {item.thang}</td>
                       <td className="text-center">{item.so_cong_thuc_te}</td>
-                      <td className="text-center">{item.so_gio_tang_ca || 0}</td>
                       <td className="text-right">{formatMoney(item.luong_gross)} đ</td>
                       <td className="text-right text-red-600">-{formatMoney(item.tong_khau_tru)} đ</td>
                       <td className="text-right font-bold">{formatMoney(item.luong_net)} đ</td>
@@ -84,7 +82,7 @@ function PayrollPrintView({ printMode, payroll, yearSummary, month, year }) {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="text-center py-4">Chưa có dữ liệu bảng lương năm {year}</td>
+                  <td colSpan={6} className="text-center py-4">Chưa có dữ liệu bảng lương năm {year}</td>
                 </tr>
               )}
             </tbody>
@@ -206,18 +204,12 @@ function PayrollPrintView({ printMode, payroll, yearSummary, month, year }) {
             </tr>
             <tr>
               <td className="text-center">3</td>
-              <td>Tiền lương tăng ca (OT)</td>
-              <td className="text-center">{payroll?.so_gio_tang_ca || 0} giờ</td>
-              <td className="text-right">{formatMoney(payroll?.tien_tang_ca)} đ</td>
-            </tr>
-            <tr>
-              <td className="text-center">4</td>
               <td>Tổng các khoản phụ cấp</td>
               <td className="text-center">Ăn trưa, xăng xe, ĐT</td>
               <td className="text-right">{formatMoney(payroll?.tong_phu_cap)} đ</td>
             </tr>
             <tr>
-              <td className="text-center">5</td>
+              <td className="text-center">4</td>
               <td>Tiền thưởng / Khen thưởng</td>
               <td className="text-center">KPI & Đạt mục tiêu</td>
               <td className="text-right">{formatMoney(payroll?.tien_thuong)} đ</td>

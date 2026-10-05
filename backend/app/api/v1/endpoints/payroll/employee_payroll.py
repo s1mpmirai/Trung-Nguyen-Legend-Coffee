@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -19,35 +19,33 @@ router = APIRouter()
 DbSession = Annotated[Session, Depends(get_db)]
 
 
-@router.get("/{ma_nv}/month", response_model=payroll_month_response, summary="[Nhân viên] Chi tiết bảng lương 1 tháng (In phiếu lương)")
+@router.get(
+    "/{ma_nv}/month",
+    response_model=Optional[payroll_month_response],
+    summary="[Nhân viên] Chi tiết bảng lương 1 tháng (In phiếu lương)",
+)
 def get_payroll_month(
     ma_nv: str,
     thang: int = Query(..., ge=1, le=12, description="Tháng (1-12)"),
     nam: int = Query(..., ge=2000, description="Năm"),
     db: DbSession = None,
 ):
-    """Lấy chi tiết bảng lương 1 tháng của nhân viên để xem hoặc in phiếu lương."""
-    try:
-        return get_employee_payroll_month(db, ma_nv, thang, nam)
-    except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(err)
-        ) from err
+    """Lấy chi tiết bảng lương 1 tháng của nhân viên để xem hoặc in phiếu lương (Trả về null với 200 OK nếu chưa có dữ liệu)."""
+    return get_employee_payroll_month(db, ma_nv, thang, nam)
 
 
-@router.get("/{ma_nv}/year", response_model=payroll_year_summary_response, summary="[Nhân viên] Tổng hợp bảng lương cả năm")
+@router.get(
+    "/{ma_nv}/year",
+    response_model=Optional[payroll_year_summary_response],
+    summary="[Nhân viên] Tổng hợp bảng lương cả năm",
+)
 def get_payroll_year(
     ma_nv: str,
     nam: int = Query(..., ge=2000, description="Năm cần xem"),
     db: DbSession = None,
 ):
-    """Lấy tổng hợp bảng lương cả năm của nhân viên để xem hoặc in bảng năm."""
-    try:
-        return get_employee_payroll_year(db, ma_nv, nam)
-    except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(err)
-        ) from err
+    """Lấy tổng hợp bảng lương cả năm của nhân viên để xem hoặc in bảng năm (Trả về null với 200 OK nếu chưa có dữ liệu)."""
+    return get_employee_payroll_year(db, ma_nv, nam)
 
 
 @router.get("/{ma_nv}/months", response_model=payroll_months_response, summary="[Nhân viên] Danh sách các tháng đã có lương")

@@ -7,9 +7,8 @@ def get_payroll_by_month(db: Session, ma_nv: str, thang: int, nam: int) -> dict 
     query = """
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
-            bl.luong_co_ban, bl.he_so_luong,
-            bl.so_cong_chuan, bl.so_cong_thuc_te, bl.so_gio_tang_ca,
-            bl.luong_theo_cong, bl.tien_tang_ca,
+            bl.so_cong_chuan, bl.so_cong_thuc_te,
+            bl.luong_theo_cong,
             bl.tong_phu_cap, bl.tien_thuong,
             bl.luong_gross,
             bl.bhxh, bl.bhyt, bl.bhtn,
@@ -49,8 +48,11 @@ def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
             nv.ho_ten, pb.ten_pb, cv.ten_cv,
-            bl.so_cong_thuc_te, bl.luong_gross, bl.tong_khau_tru, bl.luong_net,
-            bl.trang_thai
+            bl.luong_co_ban, bl.he_so_luong, bl.so_cong_chuan,
+            bl.so_cong_thuc_te,
+            bl.luong_theo_cong, bl.tong_phu_cap, bl.tien_thuong,
+            bl.luong_gross, bl.bhxh, bl.bhyt, bl.bhtn, bl.thue_tncn, bl.tong_khau_tru,
+            bl.luong_net, bl.trang_thai, bl.ghi_chu
         FROM bang_luong bl
         JOIN nhan_vien nv ON bl.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
@@ -79,6 +81,7 @@ def update_payroll_status(db: Session, ma_bl: int, trang_thai: str) -> dict | No
 def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int:
     """
     Tự động tính lương tháng cho toàn bộ nhân viên đang làm việc và lưu vào bảng bang_luong.
+    Tính lương công nhật, làm thêm ngoài giờ (OT x1.5) và phụ cấp làm việc.
     Trả về số lượng bản ghi bảng lương đã được tính/cập nhật.
     """
     # 1. Lấy danh sách nhân viên đang làm việc kèm thông tin lương
@@ -104,28 +107,25 @@ def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int
         he_so = float(emp["he_so_luong"])
         phu_cap = float(emp["phu_cap"])
 
-        # 2. Tổng hợp công từ bảng chấm công
+        # 2. Tổng hợp công thực tế từ bảng chấm công
         cc_query = """
             SELECT
-                COALESCE(SUM(so_cong), 0)          AS so_cong_thuc_te,
-                COALESCE(SUM(so_gio_tang_ca), 0)   AS so_gio_tang_ca
-            FROM bang_cham_cong
-            WHERE ma_nv = :ma_nv
-              AND MONTH(ngay_cong) = :thang
-              AND YEAR(ngay_cong)  = :nam
+                COALESCE(SUM(bcc.so_cong), 0) AS so_cong_thuc_te
+            FROM bang_cham_cong bcc
+            WHERE bcc.ma_nv = :ma_nv
+              AND MONTH(bcc.ngay_cong) = :thang
+              AND YEAR(bcc.ngay_cong)  = :nam
         """
         cc = db.execute(
             text(cc_query), {"ma_nv": ma_nv, "thang": thang, "nam": nam}
         ).mappings().first()
 
         so_cong_thuc_te = float(cc["so_cong_thuc_te"]) if cc else 0.0
-        so_gio_tang_ca = float(cc["so_gio_tang_ca"]) if cc else 0.0
 
         # 3. Tính toán các khoản lương
         luong_theo_cong = round((luong_co_ban * he_so / so_cong_chuan) * so_cong_thuc_te)
-        tien_tang_ca = round((luong_co_ban * he_so / so_cong_chuan / 8) * 1.5 * so_gio_tang_ca)
         tien_thuong = 0
-        luong_gross = luong_theo_cong + tien_tang_ca + int(phu_cap) + tien_thuong
+        luong_gross = luong_theo_cong + int(phu_cap) + tien_thuong
 
         # Các khoản bảo hiểm bắt buộc theo luật lao động VN
         bhxh = round(luong_gross * 0.08)
@@ -144,22 +144,20 @@ def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int
         upsert_query = """
             INSERT INTO bang_luong (
                 thang, nam, ma_nv, luong_co_ban, he_so_luong,
-                so_cong_chuan, so_cong_thuc_te, so_gio_tang_ca,
-                luong_theo_cong, tien_tang_ca, tong_phu_cap, tien_thuong,
+                so_cong_chuan, so_cong_thuc_te,
+                luong_theo_cong, tong_phu_cap, tien_thuong,
                 luong_gross, bhxh, bhyt, bhtn, thue_tncn, khau_tru_khac,
                 tong_khau_tru, luong_net, trang_thai
             ) VALUES (
                 :thang, :nam, :ma_nv, :luong_co_ban, :he_so_luong,
-                :so_cong_chuan, :so_cong_thuc_te, :so_gio_tang_ca,
-                :luong_theo_cong, :tien_tang_ca, :tong_phu_cap, :tien_thuong,
+                :so_cong_chuan, :so_cong_thuc_te,
+                :luong_theo_cong, :tong_phu_cap, :tien_thuong,
                 :luong_gross, :bhxh, :bhyt, :bhtn, :thue_tncn, 0,
                 :tong_khau_tru, :luong_net, 'NHAP'
             )
             ON DUPLICATE KEY UPDATE
                 so_cong_thuc_te = VALUES(so_cong_thuc_te),
-                so_gio_tang_ca  = VALUES(so_gio_tang_ca),
                 luong_theo_cong = VALUES(luong_theo_cong),
-                tien_tang_ca    = VALUES(tien_tang_ca),
                 tong_phu_cap    = VALUES(tong_phu_cap),
                 luong_gross     = VALUES(luong_gross),
                 bhxh            = VALUES(bhxh),
@@ -180,9 +178,7 @@ def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int
                 "he_so_luong": he_so,
                 "so_cong_chuan": so_cong_chuan,
                 "so_cong_thuc_te": so_cong_thuc_te,
-                "so_gio_tang_ca": so_gio_tang_ca,
                 "luong_theo_cong": luong_theo_cong,
-                "tien_tang_ca": tien_tang_ca,
                 "tong_phu_cap": phu_cap,
                 "tien_thuong": tien_thuong,
                 "luong_gross": luong_gross,
@@ -210,8 +206,8 @@ def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
             bl.luong_co_ban, bl.he_so_luong,
-            bl.so_cong_chuan, bl.so_cong_thuc_te, bl.so_gio_tang_ca,
-            bl.luong_theo_cong, bl.tien_tang_ca,
+            bl.so_cong_chuan, bl.so_cong_thuc_te,
+            bl.luong_theo_cong,
             bl.tong_phu_cap, bl.tien_thuong,
             bl.luong_gross,
             bl.bhxh, bl.bhyt, bl.bhtn,
@@ -239,7 +235,6 @@ def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
     tong_bhtn = sum(float(r["bhtn"] or 0) for r in items)
     tong_thue_tncn = sum(float(r["thue_tncn"] or 0) for r in items)
     tong_cong_thuc_te = sum(float(r["so_cong_thuc_te"] or 0) for r in items)
-    tong_gio_tang_ca = sum(float(r["so_gio_tang_ca"] or 0) for r in items)
     ho_ten = items[0]["ho_ten"] if items else ""
 
     return {
@@ -255,7 +250,6 @@ def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
         "tong_bhtn": tong_bhtn,
         "tong_thue_tncn": tong_thue_tncn,
         "tong_cong_thuc_te": tong_cong_thuc_te,
-        "tong_gio_tang_ca": tong_gio_tang_ca,
         "chi_tiet_thang": items,
     }
 

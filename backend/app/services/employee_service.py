@@ -7,14 +7,17 @@ from app.repositories.employee_repository import (
     get_by_cccd,
     get_by_ma_nv,
     get_employee_list,
+    get_monthly_personnel_report as repo_get_monthly_report,
     get_pending_profile_request_by_employee,
     get_profile_requests_for_manager,
     review_profile_update_request,
     update_contact,
+    update_employee_status as repo_update_status,
 )
 from app.schemas.employee_schemas import (
     employee_contact_update,
     employee_profile_create,
+    employee_status_update,
     profile_update_request_create,
     profile_update_review_request,
 )
@@ -93,4 +96,58 @@ def review_profile_update(db: Session, ma_yc: int, data: profile_update_review_r
         nguoi_duyet=data.nguoi_duyet,
         y_kien_duyet=data.y_kien_duyet,
     )
+
+
+def change_employee_status(db: Session, ma_nv: str, data: employee_status_update) -> dict:
+    """Quản lý khóa hoặc cập nhật trạng thái nhân viên."""
+    clean_id = ma_nv.strip().upper().replace("-", "")
+    emp = get_by_ma_nv(db, clean_id)
+    if not emp:
+        raise ValueError(f"Không tìm thấy nhân viên có mã {clean_id}")
+
+    valid_statuses = ["DANG_LAM", "DA_NGHI_VIEC", "TAM_HOAN_HD", "NGHI_PHEP", "NGHI_THAI_SAN"]
+    if data.trang_thai not in valid_statuses:
+        raise ValueError(f"Trạng thái '{data.trang_thai}' không hợp lệ. Phải là một trong: {', '.join(valid_statuses)}")
+
+    updated = repo_update_status(
+        db=db,
+        ma_nv=clean_id,
+        trang_thai=data.trang_thai,
+        ngay_nghi_viec=data.ngay_nghi_viec,
+        khoa_tai_khoan=data.khoa_tai_khoan,
+        ly_do=data.ly_do,
+    )
+    return updated
+
+
+def deactivate_employee(db: Session, ma_nv: str, ly_do: str | None = None) -> dict:
+    """Thôi việc / Khóa tài khoản nhân sự (xóa mềm an toàn)."""
+    clean_id = ma_nv.strip().upper().replace("-", "")
+    emp = get_by_ma_nv(db, clean_id)
+    if not emp:
+        raise ValueError(f"Không tìm thấy nhân viên có mã {clean_id}")
+
+    return repo_update_status(
+        db=db,
+        ma_nv=clean_id,
+        trang_thai="DA_NGHI_VIEC",
+        khoa_tai_khoan=True,
+        ly_do=ly_do or "Cho thôi việc / Khóa hồ sơ",
+    )
+
+
+def get_monthly_personnel_report(
+    db: Session,
+    thang: int,
+    nam: int,
+    ma_pb: str | None = None,
+) -> dict:
+    """Báo cáo biến động nhân sự theo tháng: đang làm, nghỉ phép, nghỉ việc."""
+    if not (1 <= thang <= 12):
+        raise ValueError("Tháng phải từ 1 đến 12")
+    if nam < 2000:
+        raise ValueError("Năm không hợp lệ")
+
+    return repo_get_monthly_report(db, thang, nam, ma_pb)
+
 

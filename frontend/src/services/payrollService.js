@@ -2,11 +2,7 @@
  * payrollService.js
  *
  * Tầng giao tiếp dữ liệu cho module Bảng Lương & Phiếu Thu Nhập.
- *
- * API Backend khả dụng:
- *   GET /api/v1/payroll/{ma_nv}/month?thang=8&nam=2026  → Chi tiết lương 1 tháng
- *   GET /api/v1/payroll/{ma_nv}/months                  → Danh sách tháng đã có lương
- *   GET /api/v1/payroll/{ma_nv}/year?nam=2026            → Tổng hợp lương cả năm
+ * Hỗ trợ cả chức năng Nhân viên (cá nhân) và Quản lý (toàn công ty).
  */
 
 import apiClient from "./apiClient";
@@ -25,19 +21,17 @@ export const FALLBACK_PAYROLL = {
   he_so_luong: 2.2,
   so_cong_chuan: 22,
   so_cong_thuc_te: 22,
-  so_gio_tang_ca: 2,
   luong_theo_cong: 35000000,
-  tien_tang_ca: 477273,
   tong_phu_cap: 3000000,
   tien_thuong: 0,
-  luong_gross: 38477273,
+  luong_gross: 38000000,
   bhxh: 2800000,
   bhyt: 525000,
   bhtn: 350000,
   thue_tncn: 4000000,
   khau_tru_khac: 0,
   tong_khau_tru: 7675000,
-  luong_net: 30802273,
+  luong_net: 30325000,
   trang_thai: "DA_DUYET",
   ghi_chu: null,
   hasData: true,
@@ -59,7 +53,6 @@ export function formatMoney(value) {
 
 /**
  * Map trạng thái lương sang nhãn hiển thị.
- * Nếu chưa có trạng thái hoặc tháng chưa có lương -> hiển thị "Đang cập nhật"
  */
 export function mapPayrollStatus(status) {
   const map = {
@@ -85,14 +78,9 @@ export function calcNetRatio(gross, net) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   API CALLS
+   API CALLS - DÀNH CHO NHÂN VIÊN
    ═══════════════════════════════════════════════════════════════ */
 
-/**
- * Lấy bảng lương 1 tháng cụ thể.
- * - Trả về Object đầy đủ nếu tháng đó ĐÃ CÓ dữ liệu trong DB.
- * - Trả về null nếu tháng đó CHƯA CÓ lương (hiển thị "Đang cập nhật").
- */
 export async function getPayrollMonth(maNv, thang, nam) {
   try {
     const data = await apiClient.get(
@@ -103,11 +91,9 @@ export async function getPayrollMonth(maNv, thang, nam) {
     }
     return null;
   } catch (error) {
-    // Nếu API trả về 404 (Không tìm thấy bảng lương trong DB)
     if (error?.status === 404 || error?.message?.includes("404")) {
       return null;
     }
-    // Khi lỗi kết nối ngoại lệ, chỉ fallback cho tháng mẫu 8/2026
     if (thang === 8 && nam === 2026) {
       return { ...FALLBACK_PAYROLL, thang, nam, ma_nv: maNv, hasData: true };
     }
@@ -115,9 +101,6 @@ export async function getPayrollMonth(maNv, thang, nam) {
   }
 }
 
-/**
- * Lấy danh sách tháng đã có bảng lương của nhân viên
- */
 export async function getPayrollMonths(maNv) {
   try {
     const data = await apiClient.get(`/payroll/${maNv}/months`);
@@ -128,16 +111,12 @@ export async function getPayrollMonths(maNv) {
   }
 }
 
-/**
- * Lấy tổng hợp lương cả năm
- */
 export async function getPayrollYearSummary(maNv, nam) {
   try {
     const data = await apiClient.get(`/payroll/${maNv}/year?nam=${nam}`);
     if (data && (data.tong_gross > 0 || (data.chi_tiet_thang && data.chi_tiet_thang.length > 0))) {
       return data;
     }
-    // Nếu API trả về rỗng nhưng là năm 2026, chỉ fallback đúng dữ liệu tháng có trong DB
     if (nam === 2026) {
       return getFallbackYearSummary(maNv, 2026);
     }
@@ -151,18 +130,13 @@ export async function getPayrollYearSummary(maNv, nam) {
   }
 }
 
-/**
- * Dữ liệu tổng hợp dự phòng theo đúng tháng thực tế trong Database (Tháng 8/2026)
- */
 function getFallbackYearSummary(maNv, nam) {
   const baseMonth = FALLBACK_PAYROLL;
-  // Chỉ lấy đúng tháng thực tế có trong Database (Tháng 8/2026)
   const chiTiet = [
     {
       thang: 8,
       nam: nam,
       so_cong_thuc_te: baseMonth.so_cong_thuc_te,
-      so_gio_tang_ca: baseMonth.so_gio_tang_ca,
       luong_gross: baseMonth.luong_gross,
       tong_khau_tru: baseMonth.tong_khau_tru,
       luong_net: baseMonth.luong_net,
@@ -183,7 +157,62 @@ function getFallbackYearSummary(maNv, nam) {
     tong_bhtn: baseMonth.bhtn,
     tong_thue_tncn: baseMonth.thue_tncn,
     tong_cong_thuc_te: baseMonth.so_cong_thuc_te,
-    tong_gio_tang_ca: baseMonth.so_gio_tang_ca,
     chi_tiet_thang: chiTiet,
   };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   API CALLS - DÀNH CHO QUẢN LÝ
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * Lấy bảng lương tháng của toàn bộ nhân viên
+ * GET /api/v1/payroll/company-summary?thang=...&nam=...
+ */
+export async function getCompanyPayroll(thang, nam) {
+  try {
+    const res = await fetch(`/api/v1/payroll/company-summary?thang=${thang}&nam=${nam}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (e) {
+    console.error('Error fetching company payroll:', e);
+  }
+  return null;
+}
+
+/**
+ * Tính toán tự động bảng lương tháng từ bảng chấm công
+ * POST /api/v1/payroll/calculate
+ */
+export async function calculatePayroll(thang, nam) {
+  const res = await fetch('/api/v1/payroll/calculate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ thang, nam }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    const msg = errData?.detail || errData?.message || `Lỗi tính lương (${res.status})`;
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
+/**
+ * Cập nhật trạng thái duyệt / chi trả bảng lương
+ * PUT /api/v1/payroll/{ma_bl}/status
+ */
+export async function updatePayrollStatus(ma_bl, trang_thai) {
+  const res = await fetch(`/api/v1/payroll/${ma_bl}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trang_thai }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => null);
+    const msg = errData?.detail || errData?.message || `Lỗi cập nhật trạng thái bảng lương (${res.status})`;
+    throw new Error(msg);
+  }
+  return await res.json();
 }

@@ -16,6 +16,8 @@ import {
   FileText,
   DollarSign,
   User,
+  X,
+  Briefcase,
 } from 'lucide-react';
 
 import logoImg from '../../assets/logo/Logo Trung Nguyên_black.png';
@@ -37,15 +39,35 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showHistoryDetail, setShowHistoryDetail] = useState(false);
 
+  // States cho Popup Modal Xác nhận Ra ca
+  const [showCheckOutModal, setShowCheckOutModal] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkOutTimeDisplay, setCheckOutTimeDisplay] = useState('');
+
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
-      const dashboardData = await getAttendanceDashboardData(userSession?.ma_nv || 'NV-8824');
+      const activeEmpId = userSession?.ma_nv || localStorage.getItem('user_ma_nv') || localStorage.getItem('ma_nv') || 'NV10';
+      const dashboardData = await getAttendanceDashboardData(activeEmpId);
       setData(dashboardData);
       setIsLoading(false);
     }
     loadData();
   }, [userSession]);
+
+  // Cập nhật giờ ra ca theo thời gian thực khi Modal xác nhận đang mở
+  useEffect(() => {
+    if (!showCheckOutModal) return;
+    const updateTime = () => {
+      const now = new Date();
+      setCheckOutTimeDisplay(
+        `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+      );
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, [showCheckOutModal]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -82,8 +104,8 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
     showToast(res.message || `✓ Đã chấm VÀO CA thành công (${res.gio_vao})`);
   };
 
-  // Thao tác RA CA (OUT)
-  const handleCheckOut = async () => {
+  // Thao tác bấm nút RA CA (OUT) -> Mở popup xác nhận (chỉ 1 lần mỗi ca)
+  const handleCheckOut = () => {
     if (!data) return;
 
     if (!hasCheckedInToday) {
@@ -91,16 +113,45 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
       return;
     }
 
-    const res = await checkOutAttendance(data.employee.ma_nv, data.location);
-    if (!res.success) {
-      showToast(res.message || 'Chấm công ra ca không thành công');
+    if (hasCheckedOutToday) {
+      showToast(
+        `Hôm nay bạn đã hoàn thành ra ca lúc ${todayRecord?.gio_ra}. Mỗi ca chỉ được check-out 1 lần!`
+      );
       return;
     }
 
-    // Tải lại dữ liệu chuẩn từ database
-    const freshData = await getAttendanceDashboardData(data.employee.ma_nv);
-    setData(freshData);
-    showToast(res.message || `✓ Đã chấm RA CA thành công (${res.gio_ra})`);
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    setCheckOutTimeDisplay(timeStr);
+    setShowCheckOutModal(true);
+  };
+
+  // Thao tác xác nhận RA CA trong Popup Modal
+  const handleConfirmCheckOut = async () => {
+    if (!data) return;
+
+    setIsCheckingOut(true);
+    try {
+      const res = await checkOutAttendance(data.employee.ma_nv, data.location);
+      if (!res.success) {
+        showToast(res.message || 'Chấm công ra ca không thành công');
+        setIsCheckingOut(false);
+        setShowCheckOutModal(false);
+        const freshData = await getAttendanceDashboardData(data.employee.ma_nv);
+        setData(freshData);
+        return;
+      }
+
+      // Tải lại dữ liệu chuẩn từ database
+      const freshData = await getAttendanceDashboardData(data.employee.ma_nv);
+      setData(freshData);
+      setShowCheckOutModal(false);
+      showToast(res.message || `✓ Đã xác nhận RA CA thành công (${res.gio_ra})`);
+    } catch (err) {
+      showToast('Có lỗi xảy ra khi chấm công ra ca');
+    } finally {
+      setIsCheckingOut(false);
+    }
   };
 
   if (isLoading || !data) {
@@ -229,11 +280,11 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
                 !hasCheckedInToday
                   ? 'bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed'
                   : hasCheckedOutToday
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/60 active:scale-[0.98]'
+                  ? 'bg-slate-100 text-slate-500 border border-slate-200 shadow-none hover:bg-slate-200/70'
                   : 'bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-800 border-slate-300 shadow-sm'
               }`}
             >
-              <LogOut size={16} className={hasCheckedOutToday ? 'text-emerald-600' : 'text-slate-500'} />
+              <LogOut size={16} className={hasCheckedOutToday ? 'text-slate-400' : 'text-slate-500'} />
               <span>{hasCheckedOutToday ? `ĐÃ RA (${todayRecord?.gio_ra})` : 'RA CA (OUT)'}</span>
             </button>
           </div>
@@ -441,6 +492,95 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
         })()}
         </section>
       </main>
+
+      {/* ───────────────── POPUP MODAL XÁC NHẬN RA CA ───────────────── */}
+      {showCheckOutModal && (
+        <div
+          onClick={() => !isCheckingOut && setShowCheckOutModal(false)}
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 cursor-pointer"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl border border-slate-100 space-y-4 relative animate-in zoom-in-95 duration-150 cursor-default"
+          >
+            {/* Header modal */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Xác nhận Ra ca</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Xác nhận kết thúc ca làm việc hôm nay?
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isCheckingOut && setShowCheckOutModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Thông tin ca và thời gian */}
+            <div className="space-y-3">
+              {/* Ca làm việc */}
+              <div className="flex items-center justify-between py-2 border-b border-slate-100 text-xs">
+                <span className="text-slate-500 font-medium">Ca làm việc</span>
+                <span className="font-semibold text-slate-900">
+                  {todayRecord?.ca_lam_viec || 'Hành chính (08:00 - 17:00)'}
+                </span>
+              </div>
+
+              {/* Giờ Vào - Giờ Ra */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <span className="text-[11px] text-slate-500 font-medium block mb-1">
+                    Giờ vào ca
+                  </span>
+                  <p className="text-lg font-bold text-slate-900">
+                    {todayRecord?.gio_vao || '--:--'}
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <span className="text-[11px] text-slate-500 font-medium block mb-1">
+                    Giờ ra ca
+                  </span>
+                  <p className="text-lg font-bold text-slate-900">
+                    {checkOutTimeDisplay || '--:--'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Các nút hành động */}
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowCheckOutModal(false)}
+                disabled={isCheckingOut}
+                className="py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs transition-colors disabled:opacity-50"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCheckOut}
+                disabled={isCheckingOut}
+                className="py-2.5 px-3 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] active:scale-[0.98] text-white font-semibold text-xs shadow-sm flex items-center justify-center space-x-1.5 transition-all disabled:opacity-70"
+              >
+                {isCheckingOut ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Đang xử lý...</span>
+                  </>
+                ) : (
+                  <span>Xác nhận Ra ca</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ───────────────── BOTTOM NAVIGATION BAR ───────────────── */}
       <BottomNavBar activeTab="attendance" />

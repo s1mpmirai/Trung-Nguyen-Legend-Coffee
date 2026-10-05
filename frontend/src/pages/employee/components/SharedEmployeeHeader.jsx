@@ -1,22 +1,20 @@
 import React from 'react';
 import { Bell, LogOut } from 'lucide-react';
 import logoImg from '../../../assets/logo/Logo Trung Nguyên_black.png';
+import { navigateClean } from '../../../utils/navigation';
 
 /**
  * SharedEmployeeHeader – Header thương hiệu TrungNguyenHR chung cho toàn bộ các trang nhân viên.
  *
  * Tính năng:
- *  - Click cụm Logo (Icon + Chữ TrungNguyenHR) -> Quay về trang Chấm công (#/attendance)
+ *  - Click cụm Logo (Icon + Chữ TrungNguyenHR) -> Quay về trang Chấm công (/attendance)
  *  - Chuông thông báo
  *  - Nút Đăng xuất tiện lợi
  */
 export default function SharedEmployeeHeader({ onLogout, onNotificationClick }) {
   const handleLogoClick = () => {
-    if (window.location.hash === '#/attendance') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      window.location.hash = '#/attendance';
-    }
+    navigateClean('attendance');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleNotify = () => {

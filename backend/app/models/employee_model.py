@@ -31,19 +31,13 @@ class nhan_vien(Base):
     so_nguoi_pt = Column(Integer, default=0)  # Số người phụ thuộc
     ma_pb = Column(String, ForeignKey("phong_ban.ma_pb"), nullable=False)
     ma_cv = Column(String, ForeignKey("chuc_vu.ma_cv"), nullable=False)
-    ma_cn = Column(String, ForeignKey("chuyen_nganh.ma_cn"), nullable=True)
     ma_ngl = Column(String, ForeignKey("ngach_luong.ma_ngl"), nullable=True)
-    ngay_vao_lam = Column(Date, nullable=False)
     ngay_nghi_viec = Column(Date)
     trang_thai = Column(String, default='DANG_LAM')  # 'DANG_LAM', 'DA_NGHI_VIEC'
-    so_tai_khoan = Column(String)
-    ngan_hang = Column(String)
-    ma_so_thue = Column(String)
-    so_bhxh = Column(String)    
+    hinh_thuc_lam_viec = Column(String, default='FULL_TIME')
     ngay_tao = Column(DateTime, default=datetime.now)
     ngay_cap_nhat = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
     ma_pb_rel = relationship("phong_ban", back_populates="nhan_vien")
     ma_cv_rel = relationship("chuc_vu", back_populates="nhan_vien")
-    ma_cn_rel = relationship("chuyen_nganh", back_populates="nhan_vien")
     ma_ngl_rel = relationship("ngach_luong", back_populates="nhan_vien")
