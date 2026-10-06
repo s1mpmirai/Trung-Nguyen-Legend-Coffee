@@ -47,11 +47,26 @@ export default function AdminWarehouseTab() {
   const [totalProducts, setTotalProducts] = useState(0);
   const [productSummary, setProductSummary] = useState({ tong_ton_kho: 0, tong_gia_tri_kho: 0 });
   const [productLoading, setProductLoading] = useState(false);
+  const [productSearchInput, setProductSearchInput] = useState("");
   const [productSearch, setProductSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [lowStockFilter, setLowStockFilter] = useState(false);
   const [productPage, setProductPage] = useState(1);
   const productPageSize = 10;
+
+  const handleTriggerProductSearch = () => {
+    setProductSearch(productSearchInput.trim());
+    setProductPage(1);
+  };
+
+  const handleProductSearchChange = (e) => {
+    const val = e.target.value;
+    setProductSearchInput(val);
+    if (!val.trim()) {
+      setProductSearch("");
+      setProductPage(1);
+    }
+  };
 
   // Modals for Products
   const [showProductModal, setShowProductModal] = useState(false);
@@ -84,10 +99,25 @@ export default function AdminWarehouseTab() {
   const [suppliers, setSuppliers] = useState([]);
   const [totalSuppliers, setTotalSuppliers] = useState(0);
   const [supplierLoading, setSupplierLoading] = useState(false);
+  const [supplierSearchInput, setSupplierSearchInput] = useState("");
   const [supplierSearch, setSupplierSearch] = useState("");
   const [supplierStatusFilter, setSupplierStatusFilter] = useState("");
   const [supplierPage, setSupplierPage] = useState(1);
   const supplierPageSize = 10;
+
+  const handleTriggerSupplierSearch = () => {
+    setSupplierSearch(supplierSearchInput.trim());
+    setSupplierPage(1);
+  };
+
+  const handleSupplierSearchChange = (e) => {
+    const val = e.target.value;
+    setSupplierSearchInput(val);
+    if (!val.trim()) {
+      setSupplierSearch("");
+      setSupplierPage(1);
+    }
+  };
 
   // Modals for Suppliers
   const [showSupplierModal, setShowSupplierModal] = useState(false);
@@ -503,18 +533,31 @@ export default function AdminWarehouseTab() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
               {/* Search */}
-              <div className="relative flex-1 min-w-[220px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm theo Mã SP, Tên sản phẩm..."
-                  value={productSearch}
-                  onChange={(e) => {
-                    setProductSearch(e.target.value);
-                    setProductPage(1);
-                  }}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
-                />
+              <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo Mã SP, Tên sản phẩm..."
+                    value={productSearchInput}
+                    onChange={handleProductSearchChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleTriggerProductSearch();
+                      }
+                    }}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTriggerProductSearch}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+                >
+                  <Search size={13} />
+                  <span>Tìm kiếm</span>
+                </button>
               </div>
 
               {/* Loai SP Filter */}
@@ -730,18 +773,31 @@ export default function AdminWarehouseTab() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
               {/* Search */}
-              <div className="relative flex-1 min-w-[220px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm theo Tên NCC, SĐT, Người liên hệ..."
-                  value={supplierSearch}
-                  onChange={(e) => {
-                    setSupplierSearch(e.target.value);
-                    setSupplierPage(1);
-                  }}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
-                />
+              <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo Tên NCC, SĐT, Người liên hệ..."
+                    value={supplierSearchInput}
+                    onChange={handleSupplierSearchChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleTriggerSupplierSearch();
+                      }
+                    }}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTriggerSupplierSearch}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+                >
+                  <Search size={13} />
+                  <span>Tìm kiếm</span>
+                </button>
               </div>
 
               {/* Status Filter */}

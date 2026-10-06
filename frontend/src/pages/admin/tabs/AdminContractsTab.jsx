@@ -42,12 +42,27 @@ export default function AdminContractsTab() {
   const [successMessage, setSuccessMessage] = useState("");
 
   // Filters & Pagination
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [loaiHdFilter, setLoaiHdFilter] = useState("");
   const [trangThaiFilter, setTrangThaiFilter] = useState("");
   const [expiringOnly, setExpiringOnly] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 10;
+
+  const handleTriggerSearch = () => {
+    setSearch(searchInput.trim());
+    setPage(1);
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    if (!val.trim()) {
+      setSearch("");
+      setPage(1);
+    }
+  };
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -401,18 +416,31 @@ export default function AdminContractsTab() {
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
           {/* Search */}
-          <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Tìm theo Mã HĐ, Mã NV, Họ tên..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
-            />
+          <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Tìm theo Mã HĐ, Mã NV, Họ tên..."
+                value={searchInput}
+                onChange={handleSearchChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleTriggerSearch();
+                  }
+                }}
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleTriggerSearch}
+              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+            >
+              <Search size={13} />
+              <span>Tìm kiếm</span>
+            </button>
           </div>
 
           {/* Loai HD */}

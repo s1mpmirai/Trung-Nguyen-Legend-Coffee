@@ -4,18 +4,11 @@ import {
   KeyRound,
   Package,
   FileText,
-  Building2,
-  Briefcase,
-  AlertTriangle,
   CheckCircle2,
-  TrendingUp,
-  ArrowRight,
   ShieldCheck,
   Sparkles,
   Loader2,
   RefreshCw,
-  Boxes,
-  Truck
 } from "lucide-react";
 import { getAdminStats } from "../../../services/adminService";
 
@@ -95,15 +88,6 @@ export default function AdminOverviewTab({ onNavigateTab }) {
             <KeyRound size={14} />
             <span>Cấp tài khoản mới</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigateTab("departments")}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all shadow-xs cursor-pointer"
-          >
-            <Building2 size={14} className="text-sky-600" />
-            <span>Thêm phòng ban</span>
-          </button>
         </div>
       </div>
 
@@ -111,8 +95,7 @@ export default function AdminOverviewTab({ onNavigateTab }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Metric 1: Tổng nhân sự */}
         <div
-          onClick={() => onNavigateTab("employees")}
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all cursor-pointer"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between cursor-default"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">Tổng nhân sự toàn chuỗi</span>
@@ -157,8 +140,7 @@ export default function AdminOverviewTab({ onNavigateTab }) {
 
         {/* Metric 3: Kho hàng & Sản phẩm */}
         <div
-          onClick={() => onNavigateTab("warehouse")}
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all cursor-pointer"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between cursor-default"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">Kho hàng & Mặt hàng</span>
@@ -180,8 +162,7 @@ export default function AdminOverviewTab({ onNavigateTab }) {
 
         {/* Metric 4: Hợp đồng lao động */}
         <div
-          onClick={() => onNavigateTab("contracts")}
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all cursor-pointer"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between cursor-default"
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">Hợp đồng lao động</span>
@@ -213,13 +194,6 @@ export default function AdminOverviewTab({ onNavigateTab }) {
               </h3>
               <p className="text-xs text-slate-500">Phân bố {totalEmployees} nhân sự trong 8 phòng ban</p>
             </div>
-            <button
-              onClick={() => onNavigateTab("departments")}
-              className="text-xs font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
-            >
-              <span>Chi tiết</span>
-              <ArrowRight size={14} />
-            </button>
           </div>
 
           <div className="space-y-3.5 mt-3">
@@ -256,13 +230,6 @@ export default function AdminOverviewTab({ onNavigateTab }) {
                 </h3>
                 <p className="text-xs text-slate-500">4 cấp bậc tài khoản đăng nhập</p>
               </div>
-              <button
-                onClick={() => onNavigateTab("permissions")}
-                className="text-xs font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
-              >
-                <span>Phân quyền</span>
-                <ArrowRight size={14} />
-              </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-3">
@@ -309,7 +276,7 @@ export default function AdminOverviewTab({ onNavigateTab }) {
             <h3 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-base text-slate-900 mb-1">
               Phím Tắt Quản Trị Hệ Thống
             </h3>
-            <p className="text-xs text-slate-500 mb-4">Các tác vụ điều hành thường nhật</p>
+            <p className="text-xs text-slate-500 mb-4">Các tác vụ quản trị tài khoản người dùng</p>
 
             <div className="grid grid-cols-2 gap-2.5">
               <button
@@ -318,35 +285,34 @@ export default function AdminOverviewTab({ onNavigateTab }) {
               >
                 <KeyRound className="w-5 h-5 text-sky-600" />
                 <span className="font-semibold text-xs text-slate-800">Cấp tài khoản</span>
-                <span className="text-[11px] text-slate-400">Còn 10 nhân sự</span>
+                <span className="text-[11px] text-slate-400">Chưa cấp: {summary.nhan_su_chua_co_tai_khoan || 0}</span>
               </button>
 
               <button
-                onClick={() => onNavigateTab("permissions")}
+                onClick={() => onNavigateTab("accounts")}
                 className="p-3 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/50 flex flex-col gap-1.5 transition text-left cursor-pointer"
               >
                 <ShieldCheck className="w-5 h-5 text-sky-600" />
-                <span className="font-semibold text-xs text-slate-800">Thăng chức NV</span>
-                <span className="text-[11px] text-slate-400">Lên Trưởng nhóm</span>
+                <span className="font-semibold text-xs text-slate-800">Quản lý tài khoản</span>
+                <span className="text-[11px] text-slate-400">Tổng: {summary.tong_tai_khoan || 0} tài khoản</span>
               </button>
 
               <button
-                onClick={() => onNavigateTab("contracts")}
+                onClick={loadStats}
                 className="p-3 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/50 flex flex-col gap-1.5 transition text-left cursor-pointer"
               >
-                <FileText className="w-5 h-5 text-sky-600" />
-                <span className="font-semibold text-xs text-slate-800">Ký hợp đồng</span>
-                <span className="text-[11px] text-slate-400">Thử việc, 1-3 năm</span>
+                <RefreshCw className={`w-5 h-5 text-sky-600 ${isLoading ? "animate-spin" : ""}`} />
+                <span className="font-semibold text-xs text-slate-800">Làm mới số liệu</span>
+                <span className="text-[11px] text-slate-400">Đồng bộ tức thời</span>
               </button>
 
-              <button
-                onClick={() => onNavigateTab("warehouse")}
-                className="p-3 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/50 flex flex-col gap-1.5 transition text-left cursor-pointer"
+              <div
+                className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-1.5 text-left cursor-default"
               >
-                <Boxes className="w-5 h-5 text-sky-600" />
-                <span className="font-semibold text-xs text-slate-800">Kho cà phê</span>
-                <span className="text-[11px] text-slate-400">9.900 đơn vị tồn</span>
-              </button>
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <span className="font-semibold text-xs text-slate-800">Hệ thống ổn định</span>
+                <span className="text-[11px] text-emerald-600 font-medium">Hoạt động 100%</span>
+              </div>
             </div>
           </div>
         </div>

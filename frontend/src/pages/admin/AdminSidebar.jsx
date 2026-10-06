@@ -1,14 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import {
-  LayoutDashboard,
   KeyRound,
-  Shield,
-  Building2,
-  Briefcase,
-  FileText,
-  Users,
-  Package,
-  ArrowLeftRight,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -16,7 +8,7 @@ import logoImg from "../../assets/logo/Logo Trung Nguyên_black.png";
 
 export default function AdminSidebar({
   userSession,
-  activeTab = "dashboard",
+  activeTab = "accounts",
   onTabChange,
   onSwitchToManager,
   onSwitchToEmployee,
@@ -51,19 +43,12 @@ export default function AdminSidebar({
   const userPerms = userSession?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
 
   const allNavItems = [
-    { id: "dashboard", label: "Tổng quan hệ thống", icon: LayoutDashboard },
     { id: "accounts", label: "Quản lý tài khoản", icon: KeyRound, badge: "Admin", permission: "ACCOUNT_MANAGE" },
-    { id: "permissions", label: "Phân quyền & RBAC", icon: Shield, badge: "Admin", permission: "PERMISSION_ASSIGN" },
-    { id: "departments", label: "Cơ cấu phòng ban", icon: Building2 },
-    { id: "positions", label: "Chức vụ & Bậc lương", icon: Briefcase },
-    { id: "contracts", label: "Hợp đồng lao động", icon: FileText },
-    { id: "employees", label: "Quản lý nhân sự", icon: Users },
   ];
 
-  // Nếu là Admin tối cao -> xem tất cả; nếu là NV IT được cấp ACCOUNT_MANAGE -> xem Dashboard và Tài khoản
+  // Nếu là Admin tối cao hoặc NV IT được cấp ACCOUNT_MANAGE -> xem Quản lý tài khoản
   const navItems = allNavItems.filter((item) => {
     if (isAdmin) return true;
-    if (item.id === "dashboard") return true;
     if (item.permission && userPerms.includes(item.permission)) return true;
     return false;
   });
@@ -93,10 +78,10 @@ export default function AdminSidebar({
           <div
             onClick={(e) => {
               e.stopPropagation();
-              onTabChange && onTabChange("dashboard");
+              onTabChange && onTabChange("accounts");
             }}
             className="flex items-center gap-3 overflow-hidden cursor-pointer group"
-            title="Quay về Tổng quan"
+            title="Quản lý tài khoản"
           >
             <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-xs group-hover:border-sky-500 group-hover:shadow transition-all shrink-0">
               <img
@@ -190,39 +175,7 @@ export default function AdminSidebar({
             : "px-4 flex flex-col gap-2"
         }
       >
-        {onSwitchToManager && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSwitchToManager();
-            }}
-            className={`${
-              collapsed ? "w-10 h-10 p-0" : "w-full py-2.5 px-3"
-            } flex items-center justify-center gap-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-sky-600 hover:bg-sky-50 border border-slate-200/80 transition-all cursor-pointer`}
-            title="Chuyển sang Cổng Quản lý (Manager)"
-          >
-            <ArrowLeftRight className="w-3.5 h-3.5 text-slate-500" />
-            {!collapsed && <span>Cổng Quản lý (Manager)</span>}
-          </button>
-        )}
 
-        {onSwitchToEmployee && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSwitchToEmployee();
-            }}
-            className={`${
-              collapsed ? "w-10 h-10 p-0" : "w-full py-2.5 px-3"
-            } flex items-center justify-center gap-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-sky-600 hover:bg-sky-50 border border-slate-200/80 transition-all cursor-pointer`}
-            title="Chuyển sang Giao diện Nhân viên"
-          >
-            <Users className="w-3.5 h-3.5 text-slate-500" />
-            {!collapsed && <span>Giao diện Nhân viên</span>}
-          </button>
-        )}
 
         {collapsed ? (
           <div

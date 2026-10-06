@@ -77,7 +77,20 @@ const getTodayDateString = () => {
 
 export default function AttendanceManagement() {
   const [viewMode, setViewMode] = useState("daily"); // "daily" | "monthly"
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleTriggerSearch = () => {
+    setSearchQuery(searchInput.trim());
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    if (!val.trim()) {
+      setSearchQuery("");
+    }
+  };
   const [selectedDept, setSelectedDept] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedDate, setSelectedDate] = useState(() => getTodayDateString());
@@ -1045,15 +1058,32 @@ export default function AttendanceManagement() {
 
         {/* Toolbar Filter */}
         <div className="p-4 bg-white border-b border-slate-100 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
-          <div className="relative flex-1 min-w-[260px]">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo Tên nhân viên, Mã NV (NV01, NV10)..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none transition-all"
-            />
+          <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={handleSearchChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleTriggerSearch();
+                  }
+                }}
+                placeholder="Tìm theo Tên nhân viên, Mã NV (NV01, NV10)..."
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 focus:outline-none transition-all"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleTriggerSearch}
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+              title="Tìm kiếm (Enter)"
+            >
+              <Search size={14} />
+              <span>Tìm kiếm</span>
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

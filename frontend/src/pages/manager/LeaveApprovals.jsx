@@ -18,13 +18,29 @@ import {
   User,
   ShieldAlert,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Search,
 } from "lucide-react";
 import { getAllLeavesForManager, reviewLeave } from "../../services/leaveService";
 
 export default function LeaveApprovals() {
   const [activeFilter, setActiveFilter] = useState("all");
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleTriggerSearch = () => {
+    setSearchQuery(searchInput.trim());
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    if (!val.trim()) {
+      setSearchQuery("");
+      setCurrentPage(1);
+    }
+  };
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -493,14 +509,32 @@ export default function LeaveApprovals() {
           </div>
 
           {/* Search */}
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm tên nhân viên, mã đơn..."
-              className="w-64 pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-sky-500 transition-all"
-            />
+          <div className="relative flex items-center gap-1.5">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={handleSearchChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleTriggerSearch();
+                  }
+                }}
+                placeholder="Tìm tên nhân viên, mã đơn..."
+                className="w-64 pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-sky-500 transition-all"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleTriggerSearch}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+              title="Tìm kiếm (Enter)"
+            >
+              <Search size={13} />
+              <span>Tìm</span>
+            </button>
           </div>
         </div>
 

@@ -100,7 +100,20 @@ export default function RolePermissions({ userSession }) {
   const [activeSubTab, setActiveSubTab] = useState("configure"); // 'configure' | 'matrix'
   const [employees, setEmployees] = useState([]);
   const [isLoadingList, setIsLoadingList] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const handleTriggerSearch = () => {
+    setSearchTerm(searchInput.trim());
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    if (!val.trim()) {
+      setSearchTerm("");
+    }
+  };
 
   // Nhân sự được chọn để cấu hình quyền
   const [selectedMaNv, setSelectedMaNv] = useState("NV10"); // Mặc định chọn nhân viên NV10 hoặc người đầu tiên
@@ -372,15 +385,32 @@ export default function RolePermissions({ userSession }) {
             </div>
 
             {/* Ô tìm kiếm */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Tìm mã NV, họ tên, phòng ban..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
-              />
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={handleSearchChange}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleTriggerSearch();
+                    }
+                  }}
+                  placeholder="Tìm mã NV, họ tên, phòng ban..."
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleTriggerSearch}
+                className="px-2.5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+                title="Tìm kiếm (Enter)"
+              >
+                <Search size={13} />
+                <span>Tìm</span>
+              </button>
             </div>
 
             {/* Danh sách cuộn */}

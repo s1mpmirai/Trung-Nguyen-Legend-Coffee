@@ -83,7 +83,22 @@ const calculateTenureData = (startDateStr) => {
 };
 
 export default function PersonnelReport() {
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleTriggerSearch = () => {
+    setSearchQuery(searchInput.trim());
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    if (!val.trim()) {
+      setSearchQuery("");
+      setCurrentPage(1);
+    }
+  };
   const [selectedTenure, setSelectedTenure] = useState("all");
   const [selectedDept, setSelectedDept] = useState("all");
   const [selectedWorkingType, setSelectedWorkingType] = useState("all");
@@ -445,15 +460,32 @@ export default function PersonnelReport() {
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col gap-3">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
-          <div className="relative flex items-center">
-            <Search className="w-4 h-4 absolute left-3.5 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm theo tên, mã NV, chức danh..."
-              className="w-full pl-10 pr-3.5 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
-            />
+          <div className="relative flex items-center gap-1.5">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3 text-slate-400 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={handleSearchChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleTriggerSearch();
+                  }
+                }}
+                placeholder="Tìm theo tên, mã NV, chức danh..."
+                className="w-full pl-9 pr-2 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleTriggerSearch}
+              className="px-2.5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+              title="Tìm kiếm (Enter)"
+            >
+              <Search size={13} />
+              <span>Tìm</span>
+            </button>
           </div>
 
           {/* Phòng ban filter */}

@@ -153,7 +153,20 @@ export default function AdminPermissionsTab() {
   const inspectDropdownRef = useRef(null);
 
   // Filter permission list
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleTriggerSearch = () => {
+    setSearchQuery(searchInput.trim());
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    if (!val.trim()) {
+      setSearchQuery("");
+    }
+  };
 
   // Toast
   const [toastMessage, setToastMessage] = useState("");
@@ -777,15 +790,31 @@ export default function AdminPermissionsTab() {
 
           <div className="flex items-center gap-3">
             {/* Tìm kiếm quyền */}
-            <div className="relative min-w-[240px]">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Tìm quyền hạn hoặc nhóm nghiệp vụ..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
-              />
+            <div className="flex items-center gap-2 min-w-[280px]">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Tìm quyền hạn hoặc nhóm nghiệp vụ..."
+                  value={searchInput}
+                  onChange={handleSearchChange}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleTriggerSearch();
+                    }
+                  }}
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500 transition"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleTriggerSearch}
+                className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm transition-all cursor-pointer shrink-0"
+              >
+                <Search size={12} />
+                <span>Tìm</span>
+              </button>
             </div>
 
             <div className="flex items-center gap-3 text-xs">

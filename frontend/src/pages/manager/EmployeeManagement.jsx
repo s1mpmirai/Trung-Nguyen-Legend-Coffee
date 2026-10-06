@@ -538,10 +538,25 @@ export default function EmployeeManagement({ initialTab = "list" }) {
   }, [initialTab]);
 
   // Bộ lọc dùng chung & theo tab
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("10/2026");
+
+  const handleTriggerSearch = () => {
+    setSearchQuery(searchInput.trim());
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchInput(val);
+    if (!val.trim()) {
+      setSearchQuery("");
+      setCurrentPage(1);
+    }
+  };
 
   // Bộ lọc chuyên sâu cho Tab Báo cáo
   const [selectedDegree, setSelectedDegree] = useState("all");
@@ -1065,15 +1080,32 @@ export default function EmployeeManagement({ initialTab = "list" }) {
 
           {/* Thanh công cụ tìm kiếm & lọc Tab 1 */}
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-            <div className="relative flex-1 min-w-[280px]">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm theo Mã NV, Họ tên, Email, Chức vụ..."
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 rounded-xl text-xs focus:outline-none focus:border-sky-500 focus:bg-white transition-all"
-              />
+            <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={handleSearchChange}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleTriggerSearch();
+                    }
+                  }}
+                  placeholder="Tìm theo Mã NV, Họ tên, Email, Chức vụ..."
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 rounded-xl text-xs focus:outline-none focus:border-sky-500 focus:bg-white transition-all"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleTriggerSearch}
+                className="px-3 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+                title="Tìm kiếm (Enter)"
+              >
+                <Search size={14} />
+                <span>Tìm kiếm</span>
+              </button>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -1267,15 +1299,32 @@ export default function EmployeeManagement({ initialTab = "list" }) {
           <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col gap-3">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
               {/* Search */}
-              <div className="lg:col-span-1 relative flex items-center">
-                <Search className="w-4 h-4 absolute left-3.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm mã NV, họ tên, chức vụ..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white transition-all"
-                />
+              <div className="lg:col-span-1 relative flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3 text-slate-400 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Tìm mã NV, họ tên, chức vụ..."
+                    value={searchInput}
+                    onChange={handleSearchChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleTriggerSearch();
+                      }
+                    }}
+                    className="w-full pl-8 pr-2 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:bg-white transition-all"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTriggerSearch}
+                  className="px-2.5 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white transition-all shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
+                  title="Tìm kiếm (Enter)"
+                >
+                  <Search size={13} />
+                  <span>Tìm</span>
+                </button>
               </div>
 
               {/* Trình độ */}
