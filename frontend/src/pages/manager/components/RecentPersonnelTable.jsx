@@ -51,7 +51,7 @@ export default function RecentPersonnelTable({ data }) {
       name: "Đỗ Thị Kim Oanh",
       initials: "DT",
       role: "Barista Cao cấp",
-      dept: "Chi nhánh Legend Cầu Giấy (Hà Nội)",
+      dept: "Phòng Kinh doanh Miền Bắc",
       effectiveDate: "03/10/2026",
       type: "Nghỉ việc",
       typeColor: "rose",

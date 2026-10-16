@@ -13,6 +13,7 @@ from app.repositories.employee_repository import (
     review_profile_update_request,
     update_contact,
     update_employee_status as repo_update_status,
+    repo_delete_employee,
 )
 from app.schemas.employee_schemas import (
     employee_contact_update,
@@ -180,5 +181,19 @@ def get_monthly_personnel_report(
         raise ValueError("Năm không hợp lệ")
 
     return repo_get_monthly_report(db, thang, nam, ma_pb)
+
+
+def delete_employee(db: Session, ma_nv: str) -> dict:
+    """Xóa hoàn toàn nhân sự khỏi hệ thống (DELETE CASCADE)."""
+    clean_id = ma_nv.strip().upper().replace("-", "")
+    emp = get_by_ma_nv(db, clean_id)
+    if not emp:
+        raise ValueError(f"Không tìm thấy nhân viên có mã {clean_id}")
+
+    success = repo_delete_employee(db, clean_id)
+    if not success:
+        raise ValueError(f"Không thể xóa nhân sự {clean_id}")
+    return {"message": f"Đã xóa hoàn toàn nhân sự {clean_id} khỏi hệ thống", "ma_nv": clean_id}
+
 
 

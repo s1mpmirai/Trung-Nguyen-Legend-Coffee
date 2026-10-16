@@ -10,7 +10,6 @@ import EmployeeManagement from "./EmployeeManagement";
 import LeaveApprovals from "./LeaveApprovals";
 import AttendanceManagement from "./AttendanceManagement";
 import PayrollManagement from "./PayrollManagement";
-import PersonnelReport from "./PersonnelReport";
 import RolePermissions from "./RolePermissions";
 import { getManagerDashboardStats } from "../../services/managerService";
 

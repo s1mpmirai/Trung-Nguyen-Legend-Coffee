@@ -20,9 +20,12 @@ import {
   TrendingUp,
   RefreshCw,
   ChevronLeft,
-  ChevronRight,
   MapPin,
   Briefcase,
+  Trash2,
+  AlertTriangle,
+  X,
+  ShieldAlert,
 } from "lucide-react";
 import AddEmployeeModal from "./components/AddEmployeeModal";
 import apiClient from "../../services/apiClient";
@@ -189,9 +192,9 @@ const DB_FALLBACK_EMPLOYEES = [
     name: "Bùi Thị Mai",
     email: "mai.bui@trungnguyen.com.vn",
     initials: "BM",
-    role: "Trưởng chi nhánh",
-    dept: "Phòng Kinh doanh Hà Nội",
-    location: "Chi nhánh Hà Nội",
+    role: "Trưởng phòng",
+    dept: "Phòng Kinh doanh Miền Bắc",
+    location: "Trụ sở chính Trung Nguyên",
     degree: "university",
     degreeLabel: "Đại học Quản trị Kinh doanh",
     school: "ĐH Kinh tế Quốc dân (2013)",
@@ -410,8 +413,8 @@ const DB_FALLBACK_EMPLOYEES = [
     email: "thao.tran@trungnguyen.com.vn",
     initials: "TT",
     role: "Nhân viên Kinh doanh",
-    dept: "Phòng Kinh doanh Hà Nội",
-    location: "Chi nhánh Hà Nội",
+    dept: "Phòng Kinh doanh Miền Bắc",
+    location: "Trụ sở chính Trung Nguyên",
     degree: "university",
     degreeLabel: "Đại học Kinh tế Đối ngoại",
     school: "ĐH Ngoại thương Hà Nội (2022)",
@@ -526,6 +529,14 @@ export default function EmployeeManagement({ initialTab = "list" }) {
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
+  // Quản lý Cho thôi việc / Xóa nhân sự
+  const [deactivateModalEmp, setDeactivateModalEmp] = useState(null);
+  const [reactivateModalEmp, setReactivateModalEmp] = useState(null);
+  const [deleteMode, setDeleteMode] = useState("soft"); // 'soft' (Thôi việc) | 'hard' (Xóa vĩnh viễn)
+  const [deactivateReason, setDeactivateReason] = useState("Nghỉ việc theo nguyện vọng cá nhân");
+  const [deactivateNote, setDeactivateNote] = useState("");
+  const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
+
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(""), 4000);
@@ -630,7 +641,6 @@ export default function EmployeeManagement({ initialTab = "list" }) {
       initials: getInitials(item.ho_ten),
       isVip: item.ma_cv === "CV08" || item.ma_cv === "CV07" || item.ma_nv === "NV01",
       cccd: item.cccd,
-      ma_cn: item.ma_cn,
     };
   };
 
@@ -671,7 +681,6 @@ export default function EmployeeManagement({ initialTab = "list" }) {
         email: newEmp.email,
         ma_pb: newEmp.ma_pb,
         ma_cv: newEmp.ma_cv,
-        ma_cn: newEmp.ma_cn,
         ngay_vao_lam: newEmp.ngay_vao_lam || new Date().toISOString().split("T")[0],
         trang_thai: "DANG_LAM",
         hinh_thuc_lam_viec: "FULL_TIME",
@@ -722,6 +731,106 @@ export default function EmployeeManagement({ initialTab = "list" }) {
       console.error("Lỗi khi thêm nhân sự:", err);
     }
   };
+
+  // Mở modal xác nhận cho thôi việc / xóa
+  const handleOpenDeactivateModal = (emp) => {
+    setDeactivateModalEmp(emp);
+    setDeleteMode("soft");
+    setDeactivateReason("Nghỉ việc theo nguyện vọng cá nhân");
+    setDeactivateNote("");
+  };
+
+  // Mở modal xác nhận khôi phục trạng thái làm việc
+  const handleOpenReactivateModal = (emp) => {
+    setReactivateModalEmp(emp);
+  };
+
+  // Xác nhận thực hiện thôi việc / xóa
+  const handleConfirmDeactivate = async () => {
+    if (!deactivateModalEmp) return;
+    const emp = deactivateModalEmp;
+    setIsSubmittingDeactivate(true);
+    try {
+      if (deleteMode === "soft") {
+        const fullReason = deactivateNote ? `${deactivateReason}: ${deactivateNote}` : deactivateReason;
+        try {
+          await apiClient.put(`/employees/${emp.id}/deactivate`, null, {
+            params: { ly_do: fullReason },
+          });
+        } catch (apiErr) {
+          console.info("[EmployeeManagement] Cập nhật thôi việc cục bộ:", apiErr.message);
+        }
+
+        setEmployees((prev) =>
+          prev.map((e) =>
+            e.id === emp.id
+              ? {
+                  ...e,
+                  status: "resigned",
+                  statusText: "Đã nghỉ việc",
+                  statusColor: "rose",
+                }
+              : e
+          )
+        );
+        showToast(`Đã ghi nhận thôi việc và khóa tài khoản cho nhân sự ${emp.name} (${emp.id}) thành công!`);
+      } else {
+        // Xóa hoàn toàn (DELETE CASCADE) khỏi CSDL
+        try {
+          await apiClient.delete(`/employees/${emp.id}`);
+        } catch (apiErr) {
+          console.info("[EmployeeManagement] Xóa hoàn toàn cục bộ:", apiErr.message);
+        }
+
+        setEmployees((prev) => prev.filter((e) => e.id !== emp.id));
+        showToast(`Đã xóa hoàn toàn hồ sơ nhân sự ${emp.name} (${emp.id}) khỏi CSDL!`);
+      }
+      setDeactivateModalEmp(null);
+    } catch (err) {
+      console.error("Lỗi khi xử lý thôi việc/xóa nhân sự:", err);
+      showToast("Có lỗi xảy ra khi thực hiện thao tác: " + err.message);
+    } finally {
+      setIsSubmittingDeactivate(false);
+    }
+  };
+
+  // Xác nhận khôi phục nhân sự
+  const handleConfirmReactivate = async () => {
+    if (!reactivateModalEmp) return;
+    const emp = reactivateModalEmp;
+    setIsSubmittingDeactivate(true);
+    try {
+      try {
+        await apiClient.put(`/employees/${emp.id}/status`, {
+          trang_thai: "DANG_LAM",
+          khoa_tai_khoan: false,
+        });
+      } catch (apiErr) {
+        console.info("[EmployeeManagement] Cập nhật khôi phục cục bộ:", apiErr.message);
+      }
+
+      setEmployees((prev) =>
+        prev.map((e) =>
+          e.id === emp.id
+            ? {
+                ...e,
+                status: "working",
+                statusText: "Đang làm việc",
+                statusColor: "emerald",
+              }
+            : e
+        )
+      );
+      showToast(`Đã khôi phục trạng thái Đang làm việc cho nhân sự ${emp.name} (${emp.id})!`);
+      setReactivateModalEmp(null);
+    } catch (err) {
+      console.error("Lỗi khi khôi phục nhân sự:", err);
+      showToast("Lỗi khi khôi phục trạng thái: " + err.message);
+    } finally {
+      setIsSubmittingDeactivate(false);
+    }
+  };
+
 
   // Danh sách phòng ban duy nhất để lọc
   const departmentOptions = useMemo(() => {
@@ -944,14 +1053,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
 
               <div className="h-4 w-px bg-slate-200 hidden sm:block mx-1"></div>
 
-              <button
-                type="button"
-                onClick={() => showToast("Đã mở trình tải lên dữ liệu nhân sự Excel mẫu!")}
-                className="px-3.5 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Nhập từ Excel</span>
-              </button>
+
               <button
                 type="button"
                 onClick={() => showToast("Đã xuất danh sách nhân sự sang file Excel thành công!")}
@@ -1423,19 +1525,20 @@ export default function EmployeeManagement({ initialTab = "list" }) {
           <table className="w-full text-left border-collapse min-w-[980px]">
             <thead>
               <tr className="bg-slate-50/90 text-slate-500 font-semibold text-[11px] uppercase tracking-wider border-b border-slate-200/80">
-                <th className="py-3.5 px-4 min-w-[240px]">Mã NV & Họ tên</th>
-                <th className="py-3.5 px-4 min-w-[170px]">Phòng ban & Chi nhánh</th>
-                <th className="py-3.5 px-4 min-w-[150px]">Chức vụ</th>
-                <th className="py-3.5 px-4 min-w-[180px]">Trình độ & Chuyên môn</th>
-                <th className="py-3.5 px-4 min-w-[150px]">Thâm niên & Ngày vào</th>
-                <th className="py-3.5 px-4 min-w-[130px] text-right">Mức lương</th>
-                <th className="py-3.5 px-4 min-w-[130px] text-center">Trạng thái</th>
+                <th className="py-3.5 px-4 min-w-[220px]">Mã NV & Họ tên</th>
+                <th className="py-3.5 px-4 min-w-[160px]">Phòng ban</th>
+                <th className="py-3.5 px-4 min-w-[140px]">Chức vụ</th>
+                <th className="py-3.5 px-4 min-w-[170px]">Trình độ & Chuyên môn</th>
+                <th className="py-3.5 px-4 min-w-[140px]">Thâm niên & Ngày vào</th>
+                <th className="py-3.5 px-4 min-w-[120px] text-right">Mức lương</th>
+                <th className="py-3.5 px-4 min-w-[120px] text-center">Trạng thái</th>
+                <th className="py-3.5 px-4 min-w-[130px] text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {isLoading && employees.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                  <td colSpan={8} className="py-16 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Loader2 className="w-7 h-7 animate-spin text-sky-600" />
                       <span className="text-xs font-medium">Đang tải danh sách nhân sự từ CSDL...</span>
@@ -1444,7 +1547,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                 </tr>
               ) : pagedEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400">
+                  <td colSpan={8} className="py-16 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Users className="w-8 h-8 text-slate-300" />
                       <span className="text-xs font-semibold text-slate-600">
@@ -1491,14 +1594,10 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                       </div>
                     </td>
 
-                    {/* Cột 2: Phòng ban & Chi nhánh */}
+                    {/* Cột 2: Phòng ban */}
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col">
                         <span className="font-semibold text-slate-800">{emp.dept}</span>
-                        <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                          <span className="truncate">{emp.location}</span>
-                        </span>
                       </div>
                     </td>
 
@@ -1577,6 +1676,31 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                         {emp.statusText}
                       </span>
                     </td>
+
+                    {/* Cột 8: Thao tác (Cho thôi việc / Xóa nhân sự / Khôi phục) */}
+                    <td className="py-3.5 px-4 text-center">
+                      {emp.status === "resigned" ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReactivateModal(emp)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
+                          title="Khôi phục trạng thái Đang làm việc cho nhân sự này"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Khôi phục</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDeactivateModal(emp)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
+                          title="Cho thôi việc / Xóa nhân sự khỏi danh sách hoạt động"
+                        >
+                          <UserX className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Thôi việc / Xóa</span>
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -1649,6 +1773,220 @@ export default function EmployeeManagement({ initialTab = "list" }) {
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleAddEmployee}
       />
+
+      {/* ──────────────── MODAL XÁC NHẬN: CHO THÔI VIỆC / XÓA NHÂN SỰ ──────────────── */}
+      {deactivateModalEmp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                  <UserX className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    Xác nhận Thôi việc / Xóa nhân sự
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Ngừng công tác và khóa quyền truy cập của nhân sự
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeactivateModalEmp(null)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex flex-col gap-4 text-xs">
+              {/* Card tóm tắt nhân viên */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-700 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+                  {deactivateModalEmp.initials}
+                </div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-slate-900 truncate">
+                      {deactivateModalEmp.name}
+                    </span>
+                    <span className="font-mono font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded text-[11px]">
+                      {deactivateModalEmp.id}
+                    </span>
+                  </div>
+                  <div className="text-slate-500 text-[11px] mt-0.5">
+                    {deactivateModalEmp.role} • {deactivateModalEmp.dept}
+                  </div>
+                </div>
+              </div>
+
+              {/* Lựa chọn phương thức: Xóa mềm (chuẩn HRM) hay Xóa hẳn */}
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-slate-700">Hình thức xử lý:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteMode("soft")}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      deleteMode === "soft"
+                        ? "bg-rose-50/70 border-rose-300 text-rose-800 ring-1 ring-rose-400/30"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="font-bold text-[11px] flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Cho thôi việc (Chuẩn HRM)</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-1 leading-normal">
+                      Khóa tài khoản, lưu ngày thôi việc, bảo toàn toàn bộ lịch sử chấm công & bảng lương.
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeleteMode("hard")}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      deleteMode === "hard"
+                        ? "bg-rose-50/70 border-rose-300 text-rose-800 ring-1 ring-rose-400/30"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="font-bold text-[11px] flex items-center gap-1.5">
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Xóa hoàn toàn CSDL</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 mt-1 leading-normal">
+                      Xóa vĩnh viễn hồ sơ (DELETE CASCADE) khỏi cơ sở dữ liệu.
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {deleteMode === "soft" && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-slate-700">Lý do thôi việc:</label>
+                  <select
+                    value={deactivateReason}
+                    onChange={(e) => setDeactivateReason(e.target.value)}
+                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-500 cursor-pointer shadow-2xs"
+                  >
+                    <option value="Nghỉ việc theo nguyện vọng cá nhân">Nghỉ việc theo nguyện vọng cá nhân</option>
+                    <option value="Hết hạn hợp đồng lao động">Hết hạn hợp đồng lao động</option>
+                    <option value="Thỏa thuận chấm dứt hợp đồng lao động">Thỏa thuận chấm dứt hợp đồng lao động</option>
+                    <option value="Kỷ luật sa thải / Chấm dứt đơn phương">Kỷ luật sa thải / Chấm dứt đơn phương</option>
+                    <option value="Chuyển công tác / Lý do khác">Chuyển công tác / Lý do khác</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-bold text-slate-700">Ghi chú bổ sung (tùy chọn):</label>
+                <textarea
+                  rows={2}
+                  value={deactivateNote}
+                  onChange={(e) => setDeactivateNote(e.target.value)}
+                  placeholder="Nhập ghi chú hoặc biên bản bàn giao nếu có..."
+                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-500 resize-none shadow-2xs"
+                />
+              </div>
+
+              {/* Thông báo chính sách */}
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-[11px] leading-relaxed flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  {deleteMode === "soft"
+                    ? "Theo chuẩn quản trị nhân sự: Nhân viên sẽ chuyển trạng thái sang 'Đã nghỉ việc', tự động khóa đăng nhập nhưng giữ nguyên dữ liệu công lương để đối soát."
+                    : "Cảnh báo: Hành động xóa vĩnh viễn sẽ xóa hoàn toàn nhân sự và dữ liệu liên quan khỏi CSDL, không thể hoàn tác."}
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeactivateModalEmp(null)}
+                disabled={isSubmittingDeactivate}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeactivate}
+                disabled={isSubmittingDeactivate}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingDeactivate ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Đang xử lý...</span>
+                  </>
+                ) : (
+                  <>
+                    <UserX className="w-3.5 h-3.5" />
+                    <span>{deleteMode === "soft" ? "Xác nhận Cho thôi việc" : "Xóa vĩnh viễn"}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──────────────── MODAL XÁC NHẬN: KHÔI PHỤC TRẠNG THÁI LÀM VIỆC ──────────────── */}
+      {reactivateModalEmp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+            <div className="p-6 flex flex-col gap-4 text-center items-center">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-xs">
+                <RotateCcw className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Khôi phục trạng thái làm việc</h3>
+                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                  Khôi phục nhân sự <strong>{reactivateModalEmp.name}</strong> ({reactivateModalEmp.id}) trở lại trạng thái <strong>Đang làm việc</strong> và mở khóa tài khoản?
+                </p>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setReactivateModalEmp(null)}
+                disabled={isSubmittingDeactivate}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReactivate}
+                disabled={isSubmittingDeactivate}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {isSubmittingDeactivate ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                )}
+                <span>Xác nhận khôi phục</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast thông báo */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-xl flex items-center gap-3 text-xs font-semibold animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }

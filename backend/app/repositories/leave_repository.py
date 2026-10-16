@@ -179,4 +179,33 @@ def review_leave(
     db.commit()
     if result.rowcount == 0:
         return None
-    return get_leave_by_id(db, ma_don)
+
+    updated_leave = get_leave_by_id(db, ma_don)
+
+    # Nếu đơn xin thôi việc (NGHI_VIEC) được duyệt -> Tự động chuyển trạng thái nhân sự sang DA_NGHI_VIEC và khóa tài khoản
+    if updated_leave and trang_thai == "DA_DUYET" and updated_leave.get("loai_don") == "NGHI_VIEC":
+        ma_nv = updated_leave.get("ma_nv")
+        ngay_nghi = updated_leave.get("ngay_ket_thuc") or updated_leave.get("ngay_bat_dau")
+        db.execute(
+            text("""
+                UPDATE nhan_vien
+                SET trang_thai = 'DA_NGHI_VIEC',
+                    ngay_nghi_viec = COALESCE(:ngay_nghi, CURDATE()),
+                    ngay_cap_nhat = NOW()
+                WHERE ma_nv = :ma_nv
+            """),
+            {"ma_nv": ma_nv, "ngay_nghi": ngay_nghi},
+        )
+        db.execute(
+            text("""
+                UPDATE tai_khoan
+                SET trang_thai = 'KHOA',
+                    ngay_cap_nhat = NOW()
+                WHERE ma_nv = :ma_nv
+            """),
+            {"ma_nv": ma_nv},
+        )
+        db.commit()
+
+    return updated_leave
+

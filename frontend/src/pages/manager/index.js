@@ -3,7 +3,6 @@ export { default as EmployeeManagement } from "./EmployeeManagement";
 export { default as LeaveApprovals } from "./LeaveApprovals";
 export { default as AttendanceManagement } from "./AttendanceManagement";
 export { default as PayrollManagement } from "./PayrollManagement";
-export { default as PersonnelReport } from "./PersonnelReport";
 export { default as RolePermissions } from "./RolePermissions";
 export { default as AddEmployeeModal } from "./components/AddEmployeeModal";
 export { default as ManagerSidebar } from "./components/ManagerSidebar";

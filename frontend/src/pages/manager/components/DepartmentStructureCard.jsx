@@ -60,7 +60,7 @@ export default function DepartmentStructureCard({ departments }) {
       </div>
 
       <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 mt-4">
-        <span>Toàn bộ chi nhánh & xưởng sản xuất</span>
+        <span>Toàn bộ cơ cấu phòng ban & xưởng</span>
         <span className="font-semibold text-slate-700">8 phòng ban & xưởng</span>
       </div>
     </div>

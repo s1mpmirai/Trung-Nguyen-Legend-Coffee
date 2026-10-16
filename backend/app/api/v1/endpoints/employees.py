@@ -29,6 +29,7 @@ from app.services.employee_service import (
     request_profile_update,
     review_profile_update,
     update_employee_contact,
+    delete_employee,
 )
 
 router = APIRouter()
@@ -262,3 +263,22 @@ def deactivate_employee_endpoint(
         return deactivate_employee(db, ma_nv, ly_do)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+
+@router.delete(
+    "/{ma_nv}",
+    summary="[Quản lý/Admin] Xóa hoàn toàn nhân sự khỏi CSDL",
+)
+def delete_employee_endpoint(
+    ma_nv: str,
+    db: DbSession,
+):
+    """
+    Xóa vĩnh viễn nhân sự khỏi CSDL (DELETE CASCADE).
+    Xóa sạch bản ghi nhân viên và các dữ liệu liên kết theo cấu hình cascade của CSDL.
+    """
+    try:
+        return delete_employee(db, ma_nv)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+

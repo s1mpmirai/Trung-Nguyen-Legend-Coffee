@@ -10,7 +10,7 @@ export const DEPARTMENTS = [
   { id: "PB05", name: "Phòng Kinh doanh (Chuỗi F&B)" },
   { id: "PB06", name: "Phòng Công nghệ Thông tin (IT)" },
   { id: "PB07", name: "Xưởng Sản xuất (Nhà máy)" },
-  { id: "PB08", name: "Phòng Kinh doanh Chi nhánh Hà Nội" },
+  { id: "PB08", name: "Phòng Kinh doanh Miền Bắc" },
 ];
 
 export const POSITIONS = [
@@ -24,38 +24,6 @@ export const POSITIONS = [
   { id: "CV08", name: "Tổng Giám đốc" },
 ];
 
-export const BRANCHES = [
-  {
-    id: "CN01",
-    name: "Trụ sở chính TP. Hồ Chí Minh",
-    address: "82 Nguyễn Du / 82-84 Bùi Thị Xuân, Q.1",
-    gps: "82-84 Bùi Thị Xuân, Q.1 • Bán kính: 50m",
-  },
-  {
-    id: "CN02",
-    name: "Nhà máy Buôn Ma Thuột",
-    address: "KCN Hòa Phú, TP. Buôn Ma Thuột, Đắk Lắk",
-    gps: "KCN Hòa Phú, Buôn Ma Thuột • Bán kính: 100m",
-  },
-  {
-    id: "CN03",
-    name: "Chi nhánh Hà Nội",
-    address: "25 Lý Thường Kiệt, Hoàn Kiếm, Hà Nội",
-    gps: "25 Lý Thường Kiệt, Hoàn Kiếm • Bán kính: 50m",
-  },
-  {
-    id: "CN04",
-    name: "Chi nhánh Đà Nẵng",
-    address: "120 Bạch Đằng, Hải Châu, Đà Nẵng",
-    gps: "120 Bạch Đằng, Hải Châu • Bán kính: 50m",
-  },
-  {
-    id: "CN05",
-    name: "Cửa hàng E-Coffee Quận 1",
-    address: "15 Đồng Khởi, Quận 1, TP. HCM",
-    gps: "15 Đồng Khởi, Quận 1 • Bán kính: 30m",
-  },
-];
 
 export const CONTRACT_TYPES = [
   { id: "THU_VIEC", name: "Hợp đồng Thử việc (02 tháng)" },
@@ -77,15 +45,12 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
     gender: "Nam",
     maPb: "PB05",
     maCv: "CV01",
-    maCn: "CN01",
     startDate: todayStr,
     contractType: "THU_VIEC",
     salary: "18,500,000",
   });
 
   if (!isOpen) return null;
-
-  const currentBranch = BRANCHES.find((b) => b.id === formData.maCn) || BRANCHES[0];
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -106,7 +71,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
       email: formData.email.trim(),
       ma_pb: formData.maPb,
       ma_cv: formData.maCv,
-      ma_cn: formData.maCn,
       ngay_vao_lam: formData.startDate,
       trang_thai: "DANG_LAM",
       hinh_thuc_lam_viec: "FULL_TIME",
@@ -121,7 +85,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
       deptName: selectedDept?.name || "Phòng ban",
       role: formData.maCv,
       roleName: selectedPos?.name || "Nhân sự",
-      branchName: currentBranch.name,
       contractName: selectedContract?.name || "Hợp đồng lao động",
       salaryFormatted: `${cleanSalary.toLocaleString("vi-VN")} đ`,
       salary: cleanSalary,
@@ -348,23 +311,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
                 </select>
               </div>
 
-              {/* Chi nhánh / Nơi làm việc (Khóa ngoại DB ma_cn) */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                  Chi nhánh / Cơ sở làm việc <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={formData.maCn}
-                  onChange={(e) => setFormData({ ...formData, maCn: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all cursor-pointer"
-                >
-                  {BRANCHES.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.id} - {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
 
               {/* Loại hợp đồng (Khớp bảng hop_dong_lao_dong) */}
               <div className="flex flex-col gap-1.5">

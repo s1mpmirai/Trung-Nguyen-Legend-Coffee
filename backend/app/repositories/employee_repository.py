@@ -770,3 +770,14 @@ def get_monthly_personnel_report(
     }
 
 
+def repo_delete_employee(db: Session, ma_nv: str) -> bool:
+    """Xóa hoàn toàn hồ sơ nhân sự khỏi CSDL (DELETE CASCADE)."""
+    result = db.execute(
+        text("DELETE FROM nhan_vien WHERE ma_nv = :ma_nv"),
+        {"ma_nv": ma_nv},
+    )
+    db.commit()
+    return result.rowcount > 0
+
+
+
