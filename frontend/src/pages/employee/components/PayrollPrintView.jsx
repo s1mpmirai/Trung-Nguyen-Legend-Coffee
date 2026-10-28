@@ -204,12 +204,18 @@ function PayrollPrintView({ printMode, payroll, yearSummary, month, year }) {
             </tr>
             <tr>
               <td className="text-center">3</td>
-              <td>Tổng các khoản phụ cấp</td>
-              <td className="text-center">Ăn trưa, xăng xe, ĐT</td>
-              <td className="text-right">{formatMoney(payroll?.tong_phu_cap)} đ</td>
+              <td>Tiền làm thêm giờ (tăng ca)</td>
+              <td className="text-center">{payroll?.so_gio_tang_ca || 0} giờ x 150%</td>
+              <td className="text-right">{formatMoney(payroll?.tien_tang_ca)} đ</td>
             </tr>
             <tr>
               <td className="text-center">4</td>
+              <td>Phụ cấp chức vụ</td>
+              <td className="text-center">Theo công thực tế</td>
+              <td className="text-right">{formatMoney(payroll?.tong_phu_cap)} đ</td>
+            </tr>
+            <tr>
+              <td className="text-center">5</td>
               <td>Tiền thưởng / Khen thưởng</td>
               <td className="text-center">KPI & Đạt mục tiêu</td>
               <td className="text-right">{formatMoney(payroll?.tien_thuong)} đ</td>
@@ -243,7 +249,9 @@ function PayrollPrintView({ printMode, payroll, yearSummary, month, year }) {
             <tr>
               <td className="text-center">9</td>
               <td>Thuế thu nhập cá nhân (Thuế TNCN)</td>
-              <td className="text-center">Theo biểu lũy tiến từng phần</td>
+              <td className="text-center">
+                Lũy tiến trên {formatMoney(payroll?.thu_nhap_tinh_thue)} đ (đã giảm trừ {formatMoney(payroll?.giam_tru_gia_canh)} đ)
+              </td>
               <td className="text-right text-red-600">-{formatMoney(payroll?.thue_tncn)} đ</td>
             </tr>
             {payroll?.khau_tru_khac > 0 && (

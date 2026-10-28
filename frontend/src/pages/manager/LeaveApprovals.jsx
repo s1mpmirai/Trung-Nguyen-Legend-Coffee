@@ -163,12 +163,11 @@ export default function LeaveApprovals() {
       subPeriod: totalDays,
       reason: item.ly_do || "Không có ghi chú lý do",
       handover: item.ban_giao || "",
-      leaveBalance: "8/12 ngày",
       status: status,
       statusText: statusText,
       approvalNote: status === "approved" ? (item.y_kien_duyet || "Đồng ý phê duyệt đơn") : "",
       rejectionReason: status === "rejected" ? (item.y_kien_duyet || "Không có lý do cụ thể") : "",
-      reviewer: item.ten_nguoi_duyet || item.nguoi_duyet,
+      reviewer: item.ten_nguoi_duyet || item.nguoi_duyet || (status === "approved" ? "Hệ thống (tự động duyệt)" : null),
       reviewDate: item.ngay_duyet,
     };
   };
@@ -187,6 +186,8 @@ export default function LeaveApprovals() {
     } catch (err) {
       console.warn("Lỗi khi tải đơn từ từ API:", err);
       setRequests([]);
+      setToast(`Không tải được danh sách đơn: ${err.message}`);
+      setTimeout(() => setToast(""), 4000);
     } finally {
       setIsLoading(false);
     }
@@ -214,18 +215,13 @@ export default function LeaveApprovals() {
   // 1. Phê duyệt đơn từ (Icon Tick)
   const handleApprove = async (req) => {
     const id = req.id;
-    const currentReviewer =
-      localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv") || "NV01";
 
     setIsSubmitting(true);
     try {
-      // Gọi API duyệt đơn nếu là đơn thực từ backend
+      // Người duyệt do backend lấy từ tài khoản đăng nhập; lỗi (tự duyệt, hết phép...) sẽ hiện ra toast
       await reviewLeave(id, {
         trang_thai: "DA_DUYET",
-        nguoi_duyet: currentReviewer,
         y_kien_duyet: "Đồng ý phê duyệt đơn",
-      }).catch((err) => {
-        console.warn("API reviewLeave fallback:", err.message);
       });
 
       // Cập nhật state cục bộ
@@ -285,18 +281,13 @@ export default function LeaveApprovals() {
     if (!rejectModalData) return;
 
     const id = rejectModalData.id;
-    const currentReviewer =
-      localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv") || "NV01";
 
     setIsSubmitting(true);
     try {
       // Gọi API từ chối đơn kèm lý do
       await reviewLeave(id, {
         trang_thai: "TU_CHOI",
-        nguoi_duyet: currentReviewer,
         y_kien_duyet: rejectionReason.trim(),
-      }).catch((err) => {
-        console.warn("API reviewLeave fallback:", err.message);
       });
 
       // Cập nhật state cục bộ

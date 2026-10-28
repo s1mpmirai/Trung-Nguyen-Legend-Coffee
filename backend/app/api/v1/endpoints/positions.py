@@ -19,9 +19,14 @@ DbSession = Annotated[Session, Depends(get_db)]
 def list_positions_endpoint(
     db: DbSession,
     search: Optional[str] = Query(None, description="Tìm theo mã hoặc tên chức vụ"),
+    sort_by: Optional[str] = Query(None, description="Trường sắp xếp: ma_cv, ten_cv, cap_bac, phu_cap_chuc_vu, so_luong_nv"),
+    sort_order: Optional[str] = Query("asc", description="Thứ tự sắp xếp: asc hoặc desc"),
+    trang_thai: Optional[int] = Query(None, description="1: Đang sử dụng, 0: Ngừng sử dụng"),
 ):
     """Lấy danh sách tất cả các chức vụ trong hệ thống kèm thang bảng lương."""
-    return department_repository.get_positions_list(db, search=search)
+    return department_repository.get_positions_list(
+        db, search=search, sort_by=sort_by, sort_order=sort_order, trang_thai=trang_thai
+    )
 
 
 @router.get("/{ma_cv}", response_model=PositionResponse, summary="Chi tiết chức vụ")
@@ -59,6 +64,8 @@ def update_position_endpoint(ma_cv: str, data: PositionUpdate, db: DbSession):
                 detail=f"Không tìm thấy chức vụ {ma_cv}",
             )
         return pos
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -66,9 +73,9 @@ def update_position_endpoint(ma_cv: str, data: PositionUpdate, db: DbSession):
         )
 
 
-@router.delete("/{ma_cv}", summary="Xóa chức vụ")
+@router.delete("/{ma_cv}", summary="Xóa chức vụ (xóa mềm: chuyển sang Ngừng sử dụng)")
 def delete_position_endpoint(ma_cv: str, db: DbSession):
-    """Xóa chức vụ (khi không có nhân viên nào giữ chức vụ này)."""
+    """Xóa mềm chức vụ khi không còn nhân sự đang giữ chức vụ. Khôi phục bằng PUT trang_thai = 1."""
     try:
         pos = department_repository.get_position_by_id(db, ma_cv)
         if not pos:
@@ -77,7 +84,9 @@ def delete_position_endpoint(ma_cv: str, db: DbSession):
                 detail=f"Không tìm thấy chức vụ {ma_cv}",
             )
         department_repository.delete_position(db, ma_cv)
-        return {"success": True, "message": f"Đã xóa thành công chức vụ {ma_cv}"}
+        return {"success": True, "message": f"Đã xóa chức vụ {ma_cv} (chuyển sang Ngừng sử dụng, có thể khôi phục)"}
+    except HTTPException:
+        raise
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:

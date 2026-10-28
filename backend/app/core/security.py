@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException
 
 from app.core.config import settings
 
@@ -33,17 +32,3 @@ def decode_access_token(token: str) -> dict | None:
         return None
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-
-
-def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
-    payload = decode_access_token(token)
-    if payload is None:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    if "sub" not in payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    ma_nv = payload.get("sub")
-    if ma_nv is None:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return int(ma_nv)

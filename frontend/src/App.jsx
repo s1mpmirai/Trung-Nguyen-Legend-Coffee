@@ -10,20 +10,6 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import FirstTimePasswordModal from "./components/common/FirstTimePasswordModal";
 import { getCleanRoute, navigateClean } from "./utils/navigation";
 
-/**
- * App – Root component tích hợp:
- *   - Login Nhân viên (/login)
- *   - Login Quản lý & Admin (/login-manage, /login-manager, /login-admin)
- *   - Cổng Quản Trị Tối Cao (/admin) - Dành riêng cho NV01 / ADMIN
- *   - Cổng Quản lý & Điều hành (/manager) - Dành cho QUAN_LY, TRUONG_NHOM, ADMIN
- *   - Chấm công (/attendance)
- *   - Bảng lương (/payroll)
- *   - Hồ sơ cá nhân (/profile)
- *   - Nghỉ phép & Đơn từ (/requests, /leaves)
- *
- * Hỗ trợ Clean Pathname routing và tự động giữ phiên đăng nhập qua localStorage.
- */
-
 // Kiểm tra role có quyền Admin tối cao hay không (ADMIN hoặc NV01)
 const isAdminRole = (role, ma_nv) => {
   if (ma_nv && String(ma_nv).toUpperCase() === "NV01") return true;

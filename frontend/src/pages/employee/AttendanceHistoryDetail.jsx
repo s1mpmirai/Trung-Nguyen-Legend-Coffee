@@ -34,7 +34,7 @@ export default function AttendanceHistoryDetail({ userSession, onBack, onTabChan
     async function loadHistory() {
       setIsLoading(true);
       const res = await getAttendanceHistory(
-        userSession?.ma_nv || 'NV10',
+        userSession?.ma_nv || localStorage.getItem('user_ma_nv'),
         currentMonth,
         currentYear
       );

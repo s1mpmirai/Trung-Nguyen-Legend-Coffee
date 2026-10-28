@@ -4,11 +4,13 @@ from typing import Annotated, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.permissions import CurrentAccount, require_permission
 from app.db.session import get_db
 from app.schemas.attendance_schemas import AttendanceAdjustRequest
 from app.services import attendance_service
 
-router = APIRouter()
+# Toàn bộ API quản lý chấm công yêu cầu quyền ATTENDANCE_MANAGE
+router = APIRouter(dependencies=[Depends(require_permission("ATTENDANCE_MANAGE"))])
 DbSession = Annotated[Session, Depends(get_db)]
 
 
@@ -50,6 +52,7 @@ def get_monthly_attendance_summary_endpoint(
 def adjust_attendance_endpoint(
     ma_cc: int,
     data: AttendanceAdjustRequest,
+    account: CurrentAccount,
     db: DbSession = None,
 ):
     """
@@ -57,7 +60,11 @@ def adjust_attendance_endpoint(
     số công và ghi chú khi nhân viên quên chấm công hoặc giải trình hợp lệ.
     """
     try:
-        return attendance_service.adjust_attendance_by_manager(db, ma_cc, data)
+        return attendance_service.adjust_attendance_by_manager(
+            db, ma_cc, data, nguoi_dieu_chinh=account["ma_nv"]
+        )
+    except PermissionError as err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err
     except ValueError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)
@@ -94,15 +101,29 @@ def get_attendance_lock_status_endpoint(
 )
 def toggle_attendance_lock_endpoint(
     data: dict[str, Any],
+    account: CurrentAccount,
     db: DbSession = None,
 ):
     """Quản lý thực hiện Chốt hoặc Mở khóa bảng công tháng."""
-    thang = int(data.get("thang") or 10)
-    nam = int(data.get("nam") or 2026)
+    if not data.get("thang") or not data.get("nam"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Thiếu tháng hoặc năm cần chốt công")
+    thang = int(data["thang"])
+    nam = int(data["nam"])
     khoa = bool(data.get("khoa", True))
     ghi_chu = str(data.get("ghi_chu") or "")
-    nguoi_chot = str(data.get("nguoi_chot") or "Quản lý nhân sự")
+    nguoi_chot = account["ma_nv"]
     return attendance_service.toggle_monthly_attendance_lock(
         db=db, thang=thang, nam=nam, is_locked=khoa, nguoi_chot=nguoi_chot, ghi_chu=ghi_chu
     )
 
+
+@router.get(
+    "/trend",
+    summary="[Quản lý] Xu hướng đi làm đúng giờ / đi trễ các ngày làm việc gần nhất",
+)
+def get_attendance_trend_endpoint(
+    days: int = Query(7, ge=1, le=31, description="Số ngày làm việc gần nhất"),
+    db: DbSession = None,
+):
+    """Dùng cho biểu đồ xu hướng chấm công trên Dashboard quản lý."""
+    return attendance_service.get_attendance_trend(db, days)

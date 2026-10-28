@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.core.datetime_utils import get_vietnam_now, get_vietnam_today
 from app.repositories import attendance_repository as repo
+from app.repositories.employee_repository import TOP_LEVEL_AUTO_APPROVE_NOTE, is_top_level_employee
+from app.utils.work_calendar import WORKING_WEEKDAYS, standard_workdays
 from app.schemas.attendance_schemas import (
     AttendanceAdjustRequest,
     AttendanceDashboardResponse,
@@ -58,17 +60,7 @@ def get_attendance_dashboard(db: Session, ma_nv: str) -> dict[str, Any]:
     # 1. Thông tin nhân sự
     emp = repo.get_employee_attendance_info(db, clean_id)
     if not emp:
-        emp = {
-            "ma_nv": clean_id,
-            "ho_ten": "Nhân viên",
-            "ten_pb": "Phòng Nhân sự",
-            "ma_pb": "PB02",
-            "ten_cv": "Nhân viên",
-            "ten_cn": "Trụ sở chính Trung Nguyên",
-            "dia_chi_cn": "82 Nguyễn Du, Q.1, TP. HCM",
-            "trang_thai": "DANG_LAM",
-            "gioi_tinh": "Nam",
-        }
+        raise ValueError(f"Không tìm thấy nhân viên có mã {clean_id}")
 
     branch_name = emp.get("ten_cn") or "Trụ sở chính Trung Nguyên"
 
@@ -155,7 +147,7 @@ def get_attendance_dashboard(db: Session, ma_nv: str) -> dict[str, Any]:
             "thang": now.month,
             "nam": now.year,
             "so_ngay_cong_thuc_te": round(so_cong, 1),
-            "so_ngay_cong_chuan": 22.0,
+            "so_ngay_cong_chuan": float(standard_workdays(now.month, now.year)),
             "so_lan_di_muon": int(st.get("so_muon") or 0),
             "chi_tiet_muon": f"Đi muộn {st['so_muon']} lần" if st.get("so_muon") else "Không có dữ liệu",
             "so_gio_ot": round(float(st.get("tong_ot") or 0), 1),
@@ -364,6 +356,9 @@ def employee_check_in(
                 "gio_vao": existing_time,
                 "message": f"Hôm nay bạn đã chấm công vào ca lúc {existing_time}. Mỗi ngày chỉ check-in 1 lần, những lần sau không tính!",
             }
+        # Nhân sự cấp cao nhất không có cấp trên để duyệt -> hệ thống tự động duyệt công
+        if is_top_level_employee(db, clean_id):
+            repo.auto_approve_attendance(db, clean_id, today, TOP_LEVEL_AUTO_APPROVE_NOTE)
     except Exception as e:
         db.rollback()
         return {
@@ -498,6 +493,9 @@ def employee_check_out(
             loai_cong=loai_cong,
             ghi_chu=ghi_chu,
         )
+        # Check-out không có check-in trước đó sẽ tạo bản ghi mới -> cũng tự động duyệt cho cấp cao nhất
+        if is_top_level_employee(db, clean_id):
+            repo.auto_approve_attendance(db, clean_id, today, TOP_LEVEL_AUTO_APPROVE_NOTE)
     except Exception as e:
         db.rollback()
         return {
@@ -647,16 +645,19 @@ def get_monthly_summary_for_manager(
 
 
 def adjust_attendance_by_manager(
-    db: Session, ma_cc: int, data: AttendanceAdjustRequest
+    db: Session, ma_cc: int, data: AttendanceAdjustRequest, nguoi_dieu_chinh: str | None = None
 ) -> dict[str, Any]:
     """
     Quản lý điều chỉnh bản ghi chấm công.
     Quy định: Chỉ Quản lý mới có quyền sửa giờ check-in (gio_vao) cho nhân viên,
     và tối đa 3 lần/tháng đối với mỗi nhân viên.
+    Không được tự duyệt / điều chỉnh công của chính mình (công của Quản lý do cấp trên duyệt).
     """
     record = repo.get_attendance_by_id(db, ma_cc)
     if not record:
         raise ValueError(f"Không tìm thấy bản ghi chấm công mã {ma_cc}")
+    if nguoi_dieu_chinh and record["ma_nv"] == nguoi_dieu_chinh:
+        raise PermissionError("Bạn không thể tự duyệt hoặc điều chỉnh công của chính mình.")
 
     fields = data.model_dump(exclude_unset=True)
     ma_nv = record["ma_nv"]
@@ -792,8 +793,36 @@ def get_monthly_attendance_lock_status(db: Session, thang: int, nam: int) -> dic
 
 
 def toggle_monthly_attendance_lock(
-    db: Session, thang: int, nam: int, is_locked: bool, nguoi_chot: str = "Quản lý", ghi_chu: str = ""
+    db: Session, thang: int, nam: int, is_locked: bool, nguoi_chot: str | None = None, ghi_chu: str = ""
 ) -> dict[str, Any]:
     """Chốt / Khóa hoặc Mở khóa bảng công tháng."""
     return repo.set_monthly_attendance_lock(db, thang, nam, is_locked, nguoi_chot, ghi_chu)
 
+
+def get_attendance_trend(db: Session, days: int = 7) -> list[dict[str, Any]]:
+    """Thống kê số người đúng giờ / đi trễ trong N ngày làm việc gần nhất (tính cả hôm nay)."""
+    working_days: list[date] = []
+    current = get_vietnam_today()
+    while len(working_days) < days:
+        if current.weekday() in WORKING_WEEKDAYS:
+            working_days.append(current)
+        current -= timedelta(days=1)
+    working_days.reverse()
+
+    stats = {r["ngay_cong"]: r for r in repo.get_attendance_counts_by_day(db, working_days[0], working_days[-1])}
+    tong_nhan_su = repo.count_active_employees(db)
+    today = get_vietnam_today()
+
+    result = []
+    for d in working_days:
+        r = stats.get(d, {})
+        result.append({
+            "ngay": str(d),
+            "thu": THU_MAP[d.weekday()],
+            "la_hom_nay": d == today,
+            "dung_gio": int(r.get("dung_gio") or 0),
+            "di_tre": int(r.get("di_tre") or 0),
+            "da_cham_cong": int(r.get("da_cham_cong") or 0),
+            "tong_nhan_su": tong_nhan_su,
+        })
+    return result

@@ -32,6 +32,7 @@ import {
   updateAccountStatus,
   getEmployeesWithoutAccountDetails,
 } from "../../../services/adminService";
+import SortableHeader, { nextSort } from "../../../components/common/SortableHeader";
 
 export default function AdminAccountsTab() {
   const [accounts, setAccounts] = useState([]);
@@ -43,6 +44,12 @@ export default function AdminAccountsTab() {
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const [sort, setSort] = useState({ by: "", order: "asc" });
+
+  const handleSort = (field) => {
+    setSort((prev) => nextSort(prev, field));
+    setPage(1);
+  };
 
   const handleTriggerSearch = () => {
     setSearchTerm(searchInput.trim());
@@ -105,6 +112,8 @@ export default function AdminAccountsTab() {
         search: searchTerm || undefined,
         ma_vai_tro: roleFilter || undefined,
         trang_thai: statusFilter || undefined,
+        sort_by: sort.by || undefined,
+        sort_order: sort.by ? sort.order : undefined,
       });
       setAccounts(data.items || []);
       setTotal(data.total || 0);
@@ -114,7 +123,7 @@ export default function AdminAccountsTab() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, searchTerm, roleFilter, statusFilter]);
+  }, [page, searchTerm, roleFilter, statusFilter, sort]);
 
   useEffect(() => {
     fetchAccounts();
@@ -418,12 +427,12 @@ export default function AdminAccountsTab() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-3 px-4">Tài khoản & Mã NV</th>
-                  <th className="py-3 px-4">Thông tin nhân sự</th>
-                  <th className="py-3 px-4">Đơn vị công tác</th>
+                  <SortableHeader className="py-3 px-4" label="Tài khoản & Mã NV" field="ma_nv" sort={sort} onSort={handleSort} />
+                  <SortableHeader className="py-3 px-4" label="Thông tin nhân sự" field="ho_ten" sort={sort} onSort={handleSort} />
+                  <SortableHeader className="py-3 px-4" label="Đơn vị công tác" field="ten_pb" sort={sort} onSort={handleSort} />
                   <th className="py-3 px-4">Liên hệ (SĐT / Email)</th>
-                  <th className="py-3 px-4">Vai trò (RBAC)</th>
-                  <th className="py-3 px-4">Trạng thái</th>
+                  <SortableHeader className="py-3 px-4" label="Vai trò (RBAC)" field="ma_vai_tro" sort={sort} onSort={handleSort} />
+                  <SortableHeader className="py-3 px-4" label="Trạng thái" field="trang_thai" sort={sort} onSort={handleSort} />
                   <th className="py-3 px-4 text-center">Thao tác</th>
                 </tr>
               </thead>

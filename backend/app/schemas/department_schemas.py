@@ -64,6 +64,7 @@ class PositionBase(BaseModel):
     cap_bac: int = Field(1, description="1=NV, 2=Tổ trưởng, 3=Phó/Trưởng phòng, 4=Phó GĐ, 5=Ban GĐ")
     phu_cap_chuc_vu: float = Field(0, description="Phụ cấp chức vụ (VNĐ)")
     mo_ta: Optional[str] = Field(None, description="Mô tả công việc chức vụ")
+    trang_thai: int = Field(1, description="1: Đang sử dụng, 0: Ngừng sử dụng (đã xóa mềm)")
 
 
 class PositionCreate(PositionBase):
@@ -75,6 +76,7 @@ class PositionUpdate(BaseModel):
     cap_bac: Optional[int] = None
     phu_cap_chuc_vu: Optional[float] = None
     mo_ta: Optional[str] = None
+    trang_thai: Optional[int] = None
 
 
 class PositionResponse(PositionBase):

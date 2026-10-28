@@ -3,15 +3,18 @@ import React, { useState } from "react";
 export default function AttendanceTrendCard({ attendanceData }) {
   const [hoverIndex, setHoverIndex] = useState(null);
 
-  const records = attendanceData || [
-    { label: "T2", date: "28/09", onTime: 18, late: 1, leave: 0, total: 19 },
-    { label: "T3", date: "29/09", onTime: 17, late: 1, leave: 1, total: 19 },
-    { label: "T4", date: "30/09", onTime: 19, late: 0, leave: 0, total: 19 },
-    { label: "T5", date: "01/10", onTime: 16, late: 2, leave: 1, total: 19 },
-    { label: "T6", date: "02/10", onTime: 17, late: 2, leave: 0, total: 19 },
-    { label: "T7", date: "03/10", onTime: 14, late: 1, leave: 0, total: 15 },
-    { label: "Nay", date: "04/10", onTime: 16, late: 2, leave: 0, total: 19 },
-  ];
+  const records = attendanceData || [];
+
+  if (records.length === 0) {
+    return (
+      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col">
+        <h2 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-sm text-slate-900 tracking-wider uppercase">
+          Xu hướng chấm công
+        </h2>
+        <p className="py-10 text-center text-xs text-slate-400">Chưa có dữ liệu chấm công</p>
+      </div>
+    );
+  }
 
   // SVG Chart Geometry
   const svgWidth = 360;
@@ -20,8 +23,9 @@ export default function AttendanceTrendCard({ attendanceData }) {
   const padYTop = 20;
   const padYBottom = 38;
   const plotH = svgHeight - padYTop - padYBottom; // 117
-  const maxVal = 20;
-  const stepX = (svgWidth - padX * 2) / (records.length - 1);
+  // Trục tung co giãn theo quân số thực tế (làm tròn lên bội số của 5)
+  const maxVal = Math.max(5, Math.ceil(Math.max(0, ...records.map((r) => Math.max(r.onTime, r.late, r.total || 0))) / 5) * 5);
+  const stepX = (svgWidth - padX * 2) / Math.max(1, records.length - 1);
 
   // Compute points
   const onTimePoints = records.map((r, i) => ({
@@ -128,7 +132,7 @@ export default function AttendanceTrendCard({ attendanceData }) {
             </defs>
 
             {/* Các đường gióng ngang mờ */}
-            {[5, 10, 15, 20].map((v) => {
+            {[0.25, 0.5, 0.75, 1].map((f) => Math.round(maxVal * f)).map((v) => {
               const y = padYTop + plotH - (v / maxVal) * plotH;
               return (
                 <line

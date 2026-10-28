@@ -16,7 +16,7 @@ class ContractBase(BaseModel):
     ngan_hang: Optional[str] = Field(None, description="Tên ngân hàng")
     ma_so_thue: Optional[str] = Field(None, description="Mã số thuế cá nhân")
     so_bhxh: Optional[str] = Field(None, description="Số sổ BHXH")
-    trang_thai: str = Field("HIEU_LUC", description="HIEU_LUC, HET_HAN, DA_THANH_LY, TAM_HOAN")
+    trang_thai: str = Field("HIEU_LUC", description="HIEU_LUC, HET_HAN, DA_THANH_LY, TAM_HOAN, DA_HUY (đã xóa mềm)")
 
 
 class ContractCreate(ContractBase):

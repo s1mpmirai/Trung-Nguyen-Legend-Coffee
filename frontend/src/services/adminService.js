@@ -9,7 +9,7 @@
  * - Quản lý Cơ cấu phòng ban (DEPARTMENTS)
  * - Quản lý Chức vụ & Bậc lương (POSITIONS)
  * - Quản lý Hợp đồng lao động (CONTRACTS)
- * - Quản lý Kho & Nhà cung cấp (PRODUCTS & SUPPLIERS)
+ * - Danh bạ nhân sự: tìm kiếm nâng cao, lọc, sắp xếp (EMPLOYEES)
  */
 
 import apiClient from "./apiClient";
@@ -35,7 +35,6 @@ export async function updateAccount(ma_nv, accountData) {
 export async function updateAccountStatus(ma_nv, status) {
   return apiClient.put(`/accounts/${ma_nv}/status`, { trang_thai: status });
 }
-
 export async function getEmployeesWithoutAccount() {
   return apiClient.get("/accounts/without_account");
 }
@@ -70,8 +69,8 @@ export async function updateCustomPermissions(ma_nv, permissionData) {
 }
 
 // ── 4. DEPARTMENTS (PHÒNG BAN) ────────────────────────────────────────
-export async function getDepartments() {
-  return apiClient.get("/departments");
+export async function getDepartments(params = {}) {
+  return apiClient.get("/departments", { params });
 }
 
 export async function getDepartmentDetail(ma_pb) {
@@ -91,8 +90,8 @@ export async function deleteDepartment(ma_pb) {
 }
 
 // ── 5. POSITIONS & SALARY SCALES (CHỨC VỤ & BẬC LƯƠNG) ───────────────
-export async function getPositions() {
-  return apiClient.get("/positions");
+export async function getPositions(params = {}) {
+  return apiClient.get("/positions", { params });
 }
 
 export async function getPositionDetail(ma_cv) {
@@ -137,51 +136,21 @@ export async function updateContract(ma_hd, contractData) {
 }
 
 export async function liquidateContract(ma_hd, data = {}) {
-  return apiClient.put(`/contracts/${ma_hd}/liquidate`, data);
+  // Backend nhận ngày thanh lý qua query string (?ngay_ket_thuc=YYYY-MM-DD), không đọc body
+  return apiClient.put(`/contracts/${ma_hd}/liquidate`, null, {
+    params: { ngay_ket_thuc: data.ngay_ket_thuc || undefined },
+  });
+}
+
+export async function restoreContract(ma_hd) {
+  return apiClient.put(`/contracts/${ma_hd}/restore`, {});
 }
 
 export async function deleteContract(ma_hd) {
   return apiClient.delete(`/contracts/${ma_hd}`);
 }
 
-// ── 7. SUPPLIERS & PRODUCTS (KHO HÀNG & NHÀ CUNG CẤP) ─────────────────
-export async function getSuppliers(params = {}) {
-  return apiClient.get("/suppliers", { params });
-}
-
-export async function createSupplier(supplierData) {
-  return apiClient.post("/suppliers", supplierData);
-}
-
-export async function updateSupplier(ma_ncc, supplierData) {
-  return apiClient.put(`/suppliers/${ma_ncc}`, supplierData);
-}
-
-export async function deleteSupplier(ma_ncc) {
-  return apiClient.delete(`/suppliers/${ma_ncc}`);
-}
-
-export async function getProducts(params = {}) {
-  return apiClient.get("/products", { params });
-}
-
-export async function createProduct(productData) {
-  return apiClient.post("/products", productData);
-}
-
-export async function updateProduct(ma_sp, productData) {
-  return apiClient.put(`/products/${ma_sp}`, productData);
-}
-
-export async function updateProductStock(ma_sp, stockData) {
-  return apiClient.put(`/products/${ma_sp}/stock`, stockData);
-}
-
-export async function deleteProduct(ma_sp) {
-  return apiClient.delete(`/products/${ma_sp}`);
-}
-
-// ── 8. EMPLOYEES (DANH SÁCH NHÂN SỰ) ─────────────────────────────────
+// ── 7. EMPLOYEES (DANH BẠ NHÂN SỰ – TÌM KIẾM NÂNG CAO) ──────────────
 export async function getEmployeesList(params = {}) {
   return apiClient.get("/employees/get_employee_list", { params });
 }

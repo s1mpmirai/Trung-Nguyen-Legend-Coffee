@@ -1,14 +1,44 @@
 import React, { useRef, useEffect } from "react";
 import {
+  LayoutDashboard,
+  Users,
   KeyRound,
+  ShieldCheck,
+  Building2,
+  Briefcase,
+  FileText,
   PanelLeftClose,
   PanelLeftOpen,
+  ArrowLeftRight,
 } from "lucide-react";
 import logoImg from "../../assets/logo/Logo Trung Nguyên_black.png";
 
+// Menu Cổng Admin. Mục có "permission" mở cho tài khoản được cấp quyền đó (vd: NV IT có ACCOUNT_MANAGE);
+// mục không có "permission" chỉ dành cho Quản trị viên.
+const ADMIN_NAV_ITEMS = [
+  { id: "overview", label: "Tổng quan hệ thống", icon: LayoutDashboard },
+  { id: "employees", label: "Danh bạ nhân sự", icon: Users, permission: "EMPLOYEE_VIEW" },
+  { id: "accounts", label: "Quản lý tài khoản", icon: KeyRound, badge: "Admin", permission: "ACCOUNT_MANAGE" },
+  { id: "permissions", label: "Phân quyền RBAC", icon: ShieldCheck, permission: "PERMISSION_ASSIGN" },
+  { id: "departments", label: "Phòng ban", icon: Building2 },
+  { id: "positions", label: "Chức vụ & Thang lương", icon: Briefcase },
+  { id: "contracts", label: "Hợp đồng lao động", icon: FileText },
+];
+
+export function getAdminNavItems(userSession) {
+  const rawRole = userSession?.role || localStorage.getItem("user_role") || "";
+  const isAdmin = rawRole.toUpperCase() === "ADMIN" || userSession?.ma_nv === "NV01";
+  const userPerms = userSession?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
+
+  return ADMIN_NAV_ITEMS.filter((item) => {
+    if (isAdmin) return true;
+    return Boolean(item.permission && userPerms.includes(item.permission));
+  });
+}
+
 export default function AdminSidebar({
   userSession,
-  activeTab = "accounts",
+  activeTab = "overview",
   onTabChange,
   onSwitchToManager,
   onSwitchToEmployee,
@@ -38,20 +68,8 @@ export default function AdminSidebar({
     };
   }, [collapsed, onToggleCollapse, onClose]);
 
-  const rawRole = userSession?.role || localStorage.getItem("user_role") || "";
-  const isAdmin = rawRole.toUpperCase() === "ADMIN" || userSession?.ma_nv === "NV01";
-  const userPerms = userSession?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
-
-  const allNavItems = [
-    { id: "accounts", label: "Quản lý tài khoản", icon: KeyRound, badge: "Admin", permission: "ACCOUNT_MANAGE" },
-  ];
-
-  // Nếu là Admin tối cao hoặc NV IT được cấp ACCOUNT_MANAGE -> xem Quản lý tài khoản
-  const navItems = allNavItems.filter((item) => {
-    if (isAdmin) return true;
-    if (item.permission && userPerms.includes(item.permission)) return true;
-    return false;
-  });
+  const navItems = getAdminNavItems(userSession);
+  const homeTab = navItems[0]?.id || "accounts";
 
   return (
     <aside
@@ -78,10 +96,10 @@ export default function AdminSidebar({
           <div
             onClick={(e) => {
               e.stopPropagation();
-              onTabChange && onTabChange("accounts");
+              onTabChange && onTabChange(homeTab);
             }}
             className="flex items-center gap-3 overflow-hidden cursor-pointer group"
-            title="Quản lý tài khoản"
+            title={navItems[0]?.label || "Quản lý tài khoản"}
           >
             <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-xs group-hover:border-sky-500 group-hover:shadow transition-all shrink-0">
               <img
@@ -175,7 +193,22 @@ export default function AdminSidebar({
             : "px-4 flex flex-col gap-2"
         }
       >
-
+        {onSwitchToEmployee && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSwitchToEmployee();
+            }}
+            className={`${
+              collapsed ? "w-10 h-10 p-0" : "w-full py-2.5 px-3"
+            } flex items-center justify-center gap-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-sky-600 hover:bg-sky-50 border border-slate-200/80 transition-all cursor-pointer`}
+            title="Chuyển sang giao diện Nhân viên"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5" />
+            {!collapsed && <span>Giao diện Nhân viên</span>}
+          </button>
+        )}
 
         {collapsed ? (
           <div

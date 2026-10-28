@@ -1,10 +1,18 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Bell, LogOut } from "lucide-react";
 import logoImg from "../../../assets/logo/Logo Trung Nguyên_black.png";
+import { getEmployeeProfile } from "../../../services/employeeService";
 
 export default function ManagerHeader({ userSession, onLogout, collapsed = false }) {
-  const userName = userSession?.ho_ten || "Đặng Lê Nguyên Vũ";
-  const userRole = userSession?.ten_vai_tro || "Tổng Giám Đốc";
+  // Hiển thị đúng họ tên / chức vụ của tài khoản đang đăng nhập
+  const maNv = userSession?.ma_nv || localStorage.getItem("user_ma_nv");
+  const [profile, setProfile] = useState(null);
+  useEffect(() => {
+    if (maNv) getEmployeeProfile(maNv).then(setProfile);
+  }, [maNv]);
+
+  const userName = profile?.fullName || maNv || "";
+  const userRole = profile?.jobTitle || userSession?.role || "";
   const initials = userName
     ? userName
         .split(" ")

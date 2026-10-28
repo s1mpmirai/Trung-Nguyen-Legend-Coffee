@@ -13,8 +13,6 @@ import EditProfileModal from "./components/EditProfileModal";
 import {
   getEmployeeProfile,
   updateEmployeeContact,
-  FALLBACK_EMPLOYEE_PROFILE,
-  formatDate,
 } from "../../services/employeeService";
 
 /* ── Styles ────────────────────────────────────────────────────── */
@@ -33,11 +31,7 @@ function EmployeeProfile({ userSession, onLogout }) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Mã nhân viên hiện tại
-  const currentMaNv =
-    userSession?.ma_nv ||
-    localStorage.getItem("user_ma_nv") ||
-    localStorage.getItem("ma_nv") ||
-    "NV02";
+  const currentMaNv = userSession?.ma_nv || localStorage.getItem("user_ma_nv");
 
   // Hiển thị toast thông báo
   const showToast = (message, type = "success") => {
@@ -57,7 +51,7 @@ function EmployeeProfile({ userSession, onLogout }) {
           setEmployee(profile);
         }
       } catch (err) {
-        console.warn("Dùng dữ liệu dự phòng:", err.message);
+        console.warn("Không tải được hồ sơ:", err.message);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -73,25 +67,10 @@ function EmployeeProfile({ userSession, onLogout }) {
   /* ── 2. Xử lý gửi yêu cầu chỉnh sửa thông tin cá nhân ─────────── */
   const handleSaveProfile = async (formData) => {
     try {
-      // Cập nhật lên API (nếu có kết nối)
-      try {
-        await updateEmployeeContact(currentMaNv, formData);
-      } catch (apiErr) {
-        console.info("[EmployeeProfile] API update offline, cập nhật tạm thời giao diện:", apiErr.message);
-      }
-
-      // Cập nhật ngay trên state để người dùng thấy thông tin họ vừa yêu cầu thay đổi
-      setEmployee((prev) => ({
-        ...prev,
-        birthDate: formData.ngay_sinh ? formatDate(formData.ngay_sinh) : prev.birthDate,
-        birthDateRaw: formData.ngay_sinh || prev.birthDateRaw,
-        gender: formData.gioi_tinh === "Nu" ? "Nữ" : (formData.gioi_tinh === "Nam" ? "Nam" : "Khác"),
-        genderRaw: formData.gioi_tinh || prev.genderRaw,
-        phone: formData.sdt || prev.phone,
-        personalEmail: formData.personalEmail || prev.personalEmail,
-      }));
-
-      showToast("Đã gửi yêu cầu chỉnh sửa thông tin thành công đến Quản lý phê duyệt!");
+      // Lưu lên CSDL rồi hiển thị đúng dữ liệu backend trả về
+      const updated = await updateEmployeeContact(currentMaNv, formData);
+      if (updated) setEmployee(updated);
+      showToast("Đã cập nhật thông tin cá nhân thành công!");
     } catch (err) {
       showToast(err.message || "Gửi yêu cầu thất bại", "error");
       throw err;
@@ -153,19 +132,23 @@ function EmployeeProfile({ userSession, onLogout }) {
             <div className="w-8 h-8 border-2 border-[#0EA5E9] border-t-transparent rounded-full animate-spin mb-3"></div>
             <p className="text-xs font-semibold text-slate-500">Đang tải thông tin hồ sơ...</p>
           </div>
+        ) : !employee ? (
+          <div className="py-24 text-center text-xs font-semibold text-rose-500">
+            Không tải được hồ sơ. Vui lòng đăng nhập lại hoặc thử lại sau.
+          </div>
         ) : (
           <>
             <ProfileHeader
-              employee={employee || FALLBACK_EMPLOYEE_PROFILE}
+              employee={employee}
             />
 
             <BasicInfoSection
-              employee={employee || FALLBACK_EMPLOYEE_PROFILE}
+              employee={employee}
               onEdit={() => setIsEditModalOpen(true)}
             />
 
             <WorkContactSection
-              employee={employee || FALLBACK_EMPLOYEE_PROFILE}
+              employee={employee}
             />
 
             <AccountSettingsSection

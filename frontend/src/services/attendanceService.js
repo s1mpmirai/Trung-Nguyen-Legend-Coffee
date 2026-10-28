@@ -1,139 +1,60 @@
 /**
  * Service kết nối dữ liệu Chấm công & Nhân sự
- * Ánh xạ 100% với cấu trúc Database Schema (bang_cham_cong, nhan_vien, phong_ban, thong_ke_thang)
+ * Ánh xạ 100% với cấu trúc Database Schema (bang_cham_cong, nhan_vien, phong_ban, chot_cong_thang)
+ * Mọi request đi qua apiClient để tự gắn token đăng nhập.
  */
 
-export const INITIAL_DATABASE_DATA = {
-  // Bảng nhan_vien (Employees)
-  employee: {
-    ma_nv: 'NV02',
-    ho_ten: 'Nguyễn Thị Minh Tâm',
-    phong_ban: 'PHÒNG QUẢN TRỊ NGUỒN NHÂN LỰC',
-    ma_pb: 'PB02',
-    chuc_vu: 'Trưởng phòng Quản trị Nguồn nhân lực',
-    loai_hop_dong: 'Chính thức',
-    trang_thai: 'DANG_LAM',
-    avatar_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop',
-    online_status: true,
-  },
+import apiClient from "./apiClient";
 
-  // Bảng dia_diem (Work Locations)
-  location: {
-    ten_dia_diem: 'Trụ sở chính Trung Nguyên',
-    vi_do: 10.7769,
-    kinh_do: 106.7009,
-    ban_kinh_cho_phep: 100,
-    khoang_cach_hien_tai: 18,
-    hop_le: true,
-  },
-
-  // Bảng thong_ke_thang (MonthlyStatistics)
-  monthlyStats: {
-    thang: new Date().getMonth() + 1,
-    nam: new Date().getFullYear(),
-    so_ngay_cong_thuc_te: 0,
-    so_ngay_cong_chuan: 22.0,
-    so_lan_di_muon: 0,
-    chi_tiet_muon: 'Không có dữ liệu',
-    so_gio_ot: 0,
-    he_so_ot: 'x1.5',
-    phep_nam_con_lai: 12.0,
-    tong_phep_nam: 12.0,
-    han_dung_phep: '31/12',
-    cap_nhat_luc: 'Vừa cập nhật',
-  },
-
-  // Bảng bang_cham_cong (AttendanceRecords / TimeLogs)
-  recentRecords: [],
-};
+const cleanMaNv = (ma_nv) => String(ma_nv || "").trim().toUpperCase().replace("-", "");
 
 /**
- * Lấy dữ liệu bảng chấm công của nhân viên
+ * Lấy dữ liệu bảng chấm công của nhân viên (null nếu không tải được)
  */
-export async function getAttendanceDashboardData(ma_nv = 'NV10') {
+export async function getAttendanceDashboardData(ma_nv) {
   try {
-    const cleanId = (ma_nv || 'NV10').toString().trim().toUpperCase().replace('-', '');
-    const res = await fetch(`/api/v1/attendance/dashboard/${cleanId}`);
-    if (res.ok) {
-      const data = await res.json();
-      return data;
-    }
+    return await apiClient.get(`/attendance/dashboard/${cleanMaNv(ma_nv)}`);
   } catch (e) {
-    console.error('Error fetching dashboard from API:', e);
+    console.error("Error fetching dashboard from API:", e);
+    return null;
   }
-  return INITIAL_DATABASE_DATA;
+}
+
+async function postCheck(endpoint, ma_nv, location, fallbackMessage) {
+  try {
+    // Backend luôn chấm công cho chính tài khoản đang đăng nhập (theo token)
+    return await apiClient.post(endpoint, { ma_nv: cleanMaNv(ma_nv), location });
+  } catch (e) {
+    return { success: false, message: e.message || fallbackMessage };
+  }
 }
 
 /**
  * Thực hiện chấm công vào ca (Check-in)
  */
 export async function checkInAttendance(ma_nv, locationData) {
-  try {
-    const res = await fetch('/api/v1/attendance/check-in', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ma_nv, location: locationData }),
-    });
-    if (res.ok) return await res.json();
-
-    const errData = await res.json().catch(() => null);
-    return {
-      success: false,
-      message: errData?.detail || errData?.message || `Lỗi máy chủ (${res.status})`,
-    };
-  } catch (e) {
-    return {
-      success: false,
-      message: 'Không thể kết nối đến máy chủ chấm công',
-    };
-  }
+  return postCheck("/attendance/check-in", ma_nv, locationData, "Không thể kết nối đến máy chủ chấm công");
 }
 
 /**
  * Thực hiện chấm công ra ca (Check-out)
  */
 export async function checkOutAttendance(ma_nv, locationData) {
-  try {
-    const res = await fetch('/api/v1/attendance/check-out', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ma_nv, location: locationData }),
-    });
-    if (res.ok) return await res.json();
-
-    const errData = await res.json().catch(() => null);
-    return {
-      success: false,
-      message: errData?.detail || errData?.message || `Lỗi máy chủ (${res.status})`,
-    };
-  } catch (e) {
-    return {
-      success: false,
-      message: 'Không thể kết nối đến máy chủ chấm công',
-    };
-  }
+  return postCheck("/attendance/check-out", ma_nv, locationData, "Không thể kết nối đến máy chủ chấm công");
 }
 
 /**
  * Lấy danh sách lịch sử chấm công chi tiết theo tháng/năm
  */
-export async function getAttendanceHistory(ma_nv = 'NV10', month = null, year = null) {
+export async function getAttendanceHistory(ma_nv, month = null, year = null) {
   try {
-    const cleanId = (ma_nv || 'NV10').toString().trim().toUpperCase().replace('-', '');
-    let url = `/api/v1/attendance/history/${cleanId}`;
-    const params = [];
-    if (month) params.push(`month=${month}`);
-    if (year) params.push(`year=${year}`);
-    if (params.length > 0) url += `?${params.join('&')}`;
-
-    const res = await fetch(url);
-    if (res.ok) {
-      return await res.json();
-    }
+    return await apiClient.get(`/attendance/history/${cleanMaNv(ma_nv)}`, {
+      params: { month: month || undefined, year: year || undefined },
+    });
   } catch (e) {
-    console.error('Error fetching attendance history:', e);
+    console.error("Error fetching attendance history:", e);
+    return { month, year, summary: {}, records: [] };
   }
-  return { month: month || 10, year: year || 2026, summary: {}, records: [] };
 }
 
 /**
@@ -142,18 +63,13 @@ export async function getAttendanceHistory(ma_nv = 'NV10', month = null, year = 
  */
 export async function getDailyAttendanceForManager(ngay = null, ma_pb = null) {
   try {
-    const params = new URLSearchParams();
-    if (ngay) params.append('ngay', ngay);
-    if (ma_pb && ma_pb !== 'all') params.append('ma_pb', ma_pb);
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`/api/v1/attendance/daily${qs}`);
-    if (res.ok) {
-      return await res.json();
-    }
+    return await apiClient.get("/attendance/daily", {
+      params: { ngay: ngay || undefined, ma_pb: ma_pb && ma_pb !== "all" ? ma_pb : undefined },
+    });
   } catch (e) {
-    console.error('Error fetching daily attendance for manager:', e);
+    console.error("Error fetching daily attendance for manager:", e);
+    return [];
   }
-  return [];
 }
 
 /**
@@ -162,19 +78,17 @@ export async function getDailyAttendanceForManager(ngay = null, ma_pb = null) {
  */
 export async function getMonthlyAttendanceSummaryForManager(thang = null, nam = null, ma_pb = null) {
   try {
-    const params = new URLSearchParams();
-    if (thang) params.append('thang', thang);
-    if (nam) params.append('nam', nam);
-    if (ma_pb && ma_pb !== 'all') params.append('ma_pb', ma_pb);
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`/api/v1/attendance/summary${qs}`);
-    if (res.ok) {
-      return await res.json();
-    }
+    return await apiClient.get("/attendance/summary", {
+      params: {
+        thang: thang || undefined,
+        nam: nam || undefined,
+        ma_pb: ma_pb && ma_pb !== "all" ? ma_pb : undefined,
+      },
+    });
   } catch (e) {
-    console.error('Error fetching monthly attendance summary for manager:', e);
+    console.error("Error fetching monthly attendance summary for manager:", e);
+    return [];
   }
-  return [];
 }
 
 /**
@@ -182,17 +96,7 @@ export async function getMonthlyAttendanceSummaryForManager(thang = null, nam = 
  * PUT /api/v1/attendance/{ma_cc}/adjust
  */
 export async function adjustAttendanceRecord(ma_cc, data) {
-  const res = await fetch(`/api/v1/attendance/${ma_cc}/adjust`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => null);
-    const msg = errData?.detail || errData?.message || `Lỗi điều chỉnh chấm công (${res.status})`;
-    throw new Error(msg);
-  }
-  return await res.json();
+  return apiClient.put(`/attendance/${ma_cc}/adjust`, data);
 }
 
 /**
@@ -201,18 +105,19 @@ export async function adjustAttendanceRecord(ma_cc, data) {
  */
 export async function getShifts() {
   try {
-    const res = await fetch('/api/v1/attendance/shifts');
-    if (res.ok) {
-      return await res.json();
-    }
+    return await apiClient.get("/attendance/shifts");
   } catch (e) {
-    console.error('Error fetching shifts:', e);
+    console.error("Error fetching shifts:", e);
+    return [];
   }
-  return [
-    { ma_ca: 'CA01', ten_ca: 'Hành chính', gio_vao: '08:00', gio_ra: '17:00', he_so: 1.0 },
-    { ma_ca: 'CA02', ten_ca: 'Ca sáng', gio_vao: '06:00', gio_ra: '14:00', he_so: 1.0 },
-    { ma_ca: 'CA03', ten_ca: 'Ca chiều', gio_vao: '14:00', gio_ra: '22:00', he_so: 1.0 },
-  ];
+}
+
+/**
+ * [Quản lý] Xu hướng chấm công N ngày làm việc gần nhất
+ * GET /api/v1/attendance/trend?days=7
+ */
+export async function getAttendanceTrend(days = 7) {
+  return apiClient.get("/attendance/trend", { params: { days } });
 }
 
 /**
@@ -221,14 +126,11 @@ export async function getShifts() {
  */
 export async function getAttendanceLockStatus(thang, nam) {
   try {
-    const res = await fetch(`/api/v1/attendance/lock-status?thang=${thang}&nam=${nam}`);
-    if (res.ok) {
-      return await res.json();
-    }
+    return await apiClient.get("/attendance/lock-status", { params: { thang, nam } });
   } catch (e) {
-    console.error('Error fetching attendance lock status:', e);
+    console.error("Error fetching attendance lock status:", e);
+    return { thang, nam, is_locked: false };
   }
-  return { thang, nam, is_locked: false };
 }
 
 /**
@@ -236,17 +138,5 @@ export async function getAttendanceLockStatus(thang, nam) {
  * POST /api/v1/attendance/toggle-lock
  */
 export async function toggleAttendanceLock(data) {
-  const res = await fetch('/api/v1/attendance/toggle-lock', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const errData = await res.json().catch(() => null);
-    const msg = errData?.detail || errData?.message || `Lỗi chốt bảng công (${res.status})`;
-    throw new Error(msg);
-  }
-  return await res.json();
+  return apiClient.post("/attendance/toggle-lock", data);
 }
-
-

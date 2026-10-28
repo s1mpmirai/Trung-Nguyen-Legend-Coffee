@@ -33,12 +33,25 @@ function PayrollDetailModal({
 
   // Danh sách thu nhập
   const incomeItems = [
-    { label: "Lương cơ bản", value: payroll.luong_co_ban },
-    { label: "Hệ số lương", value: payroll.he_so_luong, isRaw: true },
+    { label: "Lương hợp đồng", value: payroll.luong_co_ban },
+    { label: "Hệ số bậc lương", value: payroll.he_so_luong, isRaw: true },
     { label: "Lương theo công", value: payroll.luong_theo_cong },
-    { label: "Tổng phụ cấp", value: payroll.tong_phu_cap },
+    { label: `Tiền tăng ca (${payroll.so_gio_tang_ca || 0} giờ x 150%)`, value: payroll.tien_tang_ca },
+    { label: "Phụ cấp chức vụ", value: payroll.tong_phu_cap },
     { label: "Tiền thưởng", value: payroll.tien_thuong },
     { label: "Tổng thu nhập (Gross)", value: payroll.luong_gross, isTotal: true },
+  ];
+
+  // Các bước tính lương để nhân viên tự đối chiếu
+  const formulaSteps = [
+    `Lương theo công = Lương hợp đồng / ${payroll.so_cong_chuan} công chuẩn x ${payroll.so_cong_thuc_te} công thực tế = ${fmt(payroll.luong_theo_cong)}`,
+    `Tiền tăng ca = Lương hợp đồng / ${payroll.so_cong_chuan} / 8 giờ x ${payroll.so_gio_tang_ca || 0} giờ x 150% = ${fmt(payroll.tien_tang_ca)}`,
+    `Gross = Lương theo công + Tăng ca + Phụ cấp + Thưởng = ${fmt(payroll.luong_gross)}`,
+    "Bảo hiểm bắt buộc = 10.5% x (Lương hợp đồng + Phụ cấp chức vụ): BHXH 8%, BHYT 1.5%, BHTN 1%",
+    `Giảm trừ gia cảnh = 15.500.000 (bản thân) + 6.200.000 x số người phụ thuộc = ${fmt(payroll.giam_tru_gia_canh)}`,
+    `Thu nhập tính thuế = Gross - Bảo hiểm - Giảm trừ gia cảnh = ${fmt(payroll.thu_nhap_tinh_thue)}`,
+    `Thuế TNCN tính theo biểu lũy tiến 5% – 35% = ${fmt(payroll.thue_tncn)}`,
+    `Lương NET = Gross - Bảo hiểm - Thuế TNCN - Khấu trừ khác = ${fmt(payroll.luong_net)}`,
   ];
 
   // Danh sách khấu trừ
@@ -163,6 +176,16 @@ function PayrollDetailModal({
                 </strong>
               </div>
             ))}
+          </div>
+
+          {/* Cách tính lương */}
+          <div className="pr-modal__section">
+            <h4 className="pr-modal__section-title">Cách tính lương</h4>
+            <ol style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "12px", lineHeight: 1.6, color: "#475569" }}>
+              {formulaSteps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
           </div>
 
           {/* Lương NET */}

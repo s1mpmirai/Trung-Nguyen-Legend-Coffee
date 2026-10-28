@@ -20,9 +20,13 @@ def list_departments_endpoint(
     db: DbSession,
     search: Optional[str] = Query(None, description="Tìm theo mã PB, tên PB hoặc tên trưởng phòng"),
     trang_thai: Optional[int] = Query(None, description="1: Hoạt động, 0: Ngừng"),
+    sort_by: Optional[str] = Query(None, description="Trường sắp xếp: ma_pb, ten_pb, ten_truong_pb, so_luong_nv, trang_thai, ngay_tao"),
+    sort_order: Optional[str] = Query("asc", description="Thứ tự sắp xếp: asc hoặc desc"),
 ):
     """Lấy danh sách tất cả các phòng ban trong tập đoàn Trung Nguyên kèm số lượng nhân sự."""
-    return department_repository.get_departments_list(db, search=search, trang_thai=trang_thai)
+    return department_repository.get_departments_list(
+        db, search=search, trang_thai=trang_thai, sort_by=sort_by, sort_order=sort_order
+    )
 
 
 @router.get("/{ma_pb}", response_model=DepartmentDetailResponse, summary="Chi tiết phòng ban")
@@ -60,6 +64,8 @@ def update_department_endpoint(ma_pb: str, data: DepartmentUpdate, db: DbSession
                 detail=f"Không tìm thấy phòng ban {ma_pb}",
             )
         return dept
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -67,9 +73,9 @@ def update_department_endpoint(ma_pb: str, data: DepartmentUpdate, db: DbSession
         )
 
 
-@router.delete("/{ma_pb}", summary="Xóa phòng ban")
+@router.delete("/{ma_pb}", summary="Xóa phòng ban (xóa mềm: chuyển sang Ngừng hoạt động)")
 def delete_department_endpoint(ma_pb: str, db: DbSession):
-    """Xóa phòng ban (chỉ được xóa khi không còn nhân sự thuộc phòng ban này)."""
+    """Xóa mềm phòng ban khi không còn nhân sự đang làm việc. Khôi phục bằng PUT trang_thai = 1."""
     try:
         dept = department_repository.get_department_by_id(db, ma_pb)
         if not dept:
@@ -78,7 +84,9 @@ def delete_department_endpoint(ma_pb: str, db: DbSession):
                 detail=f"Không tìm thấy phòng ban {ma_pb}",
             )
         department_repository.delete_department(db, ma_pb)
-        return {"success": True, "message": f"Đã xóa thành công phòng ban {ma_pb}"}
+        return {"success": True, "message": f"Đã xóa phòng ban {ma_pb} (chuyển sang Ngừng hoạt động, có thể khôi phục)"}
+    except HTTPException:
+        raise
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:

@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_permission
 from app.db.session import get_db
 from app.schemas.payroll_schemas import (
     payroll_calculate_request,
@@ -15,7 +16,8 @@ from app.services.payroll_service import (
     get_company_payroll_summary,
 )
 
-router = APIRouter()
+# Toàn bộ API tính / duyệt lương yêu cầu quyền PAYROLL_MANAGE
+router = APIRouter(dependencies=[Depends(require_permission("PAYROLL_MANAGE"))])
 DbSession = Annotated[Session, Depends(get_db)]
 
 
@@ -36,11 +38,8 @@ def calculate_payroll_endpoint(
     """
     try:
         return calculate_payroll_month(db, data.thang, data.nam)
-    except Exception as err:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Lỗi khi tính lương: {str(err)}",
-        ) from err
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
 
 
 @router.get(
@@ -74,7 +73,7 @@ def update_payroll_status_endpoint(
     """Duyệt bảng lương (NHAP -> DA_DUYET -> DA_TRA)."""
     try:
         return change_payroll_status(db, ma_bl, data.trang_thai)
+    except LookupError as err:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err)) from err
     except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(err)
-        ) from err
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err

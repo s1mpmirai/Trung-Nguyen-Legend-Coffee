@@ -215,10 +215,11 @@ CREATE TABLE IF NOT EXISTS chot_cong_thang (
     thang TINYINT NOT NULL,
     nam SMALLINT NOT NULL,
     trang_thai VARCHAR(20) DEFAULT 'DA_CHOT',
-    nguoi_chot VARCHAR(50) NULL,
+    nguoi_chot VARCHAR(10) NULL COMMENT 'Mã nhân viên thực hiện chốt/mở khóa',
     ngay_chot DATETIME DEFAULT CURRENT_TIMESTAMP,
     ghi_chu VARCHAR(255) NULL,
-    UNIQUE (thang, nam)
+    UNIQUE (thang, nam),
+    CONSTRAINT fk_chot_nguoichot FOREIGN KEY (nguoi_chot) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Chốt và khóa bảng chấm công tháng';
 
 
@@ -516,7 +517,7 @@ INSERT INTO quyen (ma_quyen, ten_quyen, nhom_quyen, mo_ta) VALUES
 
 -- 14. Phân quyền theo vai trò
 INSERT INTO vai_tro_quyen (ma_vai_tro, ma_quyen) VALUES
-('ADMIN', 'ACCOUNT_MANAGE'),
+('ADMIN', 'ACCOUNT_MANAGE'), ('ADMIN', 'PERMISSION_ASSIGN'), ('ADMIN', 'EMPLOYEE_VIEW'),
 ('QUAN_LY', 'EMPLOYEE_VIEW'), ('QUAN_LY', 'EMPLOYEE_CREATE'), ('QUAN_LY', 'EMPLOYEE_UPDATE'),
 ('QUAN_LY', 'LEAVE_VIEW'), ('QUAN_LY', 'LEAVE_APPROVE'), ('QUAN_LY', 'ATTENDANCE_MANAGE'),
 ('QUAN_LY', 'PAYROLL_VIEW'), ('QUAN_LY', 'PAYROLL_MANAGE'),

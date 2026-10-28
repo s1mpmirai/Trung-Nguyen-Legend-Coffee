@@ -628,9 +628,13 @@ export default function AttendanceManagement() {
 
   const isApprovedRow = (r) => r.trang_thai_duyet === "DA_DUYET";
 
-  // Tiêu chí ĐƯỢC PHÊ DUYỆT (bỏ qua người đã duyệt hoặc bị từ chối):
+  // Công của chính người đang đăng nhập do cấp trên duyệt, không tự duyệt
+  const currentMaNv = localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv");
+  const isOwnRow = (r) => Boolean(currentMaNv) && r.ma_nv === currentMaNv;
+
+  // Tiêu chí ĐƯỢC PHÊ DUYỆT (bỏ qua người đã duyệt, bị từ chối hoặc công của chính mình):
   const isEligibleToApprove = (r) =>
-    Boolean(r.ma_cc) && !isApprovedRow(r) && !isRejectedRow(r);
+    Boolean(r.ma_cc) && !isApprovedRow(r) && !isRejectedRow(r) && !isOwnRow(r);
 
   // Danh sách các dòng được tick chọn và THỰC SỰ ĐỦ ĐIỀU KIỆN PHÊ DUYỆT
   const selectedEligibleDailyRows = dailyAttendance.filter(
@@ -639,7 +643,7 @@ export default function AttendanceManagement() {
 
   // Danh sách các dòng có thể tick chọn trên bảng (các dòng có ma_cc và chưa duyệt công)
   const selectableDailyRows = filteredDaily.filter(
-    (r) => r.ma_cc && !isApprovedRow(r)
+    (r) => r.ma_cc && !isApprovedRow(r) && !isOwnRow(r)
   );
 
   const isAllDailySelected =
@@ -1258,9 +1262,9 @@ export default function AttendanceManagement() {
                             type="checkbox"
                             checked={Boolean(row.ma_cc && selectedRowIds.includes(row.ma_cc))}
                             onChange={() => handleToggleSelectRow(row.ma_cc)}
-                            disabled={!row.ma_cc || isApproved || isMonthLocked}
+                            disabled={!row.ma_cc || isApproved || isMonthLocked || isOwnRow(row)}
                             className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                            title={!row.ma_cc ? "Chưa có công để chọn" : isApproved ? "Đã duyệt công đủ" : "Chọn để duyệt công"}
+                            title={!row.ma_cc ? "Chưa có công để chọn" : isOwnRow(row) ? "Công của bạn do cấp trên duyệt" : isApproved ? "Đã duyệt công đủ" : "Chọn để duyệt công"}
                           />
                         </td>
 
@@ -1420,6 +1424,10 @@ export default function AttendanceManagement() {
                                 title="Bảng công tháng đã khóa, không thể điều chỉnh"
                               >
                                 <Lock className="w-4 h-4" />
+                              </span>
+                            ) : isOwnRow(row) ? (
+                              <span className="text-slate-400 text-xs italic px-2" title="Không thể tự duyệt công của chính mình">
+                                Cấp trên duyệt
                               </span>
                             ) : !row.ma_cc ? (
                               <span className="text-slate-300 text-xs italic px-2">Chưa có công</span>

@@ -1,6 +1,25 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.core.datetime_utils import get_vietnam_now
+from app.utils.sorting import build_order_by
+
+DEPARTMENT_SORT_COLUMNS = {
+    "ma_pb": "CAST(SUBSTRING(pb.ma_pb, 3) AS UNSIGNED)",
+    "ten_pb": "pb.ten_pb",
+    "ten_truong_pb": "nv.ho_ten",
+    "so_luong_nv": "so_luong_nv",
+    "trang_thai": "pb.trang_thai",
+    "ngay_tao": "pb.ngay_tao",
+}
+
+POSITION_SORT_COLUMNS = {
+    "ma_cv": "CAST(SUBSTRING(cv.ma_cv, 3) AS UNSIGNED)",
+    "ten_cv": "cv.ten_cv",
+    "cap_bac": "cv.cap_bac",
+    "phu_cap_chuc_vu": "cv.phu_cap_chuc_vu",
+    "so_luong_nv": "so_luong_nv",
+    "trang_thai": "cv.trang_thai",
+}
 
 
 # ===================== PHÒNG BAN =====================
@@ -24,6 +43,8 @@ def get_departments_list(
     db: Session,
     search: str | None = None,
     trang_thai: int | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = None,
 ) -> list[dict]:
     conditions = ["1=1"]
     params = {}
@@ -53,7 +74,7 @@ def get_departments_list(
         FROM phong_ban pb
         LEFT JOIN nhan_vien nv ON pb.ma_truong_pb = nv.ma_nv
         WHERE {where_sql}
-        ORDER BY pb.ma_pb ASC
+        {build_order_by(sort_by, sort_order, DEPARTMENT_SORT_COLUMNS, "pb.ma_pb ASC")}
     """
     rows = db.execute(text(query), params).mappings().all()
     return [dict(r) for r in rows]
@@ -137,14 +158,20 @@ def update_department(db: Session, ma_pb: str, data: dict) -> dict | None:
 
 
 def delete_department(db: Session, ma_pb: str) -> bool:
-    count_nv = db.execute(
-        text("SELECT COUNT(*) FROM nhan_vien WHERE ma_pb = :ma_pb AND trang_thai = 'DANG_LAM'"),
-        {"ma_pb": ma_pb}
+    """Xóa mềm phòng ban: chuyển sang Ngừng hoạt động, giữ nguyên hồ sơ nhân sự cũ thuộc phòng ban."""
+    if not get_department_by_id(db, ma_pb):
+        return False
+    so_dang_lam = db.execute(
+        text("SELECT COUNT(*) FROM nhan_vien WHERE ma_pb = :ma_pb AND trang_thai <> 'DA_NGHI_VIEC'"),
+        {"ma_pb": ma_pb},
     ).scalar() or 0
-    if count_nv > 0:
-        raise ValueError(f"Không thể xóa phòng ban vì đang có {count_nv} nhân viên đang làm việc. Vui lòng chuyển nhân sự sang phòng ban khác trước!")
+    if so_dang_lam > 0:
+        raise ValueError(f"Không thể xóa phòng ban vì còn {so_dang_lam} nhân sự đang làm việc. Vui lòng chuyển nhân sự sang phòng ban khác trước!")
 
-    db.execute(text("DELETE FROM phong_ban WHERE ma_pb = :ma_pb"), {"ma_pb": ma_pb})
+    db.execute(
+        text("UPDATE phong_ban SET trang_thai = 0, ngay_cap_nhat = :now WHERE ma_pb = :ma_pb"),
+        {"ma_pb": ma_pb, "now": get_vietnam_now()},
+    )
     db.commit()
     return True
 
@@ -166,12 +193,21 @@ def generate_position_code(db: Session) -> str:
     return "CV01"
 
 
-def get_positions_list(db: Session, search: str | None = None) -> list[dict]:
+def get_positions_list(
+    db: Session,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = None,
+    trang_thai: int | None = None,
+) -> list[dict]:
     conditions = ["1=1"]
     params = {}
     if search:
         conditions.append("(cv.ma_cv LIKE :search OR cv.ten_cv LIKE :search)")
         params["search"] = f"%{search.strip()}%"
+    if trang_thai is not None:
+        conditions.append("cv.trang_thai = :trang_thai")
+        params["trang_thai"] = trang_thai
 
     where_sql = " AND ".join(conditions)
 
@@ -182,12 +218,13 @@ def get_positions_list(db: Session, search: str | None = None) -> list[dict]:
             cv.cap_bac,
             cv.phu_cap_chuc_vu,
             cv.mo_ta,
+            cv.trang_thai,
             cv.ngay_tao,
             cv.ngay_cap_nhat,
             (SELECT COUNT(*) FROM nhan_vien e WHERE e.ma_cv = cv.ma_cv AND e.trang_thai = 'DANG_LAM') AS so_luong_nv
         FROM chuc_vu cv
         WHERE {where_sql}
-        ORDER BY cv.cap_bac DESC, cv.ma_cv ASC
+        {build_order_by(sort_by, sort_order, POSITION_SORT_COLUMNS, "cv.cap_bac DESC, cv.ma_cv ASC")}
     """
     rows = db.execute(text(query), params).mappings().all()
     results = []
@@ -210,6 +247,7 @@ def get_position_by_id(db: Session, ma_cv: str) -> dict | None:
             cv.cap_bac,
             cv.phu_cap_chuc_vu,
             cv.mo_ta,
+            cv.trang_thai,
             cv.ngay_tao,
             cv.ngay_cap_nhat,
             (SELECT COUNT(*) FROM nhan_vien e WHERE e.ma_cv = cv.ma_cv AND e.trang_thai = 'DANG_LAM') AS so_luong_nv
@@ -269,14 +307,20 @@ def update_position(db: Session, ma_cv: str, data: dict) -> dict | None:
 
 
 def delete_position(db: Session, ma_cv: str) -> bool:
-    count_nv = db.execute(
-        text("SELECT COUNT(*) FROM nhan_vien WHERE ma_cv = :ma_cv AND trang_thai = 'DANG_LAM'"),
-        {"ma_cv": ma_cv}
+    """Xóa mềm chức vụ: chuyển sang Ngừng sử dụng, giữ thang bậc lương và hồ sơ nhân sự cũ."""
+    if not get_position_by_id(db, ma_cv):
+        return False
+    so_dang_lam = db.execute(
+        text("SELECT COUNT(*) FROM nhan_vien WHERE ma_cv = :ma_cv AND trang_thai <> 'DA_NGHI_VIEC'"),
+        {"ma_cv": ma_cv},
     ).scalar() or 0
-    if count_nv > 0:
-        raise ValueError(f"Không thể xóa chức vụ vì đang có {count_nv} nhân sự đảm nhiệm chức vụ này!")
+    if so_dang_lam > 0:
+        raise ValueError(f"Không thể xóa chức vụ vì còn {so_dang_lam} nhân sự đang đảm nhiệm chức vụ này!")
 
-    db.execute(text("DELETE FROM chuc_vu WHERE ma_cv = :ma_cv"), {"ma_cv": ma_cv})
+    db.execute(
+        text("UPDATE chuc_vu SET trang_thai = 0, ngay_cap_nhat = :now WHERE ma_cv = :ma_cv"),
+        {"ma_cv": ma_cv, "now": get_vietnam_now()},
+    )
     db.commit()
     return True
 

@@ -1,6 +1,6 @@
 from typing import Annotated  # 1. Import thêm Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 import app.services.auth_service as account_service
@@ -113,6 +113,8 @@ def list_accounts_endpoint(
     search: str | None = None,
     ma_vai_tro: str | None = None,
     trang_thai: str | None = None,
+    sort_by: str | None = Query(None, description="Trường sắp xếp: ma_nv, ho_ten, ten_pb, ma_vai_tro, trang_thai, lan_dn_cuoi, ngay_tao"),
+    sort_order: str | None = Query("asc", description="Thứ tự sắp xếp: asc hoặc desc"),
 ):
     """Lấy danh sách tất cả tài khoản hệ thống phục vụ màn hình Quản trị Tài khoản Admin."""
     return account_service.get_accounts_list(
@@ -122,5 +124,7 @@ def list_accounts_endpoint(
         search=search,
         ma_vai_tro=ma_vai_tro,
         trang_thai=trang_thai,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
 

@@ -1,35 +1,22 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { getDepartments, getPositions } from "../../../services/adminService";
 import { UserPlus, X, CheckCircle2, Save, ShieldCheck } from "lucide-react";
-
-// Danh mục chuẩn hóa khớp 100% với CSDL (00_full_hrm_lite.sql)
-export const DEPARTMENTS = [
-  { id: "PB01", name: "Ban Giám Đốc" },
-  { id: "PB02", name: "Phòng Nhân sự" },
-  { id: "PB03", name: "Phòng Kế toán – Tài chính" },
-  { id: "PB04", name: "Phòng Marketing" },
-  { id: "PB05", name: "Phòng Kinh doanh (Chuỗi F&B)" },
-  { id: "PB06", name: "Phòng Công nghệ Thông tin (IT)" },
-  { id: "PB07", name: "Xưởng Sản xuất (Nhà máy)" },
-  { id: "PB08", name: "Phòng Kinh doanh Miền Bắc" },
-];
-
-export const POSITIONS = [
-  { id: "CV01", name: "Nhân viên (Thử việc / Mới)" },
-  { id: "CV02", name: "Nhân viên chính" },
-  { id: "CV03", name: "Tổ trưởng / Trưởng nhóm" },
-  { id: "CV04", name: "Phó phòng" },
-  { id: "CV05", name: "Trưởng phòng" },
-  { id: "CV06", name: "Phó Giám đốc" },
-  { id: "CV07", name: "Giám đốc" },
-  { id: "CV08", name: "Tổng Giám đốc" },
-];
-
 
 export const CONTRACT_TYPES = [
   { id: "THU_VIEC", name: "Hợp đồng Thử việc (02 tháng)" },
   { id: "XAC_DINH_1_NAM", name: "Hợp đồng xác định thời hạn (12 tháng)" },
   { id: "XAC_DINH_3_NAM", name: "Hợp đồng xác định thời hạn (36 tháng)" },
   { id: "KHONG_XAC_DINH", name: "Hợp đồng không xác định thời hạn" },
+];
+
+export const EDUCATION_LEVELS = [
+  { id: "THPT", name: "Trung học phổ thông" },
+  { id: "TRUNG_CAP", name: "Trung cấp" },
+  { id: "CAO_DANG", name: "Cao đẳng" },
+  { id: "DAI_HOC", name: "Đại học" },
+  { id: "THAC_SI", name: "Thạc sĩ" },
+  { id: "TIEN_SI", name: "Tiến sĩ" },
+  { id: "CHUNG_CHI", name: "Chứng chỉ nghề" },
 ];
 
 export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
@@ -47,8 +34,31 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
     maCv: "CV01",
     startDate: todayStr,
     contractType: "THU_VIEC",
-    salary: "18,500,000",
+    salary: "",
+    educationLevel: "DAI_HOC",
+    major: "",
   });
+
+  // Chỉ cho chọn phòng ban / chức vụ đang hoạt động (đã xóa mềm thì không hiện)
+  const [departments, setDepartments] = useState([]);
+  const [positions, setPositions] = useState([]);
+  useEffect(() => {
+    if (!isOpen) return;
+    Promise.all([getDepartments({ trang_thai: 1 }), getPositions({ trang_thai: 1 })])
+      .then(([pbs, cvs]) => {
+        const deptList = (pbs || []).map((pb) => ({ id: pb.ma_pb, name: pb.ten_pb }));
+        const posList = (cvs || []).map((cv) => ({ id: cv.ma_cv, name: cv.ten_cv }));
+        setDepartments(deptList);
+        setPositions(posList);
+        // Giá trị mặc định phải nằm trong danh sách đang hoạt động
+        setFormData((prev) => ({
+          ...prev,
+          maPb: deptList.some((d) => d.id === prev.maPb) ? prev.maPb : deptList[0]?.id || "",
+          maCv: posList.some((p) => p.id === prev.maCv) ? prev.maCv : posList[0]?.id || "",
+        }));
+      })
+      .catch((err) => console.error("Không tải được danh mục phòng ban / chức vụ:", err));
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -56,9 +66,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
     e.preventDefault();
 
     // Chuẩn hóa mức lương về số nguyên phục vụ DB DECIMAL(12,0)
-    const cleanSalary = Number(String(formData.salary).replace(/[^0-9]/g, "")) || 18500000;
-    const selectedDept = DEPARTMENTS.find((d) => d.id === formData.maPb);
-    const selectedPos = POSITIONS.find((p) => p.id === formData.maCv);
+    const cleanSalary = Number(String(formData.salary).replace(/[^0-9]/g, ""));
+    const selectedDept = departments.find((d) => d.id === formData.maPb);
+    const selectedPos = positions.find((p) => p.id === formData.maCv);
     const selectedContract = CONTRACT_TYPES.find((c) => c.id === formData.contractType);
 
     const payload = {
@@ -76,9 +86,10 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
       hinh_thuc_lam_viec: "FULL_TIME",
       muc_luong: cleanSalary,
       loai_hd: formData.contractType,
+      trinh_do: formData.educationLevel,
+      chuyen_nganh: formData.major.trim() || null,
 
       // Thuộc tính tương thích giao diện frontend
-      maNv: formData.maNv === "Tự sinh (Hệ thống)" ? `NV${Math.floor(1280 + Math.random() * 500)}` : formData.maNv,
       fullName: formData.fullName.trim(),
       phone: formData.phone.trim(),
       department: formData.maPb,
@@ -285,7 +296,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
                   onChange={(e) => setFormData({ ...formData, maPb: e.target.value })}
                   className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all cursor-pointer"
                 >
-                  {DEPARTMENTS.map((dept) => (
+                  {departments.map((dept) => (
                     <option key={dept.id} value={dept.id}>
                       {dept.id} - {dept.name}
                     </option>
@@ -303,7 +314,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
                   onChange={(e) => setFormData({ ...formData, maCv: e.target.value })}
                   className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all cursor-pointer"
                 >
-                  {POSITIONS.map((pos) => (
+                  {positions.map((pos) => (
                     <option key={pos.id} value={pos.id}>
                       {pos.id} - {pos.name}
                     </option>
@@ -328,6 +339,35 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Trình độ học vấn (lưu vào bảng bang_cap) */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                  Trình độ học vấn <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={formData.educationLevel}
+                  onChange={(e) => setFormData({ ...formData, educationLevel: e.target.value })}
+                  className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all cursor-pointer"
+                >
+                  {EDUCATION_LEVELS.map((lv) => (
+                    <option key={lv.id} value={lv.id}>
+                      {lv.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-700">Chuyên ngành</label>
+                <input
+                  type="text"
+                  value={formData.major}
+                  onChange={(e) => setFormData({ ...formData, major: e.target.value })}
+                  placeholder="VD: Quản trị kinh doanh"
+                  className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all"
+                />
               </div>
 
               {/* Mức lương cơ bản */}

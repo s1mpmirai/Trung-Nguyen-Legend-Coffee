@@ -55,13 +55,7 @@ export default function Login({ onLoginSuccess }) {
       const data = await response.json();
       const role = String(data.ma_vai_tro || 'NHAN_VIEN').toUpperCase();
 
-      // Chặn tài khoản Quản lý / Admin đăng nhập tại cổng nhân viên
-      if (['ADMIN', 'QUAN_LY', 'TRUONG_NHOM'].includes(role)) {
-        setErrorMessage('Tài khoản Quản lý / Quản trị viên không được phép đăng nhập tại đây. Vui lòng sử dụng Cổng Điều Hành (/login-manage).');
-        setIsLoading(false);
-        return;
-      }
-
+      // Mọi nhân sự (kể cả Quản lý / Admin) đều được vào Cổng nhân viên để chấm công cá nhân
       localStorage.setItem('user_role', role);
       localStorage.setItem('user_ma_nv', data.ma_nv);
       localStorage.setItem('ma_nv', data.ma_nv);

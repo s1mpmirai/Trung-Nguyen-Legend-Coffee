@@ -47,7 +47,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
-      const activeEmpId = userSession?.ma_nv || localStorage.getItem('user_ma_nv') || localStorage.getItem('ma_nv') || 'NV10';
+      const activeEmpId = userSession?.ma_nv || localStorage.getItem('user_ma_nv');
       const dashboardData = await getAttendanceDashboardData(activeEmpId);
       setData(dashboardData);
       setIsLoading(false);
@@ -153,6 +153,16 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
       setIsCheckingOut(false);
     }
   };
+
+  if (!isLoading && !data) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
+        <p className="text-xs font-semibold text-rose-500">
+          Không tải được dữ liệu chấm công. Vui lòng đăng nhập lại hoặc thử lại sau.
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading || !data) {
     return (

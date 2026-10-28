@@ -1,7 +1,7 @@
 # ==============================================================================
 # TRUNG NGUYEN LEGEND COFFEE - DANH MỤC API BACKEND (API LINKS)
 # Tự động cập nhật mỗi khi có API mới hoặc thay đổi endpoint
-# Cập nhật lần cuối: 2026-10-05 18:30:00 (UTC+7)
+# Cập nhật lần cuối: 2026-10-26 (UTC+7)
 # ==============================================================================
 
 [AUTH - XÁC THỰC & ĐĂNG NHẬP]
@@ -14,7 +14,7 @@
 - POST /api/v1/auth/login-employee          | Đăng nhập tài khoản Nhân viên (Employee - Alias)
 
 [ACCOUNTS - QUẢN LÝ TÀI KHOẢN NGƯỜI DÙNG]
-- GET  /api/v1/accounts                     | [Admin] Lấy danh sách toàn bộ tài khoản (phân trang, tìm kiếm, lọc vai trò, trạng thái)
+- GET  /api/v1/accounts                     | [Admin] Lấy danh sách toàn bộ tài khoản (phân trang, tìm kiếm, lọc vai trò, trạng thái, sắp xếp sort_by/sort_order)
 - POST /api/v1/accounts/create_account      | [Admin] Tạo tài khoản người dùng mới (Mật khẩu mặc định là 1)
 - PUT  /api/v1/accounts/{ma_nv}             | [Admin] Cập nhật tài khoản (Đổi mật khẩu mới, đổi vai trò, đổi trạng thái)
 - PUT  /api/v1/accounts/{ma_nv}/status      | [Admin] Cập nhật trạng thái tài khoản (Kích hoạt / Khóa)
@@ -34,14 +34,14 @@
 - GET  /api/v1/admin/dashboard/stats        | [Admin] Báo cáo thống kê toàn diện: Nhân sự, Phòng ban, Chức vụ, Tài khoản, Kho hàng, Hợp đồng
 
 [DEPARTMENTS - CƠ CẤU PHÒNG BAN]
-- GET  /api/v1/departments                  | [Admin/QL] Danh sách phòng ban (kèm thông tin trưởng phòng, số lượng nhân sự)
+- GET  /api/v1/departments                  | [Admin/QL] Danh sách phòng ban (kèm thông tin trưởng phòng, số lượng nhân sự; sắp xếp sort_by/sort_order)
 - GET  /api/v1/departments/{ma_pb}          | [Admin/QL] Chi tiết phòng ban kèm danh sách nhân sự trực thuộc
 - POST /api/v1/departments                  | [Admin] Thêm phòng ban mới
 - PUT  /api/v1/departments/{ma_pb}          | [Admin] Cập nhật thông tin phòng ban, thay đổi/bổ nhiệm trưởng phòng
 - DELETE /api/v1/departments/{ma_pb}        | [Admin] Xóa phòng ban (khi không còn nhân sự trực thuộc)
 
 [POSITIONS - CHỨC VỤ & BẬC LƯƠNG]
-- GET  /api/v1/positions                    | [Admin/QL] Danh sách chức vụ (phụ cấp chức vụ, cấp bậc 1-5, số nhân sự đảm nhiệm)
+- GET  /api/v1/positions                    | [Admin/QL] Danh sách chức vụ (phụ cấp chức vụ, cấp bậc 1-5, số nhân sự đảm nhiệm; sắp xếp sort_by/sort_order)
 - GET  /api/v1/positions/{ma_cv}            | [Admin/QL] Chi tiết chức vụ kèm thang bảng lương
 - POST /api/v1/positions                    | [Admin] Thêm chức vụ mới
 - PUT  /api/v1/positions/{ma_cv}            | [Admin] Cập nhật thông tin chức vụ, phụ cấp
@@ -50,7 +50,7 @@
 - POST /api/v1/positions/{ma_cv}/salary-scales | [Admin] Thêm bậc lương cho chức vụ
 
 [CONTRACTS - HỢP ĐỒNG LAO ĐỘNG]
-- GET  /api/v1/contracts                    | [Admin/HR] Danh sách hợp đồng (lọc loại HĐ, trạng thái, hợp đồng sắp hết hạn 30 ngày)
+- GET  /api/v1/contracts                    | [Admin/HR] Danh sách hợp đồng (lọc loại HĐ, trạng thái, hợp đồng sắp hết hạn 30 ngày; sắp xếp sort_by/sort_order)
 - GET  /api/v1/contracts/{ma_hd}            | [Admin/HR] Chi tiết hợp đồng (lương cơ bản, tỷ lệ hưởng, STK, ngân hàng, MST, BHXH)
 - GET  /api/v1/contracts/employee/{ma_nv}   | [Admin/HR/NV] Lịch sử các hợp đồng lao động của một nhân viên
 - POST /api/v1/contracts                    | [Admin/HR] Ký / Tạo mới hợp đồng lao động

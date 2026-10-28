@@ -195,6 +195,18 @@ def record_check_in(
     }
 
 
+def auto_approve_attendance(db: Session, ma_nv: str, ngay_cong: date, ghi_chu_duyet: str) -> None:
+    """Tự động duyệt công trong ngày (dùng cho nhân sự cấp cao nhất, không có cấp trên để duyệt)."""
+    update_sql = text("""
+        UPDATE bang_cham_cong
+        SET trang_thai_duyet = 'DA_DUYET',
+            ghi_chu = CONCAT_WS(' | ', NULLIF(ghi_chu, ''), :ghi_chu_duyet)
+        WHERE ma_nv = :ma_nv AND ngay_cong = :ngay_cong AND trang_thai_duyet <> 'DA_DUYET'
+    """)
+    db.execute(update_sql, {"ma_nv": ma_nv, "ngay_cong": ngay_cong, "ghi_chu_duyet": ghi_chu_duyet})
+    db.commit()
+
+
 def record_check_out(
     db: Session,
     ma_nv: str,
@@ -556,10 +568,12 @@ def ensure_attendance_lock_table(db: Session):
             thang TINYINT NOT NULL,
             nam SMALLINT NOT NULL,
             trang_thai VARCHAR(20) DEFAULT 'DA_CHOT',
-            nguoi_chot VARCHAR(50) NULL,
+            nguoi_chot VARCHAR(10) NULL,
             ngay_chot DATETIME DEFAULT CURRENT_TIMESTAMP,
             ghi_chu VARCHAR(255) NULL,
-            UNIQUE (thang, nam)
+            UNIQUE (thang, nam),
+            CONSTRAINT fk_chot_nguoichot FOREIGN KEY (nguoi_chot)
+                REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL
         ) ENGINE=InnoDB;
     """)
     db.execute(create_sql)
@@ -597,7 +611,7 @@ def get_monthly_attendance_lock(db: Session, thang: int, nam: int) -> dict[str, 
 
 
 def set_monthly_attendance_lock(
-    db: Session, thang: int, nam: int, is_locked: bool, nguoi_chot: str = "Quản lý", ghi_chu: str = ""
+    db: Session, thang: int, nam: int, is_locked: bool, nguoi_chot: str | None = None, ghi_chu: str = ""
 ) -> dict[str, Any]:
     """Khóa hoặc Mở khóa bảng công tháng."""
     ensure_attendance_lock_table(db)
@@ -621,3 +635,21 @@ def set_monthly_attendance_lock(
     db.commit()
     return get_monthly_attendance_lock(db, thang, nam)
 
+
+def get_attendance_counts_by_day(db: Session, start: date, end: date) -> list[dict[str, Any]]:
+    """Đếm số lượt chấm công đúng giờ / đi trễ theo từng ngày."""
+    query = text("""
+        SELECT
+            ngay_cong,
+            SUM(CASE WHEN gio_vao IS NOT NULL AND loai_cong <> 'DI_TRE' THEN 1 ELSE 0 END) AS dung_gio,
+            SUM(CASE WHEN gio_vao IS NOT NULL AND loai_cong = 'DI_TRE' THEN 1 ELSE 0 END) AS di_tre,
+            SUM(CASE WHEN gio_vao IS NOT NULL THEN 1 ELSE 0 END) AS da_cham_cong
+        FROM bang_cham_cong
+        WHERE ngay_cong BETWEEN :start AND :end
+        GROUP BY ngay_cong
+    """)
+    return [dict(r) for r in db.execute(query, {"start": start, "end": end}).mappings().all()]
+
+
+def count_active_employees(db: Session) -> int:
+    return int(db.execute(text("SELECT COUNT(*) FROM nhan_vien WHERE trang_thai = 'DANG_LAM'")).scalar() or 0)

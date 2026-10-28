@@ -39,16 +39,18 @@ function EmployeePayroll({ userSession, onLogout }) {
   const [viewMode, setViewMode] = useState("month");     // "month" | "year"
   const [printMode, setPrintMode] = useState("month");   // "month" | "year"
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState({ thang: 8, nam: 2026 });
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    // Mặc định tháng liền trước (tháng gần nhất đã có thể chốt lương)
+    const now = new Date();
+    return now.getMonth() === 0
+      ? { thang: 12, nam: now.getFullYear() - 1 }
+      : { thang: now.getMonth(), nam: now.getFullYear() };
+  });
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
 
   // Mã NV hiện tại
-  const currentMaNv =
-    userSession?.ma_nv ||
-    localStorage.getItem("user_ma_nv") ||
-    localStorage.getItem("ma_nv") ||
-    "NV02";
+  const currentMaNv = userSession?.ma_nv || localStorage.getItem("user_ma_nv");
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -71,14 +73,6 @@ function EmployeePayroll({ userSession, onLogout }) {
           if (latestClosed) {
             setSelectedMonth({ thang: latestClosed.thang, nam: latestClosed.nam });
           }
-        } else if (mounted) {
-          // Nếu DB chưa có bản ghi, tính theo tháng chốt gần nhất của thời gian thực (tháng hiện tại - 1)
-          const now = new Date();
-          const curM = now.getMonth() + 1;
-          const curY = now.getFullYear();
-          const prevM = curM === 1 ? 12 : curM - 1;
-          const prevY = curM === 1 ? curY - 1 : curY;
-          setSelectedMonth({ thang: prevM, nam: prevY });
         }
       } catch (err) {
         console.warn("Lỗi load danh sách tháng:", err);
@@ -101,6 +95,7 @@ function EmployeePayroll({ userSession, onLogout }) {
     } catch (err) {
       console.warn("Không thể tải bảng lương:", err.message);
       setPayroll(null);
+      showToast(`Không tải được bảng lương: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -121,6 +116,8 @@ function EmployeePayroll({ userSession, onLogout }) {
         if (mounted) setYearSummary(data);
       } catch (err) {
         console.warn("Lỗi tải tổng hợp năm:", err.message);
+        if (mounted) setYearSummary(null);
+        showToast(`Không tải được bảng lương năm: ${err.message}`);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -203,14 +200,6 @@ function EmployeePayroll({ userSession, onLogout }) {
     setIsPrintModalOpen(true);
   };
 
-  const handleSendEmail = () => {
-    if (!hasData) {
-      showToast(`Dữ liệu Tháng ${selectedMonth.thang}/${selectedMonth.nam} đang được cập nhật.`);
-      return;
-    }
-    showToast("Bản sao bảng lương đã được gửi đến email nội bộ");
-  };
-
   const handleViewDetail = () => {
     if (!hasData) {
       showToast(`Bảng lương Tháng ${selectedMonth.thang}/${selectedMonth.nam} đang được cập nhật, chưa có bảng kê chi tiết.`);
@@ -272,7 +261,7 @@ function EmployeePayroll({ userSession, onLogout }) {
         {/* Hành động nhanh */}
         <QuickActions
           onPrint={() => setIsPrintModalOpen(true)}
-          onSendEmail={handleSendEmail}
+          onPrintYear={() => handlePrintYear(selectedMonth.nam)}
         />
 
         {/* Tổng Gross & Khấu trừ + link chi tiết */}

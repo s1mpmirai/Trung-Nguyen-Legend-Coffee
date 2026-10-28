@@ -12,6 +12,7 @@ import {
   AlertCircle,
   X,
   UserCheck,
+  RotateCcw,
 } from "lucide-react";
 import {
   getDepartments,
@@ -19,12 +20,16 @@ import {
   updateDepartment,
   deleteDepartment,
 } from "../../../services/adminService";
+import SortableHeader, { nextSort } from "../../../components/common/SortableHeader";
 
 export default function AdminDepartmentsTab() {
   const [departments, setDepartments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState({ by: "", order: "asc" });
+
+  const handleSort = (field) => setSort((prev) => nextSort(prev, field));
 
   const handleTriggerSearch = () => {
     setSearchTerm(searchInput.trim());
@@ -48,6 +53,7 @@ export default function AdminDepartmentsTab() {
     ma_truong_pb: "",
     sdt: "",
     mo_ta: "",
+    trang_thai: 1,
   });
 
   const [toastMessage, setToastMessage] = useState("");
@@ -62,7 +68,10 @@ export default function AdminDepartmentsTab() {
   const fetchDepartments = async () => {
     setIsLoading(true);
     try {
-      const data = await getDepartments();
+      const data = await getDepartments({
+        sort_by: sort.by || undefined,
+        sort_order: sort.by ? sort.order : undefined,
+      });
       setDepartments(data || []);
     } catch (err) {
       console.error("Lỗi tải danh sách phòng ban:", err);
@@ -74,7 +83,7 @@ export default function AdminDepartmentsTab() {
 
   useEffect(() => {
     fetchDepartments();
-  }, []);
+  }, [sort]);
 
   const handleOpenCreate = () => {
     setModalMode("create");
@@ -85,6 +94,7 @@ export default function AdminDepartmentsTab() {
       ma_truong_pb: "",
       sdt: "028 3829 ",
       mo_ta: "",
+      trang_thai: 1,
     });
     setIsModalOpen(true);
   };
@@ -98,6 +108,7 @@ export default function AdminDepartmentsTab() {
       ma_truong_pb: pb.ma_truong_pb || "",
       sdt: pb.sdt || "",
       mo_ta: pb.mo_ta || "",
+      trang_thai: pb.trang_thai ?? 1,
     });
     setIsModalOpen(true);
   };
@@ -125,6 +136,7 @@ export default function AdminDepartmentsTab() {
           ma_truong_pb: formData.ma_truong_pb.trim().toUpperCase() || null,
           sdt: formData.sdt.trim() || null,
           mo_ta: formData.mo_ta.trim() || null,
+          trang_thai: Number(formData.trang_thai),
         });
         showToast(`Đã cập nhật thông tin phòng ban ${formData.ten_pb}!`);
       }
@@ -143,16 +155,31 @@ export default function AdminDepartmentsTab() {
       return;
     }
 
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa phòng ban "${pb.ten_pb}" (${pb.ma_pb})?`)) {
+    if (
+      !window.confirm(
+        `Xóa phòng ban "${pb.ten_pb}" (${pb.ma_pb})?\nPhòng ban sẽ chuyển sang "Ngừng hoạt động", dữ liệu vẫn được giữ lại và có thể khôi phục.`
+      )
+    ) {
       return;
     }
 
     try {
       await deleteDepartment(pb.ma_pb);
-      showToast(`Đã xóa phòng ban ${pb.ten_pb} thành công!`);
+      showToast(`Đã xóa phòng ban ${pb.ten_pb} (chuyển sang Ngừng hoạt động)`);
       fetchDepartments();
     } catch (err) {
       showToast(err.message || "Xóa phòng ban thất bại", "error");
+    }
+  };
+
+  // Khôi phục phòng ban đã xóa mềm
+  const handleRestore = async (pb) => {
+    try {
+      await updateDepartment(pb.ma_pb, { trang_thai: 1 });
+      showToast(`Đã khôi phục phòng ban ${pb.ten_pb}`);
+      fetchDepartments();
+    } catch (err) {
+      showToast(err.message || "Khôi phục phòng ban thất bại", "error");
     }
   };
 
@@ -253,11 +280,11 @@ export default function AdminDepartmentsTab() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-3 px-4">Mã PB</th>
-                  <th className="py-3 px-4">Tên phòng ban</th>
-                  <th className="py-3 px-4">Trưởng phòng</th>
+                  <SortableHeader className="py-3 px-4" label="Mã PB" field="ma_pb" sort={sort} onSort={handleSort} />
+                  <SortableHeader className="py-3 px-4" label="Tên phòng ban" field="ten_pb" sort={sort} onSort={handleSort} />
+                  <SortableHeader className="py-3 px-4" label="Trưởng phòng" field="ten_truong_pb" sort={sort} onSort={handleSort} />
                   <th className="py-3 px-4">Điện thoại</th>
-                  <th className="py-3 px-4">Số lượng NV</th>
+                  <SortableHeader className="py-3 px-4" label="Số lượng NV" field="so_luong_nv" sort={sort} onSort={handleSort} />
                   <th className="py-3 px-4">Mô tả nhiệm vụ</th>
                   <th className="py-3 px-4 text-center">Thao tác</th>
                 </tr>
@@ -269,6 +296,11 @@ export default function AdminDepartmentsTab() {
 
                     <td className="py-3.5 px-4">
                       <span className="font-bold text-slate-800">{pb.ten_pb}</span>
+                      {Number(pb.trang_thai) === 0 && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                          Ngừng hoạt động
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -307,14 +339,25 @@ export default function AdminDepartmentsTab() {
                           <Edit size={15} />
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(pb)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Xóa phòng ban"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {Number(pb.trang_thai) === 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRestore(pb)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                            title="Khôi phục phòng ban"
+                          >
+                            <RotateCcw size={15} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(pb)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Xóa phòng ban (ngừng sử dụng, có thể khôi phục)"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -406,6 +449,20 @@ export default function AdminDepartmentsTab() {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-sky-500"
                 />
               </div>
+
+              {modalMode === "edit" && (
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-slate-700">Trạng thái hoạt động</label>
+                  <select
+                    value={formData.trang_thai}
+                    onChange={(e) => setFormData({ ...formData, trang_thai: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                  >
+                    <option value={1}>Đang hoạt động</option>
+                    <option value={0}>Ngừng hoạt động (giữ lại hồ sơ cũ)</option>
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="block text-[11px] font-semibold text-slate-700">Mô tả chức năng nhiệm vụ</label>

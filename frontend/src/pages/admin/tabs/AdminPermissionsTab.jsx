@@ -78,26 +78,6 @@ export const PERMISSION_MAP = {
     group: "Lương bổng & Đãi ngộ",
     desc: "Khóa bảng lương tháng, tính thưởng phạt và duyệt chi trả toàn chuỗi",
   },
-  PRODUCT_VIEW: {
-    label: "Tra cứu danh mục sản phẩm & kho",
-    group: "Kho vận & Vật tư",
-    desc: "Xem số lượng tồn kho nguyên vật liệu, hạt cà phê, máy móc và vật phẩm",
-  },
-  PRODUCT_MANAGE: {
-    label: "Quản lý nhập - xuất kho hàng hóa",
-    group: "Kho vận & Vật tư",
-    desc: "Thêm mới mã hàng, cập nhật số lượng tồn kho và điều chuyển kho",
-  },
-  SUPPLIER_VIEW: {
-    label: "Xem thông tin đối tác & Nhà cung cấp",
-    group: "Nhà cung cấp",
-    desc: "Tra cứu danh bạ nhà cung cấp cà phê nhân, máy móc và dịch vụ",
-  },
-  SUPPLIER_MANAGE: {
-    label: "Quản lý hồ sơ Nhà cung cấp",
-    group: "Nhà cung cấp",
-    desc: "Thêm mới, đánh giá chất lượng và cập nhật thông tin đối tác cung ứng",
-  },
   ACCOUNT_MANAGE: {
     label: "Quản lý & Cấp tài khoản người dùng",
     group: "Bảo mật & Phân quyền",
@@ -115,7 +95,6 @@ export const GROUP_MAP = {
   DON_TU: "Đơn từ & Nghỉ phép",
   CHAM_CONG: "Chấm công & Ca kíp",
   LUONG: "Lương bổng & Đãi ngộ",
-  KHO: "Kho vận & Nhà cung cấp",
   PHAN_QUYEN: "Bảo mật & Phân quyền",
 };
 
@@ -840,10 +819,10 @@ export default function AdminPermissionsTab() {
                 <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
                   <th className="py-3 px-4 w-2/5">Tên quyền hạn & Mô tả chức năng</th>
                   <th className="py-3 px-4 w-1/5">Phân nhóm nghiệp vụ</th>
-                  <th className="py-3 px-3 text-center text-slate-700">Nhân viên (3)</th>
-                  <th className="py-3 px-3 text-center text-purple-700">Trưởng nhóm (5)</th>
-                  <th className="py-3 px-3 text-center text-sky-700">Quản lý (12)</th>
-                  <th className="py-3 px-3 text-center text-sky-800 bg-sky-50/60">Admin (16)</th>
+                  <th className="py-3 px-3 text-center text-slate-700">Nhân viên ({matrixMap.NHAN_VIEN?.length || 0})</th>
+                  <th className="py-3 px-3 text-center text-purple-700">Trưởng nhóm ({matrixMap.TRUONG_NHOM?.length || 0})</th>
+                  <th className="py-3 px-3 text-center text-sky-700">Quản lý ({matrixMap.QUAN_LY?.length || 0})</th>
+                  <th className="py-3 px-3 text-center text-sky-800 bg-sky-50/60">Admin ({matrixMap.ADMIN?.length || 0})</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -865,7 +844,7 @@ export default function AdminPermissionsTab() {
                     const hasNhanVien = matrixMap.NHAN_VIEN?.includes(perm.ma_quyen);
                     const hasTruongNhom = matrixMap.TRUONG_NHOM?.includes(perm.ma_quyen);
                     const hasQuanLy = matrixMap.QUAN_LY?.includes(perm.ma_quyen);
-                    const hasAdmin = matrixMap.ADMIN?.includes(perm.ma_quyen) ?? true;
+                    const hasAdmin = Boolean(matrixMap.ADMIN?.includes(perm.ma_quyen));
 
                     return (
                       <tr key={perm.ma_quyen} className="hover:bg-slate-50/60 transition-colors">

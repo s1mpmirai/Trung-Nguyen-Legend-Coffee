@@ -1,8 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.permissions import CurrentAccount, ensure_self_or_permission
 from app.db.session import get_db
 from app.schemas.leave_schemas import leave_create, leave_response
 from app.services import leave_service
@@ -25,12 +26,14 @@ DbSession = Annotated[Session, Depends(get_db)]
 )
 def create_leave_endpoint(
     data: leave_create,
+    account: CurrentAccount,
     db: DbSession = None,
 ):
     """
     Nhân viên nộp đơn xin nghỉ (nghỉ phép, nghỉ ốm, thai sản, nghỉ không lương, nghỉ việc).
-    Đơn mới tạo sẽ ở trạng thái 'CHO_DUYET'.
+    Đơn mới tạo sẽ ở trạng thái 'CHO_DUYET'. Đơn luôn được tạo cho chính người đang đăng nhập.
     """
+    data.ma_nv = account["ma_nv"]
     try:
         return leave_service.create_employee_leave(db, data)
     except ValueError as err:
@@ -51,10 +54,12 @@ def create_leave_endpoint(
 )
 def get_leaves_by_employee_endpoint(
     ma_nv: str,
+    account: CurrentAccount,
     db: DbSession = None,
 ):
     """Lấy toàn bộ lịch sử đơn từ mà nhân viên này đã từng nộp."""
-    return leave_service.get_employee_leave_history(db, ma_nv)
+    clean_id = ensure_self_or_permission(account, ma_nv, "LEAVE_APPROVE")
+    return leave_service.get_employee_leave_history(db, clean_id)
 
 
 @router.put(
@@ -69,12 +74,12 @@ def get_leaves_by_employee_endpoint(
 )
 def cancel_leave_endpoint(
     ma_don: str,
-    ma_nv: str = Query(..., description="Mã nhân viên người tạo đơn"),
+    account: CurrentAccount,
     db: DbSession = None,
 ):
     """Nhân viên tự hủy đơn nghỉ của mình nếu đơn chưa được duyệt."""
     try:
-        return leave_service.cancel_employee_leave(db, ma_don, ma_nv)
+        return leave_service.cancel_employee_leave(db, ma_don, account["ma_nv"])
     except ValueError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)

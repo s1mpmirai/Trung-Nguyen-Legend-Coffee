@@ -7,11 +7,13 @@ def get_payroll_by_month(db: Session, ma_nv: str, thang: int, nam: int) -> dict 
     query = """
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
-            bl.so_cong_chuan, bl.so_cong_thuc_te,
-            bl.luong_theo_cong,
+            bl.luong_co_ban, bl.he_so_luong,
+            bl.so_cong_chuan, bl.so_cong_thuc_te, bl.so_gio_tang_ca,
+            bl.luong_theo_cong, bl.tien_tang_ca,
             bl.tong_phu_cap, bl.tien_thuong,
             bl.luong_gross,
             bl.bhxh, bl.bhyt, bl.bhtn,
+            bl.giam_tru_gia_canh, bl.thu_nhap_tinh_thue,
             bl.thue_tncn, bl.khau_tru_khac, bl.tong_khau_tru,
             bl.luong_net,
             bl.trang_thai, bl.ghi_chu,
@@ -50,9 +52,16 @@ def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
             nv.ho_ten, pb.ten_pb, cv.ten_cv,
             bl.luong_co_ban, bl.he_so_luong, bl.so_cong_chuan,
             bl.so_cong_thuc_te,
-            bl.luong_theo_cong, bl.tong_phu_cap, bl.tien_thuong,
+            bl.luong_theo_cong, bl.so_gio_tang_ca, bl.tien_tang_ca, bl.tong_phu_cap, bl.tien_thuong,
             bl.luong_gross, bl.bhxh, bl.bhyt, bl.bhtn, bl.thue_tncn, bl.tong_khau_tru,
-            bl.luong_net, bl.trang_thai, bl.ghi_chu
+            bl.luong_net, bl.trang_thai, bl.ghi_chu,
+            (
+                SELECT CONCAT_WS(' • ', h.ngan_hang, h.so_tai_khoan)
+                FROM hop_dong_lao_dong h
+                WHERE h.ma_nv = bl.ma_nv AND h.trang_thai <> 'DA_HUY'
+                ORDER BY h.ngay_bat_dau DESC
+                LIMIT 1
+            ) AS tai_khoan_nhan_luong
         FROM bang_luong bl
         JOIN nhan_vien nv ON bl.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
@@ -62,6 +71,12 @@ def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
     """
     rows = db.execute(text(query), {"thang": thang, "nam": nam}).mappings().all()
     return [dict(r) for r in rows]
+
+
+def get_payroll_status(db: Session, ma_bl: int) -> str | None:
+    return db.execute(
+        text("SELECT trang_thai FROM bang_luong WHERE ma_bl = :ma_bl"), {"ma_bl": ma_bl}
+    ).scalar()
 
 
 def update_payroll_status(db: Session, ma_bl: int, trang_thai: str) -> dict | None:
@@ -78,122 +93,101 @@ def update_payroll_status(db: Session, ma_bl: int, trang_thai: str) -> dict | No
     return {"ma_bl": ma_bl, "trang_thai": trang_thai}
 
 
-def calculate_and_save_monthly_payroll(db: Session, thang: int, nam: int) -> int:
+def get_payroll_inputs(db: Session, start, end) -> list[dict]:
     """
-    Tự động tính lương tháng cho toàn bộ nhân viên đang làm việc và lưu vào bảng bang_luong.
-    Tính lương công nhật, làm thêm ngoài giờ (OT x1.5) và phụ cấp làm việc.
-    Trả về số lượng bản ghi bảng lương đã được tính/cập nhật.
+    Lấy dữ liệu đầu vào tính lương của tháng [start, end]:
+    nhân sự còn làm trong tháng (kể cả nghỉ việc giữa tháng), hợp đồng hiện hành,
+    bậc lương, phụ cấp chức vụ, số người phụ thuộc và tổng hợp chấm công trong tháng.
     """
-    # 1. Lấy danh sách nhân viên đang làm việc kèm thông tin lương
-    emp_query = """
+    query = """
         SELECT
-            nv.ma_nv,
-            COALESCE(bl.muc_luong, 5000000) AS luong_co_ban,
-            COALESCE(bl.he_so, 1.00)        AS he_so_luong,
-            COALESCE(cv.phu_cap_chuc_vu, 0) AS phu_cap
+            nv.ma_nv, nv.so_nguoi_pt,
+            hd.luong_co_ban AS luong_hop_dong, hd.ty_le_huong, hd.loai_hd,
+            bl.muc_luong AS luong_bac, bl.he_so AS he_so_luong,
+            COALESCE(cv.phu_cap_chuc_vu, 0) AS phu_cap_chuc_vu,
+            COALESCE(cc.so_cong, 0) AS so_cong_thuc_te,
+            COALESCE(cc.so_gio_tang_ca, 0) AS so_gio_tang_ca
         FROM nhan_vien nv
+        LEFT JOIN (
+            SELECT hd1.*
+            FROM hop_dong_lao_dong hd1
+            INNER JOIN (
+                SELECT ma_nv, MAX(ngay_bat_dau) AS max_ngay
+                FROM hop_dong_lao_dong
+                WHERE ngay_bat_dau <= :end AND trang_thai <> 'DA_HUY'
+                GROUP BY ma_nv
+            ) latest ON hd1.ma_nv = latest.ma_nv AND hd1.ngay_bat_dau = latest.max_ngay
+            WHERE hd1.trang_thai <> 'DA_HUY'
+        ) hd ON hd.ma_nv = nv.ma_nv
         LEFT JOIN bac_luong bl ON nv.ma_bac = bl.ma_bac
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
-        WHERE nv.trang_thai = 'DANG_LAM'
+        LEFT JOIN (
+            SELECT ma_nv, SUM(so_cong) AS so_cong, SUM(so_gio_tang_ca) AS so_gio_tang_ca
+            FROM bang_cham_cong
+            WHERE ngay_cong BETWEEN :start AND :end
+            GROUP BY ma_nv
+        ) cc ON cc.ma_nv = nv.ma_nv
+        WHERE NOT (nv.trang_thai = 'DA_NGHI_VIEC' AND COALESCE(nv.ngay_nghi_viec, '1900-01-01') < :start)
+          AND (hd.ma_hd IS NOT NULL OR bl.ma_bac IS NOT NULL)
+        ORDER BY nv.ma_nv
     """
-    employees = db.execute(text(emp_query)).mappings().all()
+    rows = db.execute(text(query), {"start": start, "end": end}).mappings().all()
+    return [dict(r) for r in rows]
 
-    count = 0
-    so_cong_chuan = 26.0
 
-    for emp in employees:
-        ma_nv = emp["ma_nv"]
-        luong_co_ban = float(emp["luong_co_ban"])
-        he_so = float(emp["he_so_luong"])
-        phu_cap = float(emp["phu_cap"])
+def get_payroll_rows_of_month(db: Session, thang: int, nam: int) -> dict[str, dict]:
+    """Bảng lương đã có của tháng (theo mã NV) để giữ thưởng / khấu trừ khác và không ghi đè bảng đã duyệt."""
+    query = """
+        SELECT ma_nv, trang_thai, tien_thuong, khau_tru_khac
+        FROM bang_luong
+        WHERE thang = :thang AND nam = :nam
+    """
+    rows = db.execute(text(query), {"thang": thang, "nam": nam}).mappings().all()
+    return {r["ma_nv"]: dict(r) for r in rows}
 
-        # 2. Tổng hợp công thực tế từ bảng chấm công
-        cc_query = """
-            SELECT
-                COALESCE(SUM(bcc.so_cong), 0) AS so_cong_thuc_te
-            FROM bang_cham_cong bcc
-            WHERE bcc.ma_nv = :ma_nv
-              AND MONTH(bcc.ngay_cong) = :thang
-              AND YEAR(bcc.ngay_cong)  = :nam
-        """
-        cc = db.execute(
-            text(cc_query), {"ma_nv": ma_nv, "thang": thang, "nam": nam}
-        ).mappings().first()
 
-        so_cong_thuc_te = float(cc["so_cong_thuc_te"]) if cc else 0.0
-
-        # 3. Tính toán các khoản lương
-        luong_theo_cong = round((luong_co_ban * he_so / so_cong_chuan) * so_cong_thuc_te)
-        tien_thuong = 0
-        luong_gross = luong_theo_cong + int(phu_cap) + tien_thuong
-
-        # Các khoản bảo hiểm bắt buộc theo luật lao động VN
-        bhxh = round(luong_gross * 0.08)
-        bhyt = round(luong_gross * 0.015)
-        bhtn = round(luong_gross * 0.01)
-        thue_tncn = 0  # Giảm trừ gia cảnh cơ bản 11tr
-        if luong_gross > 11000000:
-            thue_tncn = round((luong_gross - 11000000 - bhxh - bhyt - bhtn) * 0.05)
-            if thue_tncn < 0:
-                thue_tncn = 0
-
-        tong_khau_tru = bhxh + bhyt + bhtn + thue_tncn
-        luong_net = luong_gross - tong_khau_tru
-
-        # 4. Lưu hoặc cập nhật vào bảng lương (ON DUPLICATE KEY UPDATE)
-        upsert_query = """
-            INSERT INTO bang_luong (
-                thang, nam, ma_nv, luong_co_ban, he_so_luong,
-                so_cong_chuan, so_cong_thuc_te,
-                luong_theo_cong, tong_phu_cap, tien_thuong,
-                luong_gross, bhxh, bhyt, bhtn, thue_tncn, khau_tru_khac,
-                tong_khau_tru, luong_net, trang_thai
-            ) VALUES (
-                :thang, :nam, :ma_nv, :luong_co_ban, :he_so_luong,
-                :so_cong_chuan, :so_cong_thuc_te,
-                :luong_theo_cong, :tong_phu_cap, :tien_thuong,
-                :luong_gross, :bhxh, :bhyt, :bhtn, :thue_tncn, 0,
-                :tong_khau_tru, :luong_net, 'NHAP'
-            )
-            ON DUPLICATE KEY UPDATE
-                so_cong_thuc_te = VALUES(so_cong_thuc_te),
-                luong_theo_cong = VALUES(luong_theo_cong),
-                tong_phu_cap    = VALUES(tong_phu_cap),
-                luong_gross     = VALUES(luong_gross),
-                bhxh            = VALUES(bhxh),
-                bhyt            = VALUES(bhyt),
-                bhtn            = VALUES(bhtn),
-                thue_tncn       = VALUES(thue_tncn),
-                tong_khau_tru   = VALUES(tong_khau_tru),
-                luong_net       = VALUES(luong_net),
-                ngay_cap_nhat   = NOW()
-        """
-        db.execute(
-            text(upsert_query),
-            {
-                "thang": thang,
-                "nam": nam,
-                "ma_nv": ma_nv,
-                "luong_co_ban": luong_co_ban,
-                "he_so_luong": he_so,
-                "so_cong_chuan": so_cong_chuan,
-                "so_cong_thuc_te": so_cong_thuc_te,
-                "luong_theo_cong": luong_theo_cong,
-                "tong_phu_cap": phu_cap,
-                "tien_thuong": tien_thuong,
-                "luong_gross": luong_gross,
-                "bhxh": bhxh,
-                "bhyt": bhyt,
-                "bhtn": bhtn,
-                "thue_tncn": thue_tncn,
-                "tong_khau_tru": tong_khau_tru,
-                "luong_net": luong_net,
-            },
+def upsert_payroll_line(db: Session, line: dict) -> None:
+    """Thêm mới hoặc cập nhật 1 dòng bảng lương ở trạng thái NHAP (người gọi commit)."""
+    query = """
+        INSERT INTO bang_luong (
+            thang, nam, ma_nv, luong_co_ban, he_so_luong,
+            so_cong_chuan, so_cong_thuc_te, so_gio_tang_ca,
+            luong_theo_cong, tien_tang_ca, tong_phu_cap, tien_thuong,
+            luong_gross, bhxh, bhyt, bhtn,
+            giam_tru_gia_canh, thu_nhap_tinh_thue, thue_tncn, khau_tru_khac,
+            tong_khau_tru, luong_net, trang_thai, ghi_chu
+        ) VALUES (
+            :thang, :nam, :ma_nv, :luong_co_ban, :he_so_luong,
+            :so_cong_chuan, :so_cong_thuc_te, :so_gio_tang_ca,
+            :luong_theo_cong, :tien_tang_ca, :tong_phu_cap, :tien_thuong,
+            :luong_gross, :bhxh, :bhyt, :bhtn,
+            :giam_tru_gia_canh, :thu_nhap_tinh_thue, :thue_tncn, :khau_tru_khac,
+            :tong_khau_tru, :luong_net, 'NHAP', :ghi_chu
         )
-        count += 1
-
-    db.commit()
-    return count
+        ON DUPLICATE KEY UPDATE
+            luong_co_ban       = VALUES(luong_co_ban),
+            he_so_luong        = VALUES(he_so_luong),
+            so_cong_chuan      = VALUES(so_cong_chuan),
+            so_cong_thuc_te    = VALUES(so_cong_thuc_te),
+            so_gio_tang_ca     = VALUES(so_gio_tang_ca),
+            luong_theo_cong    = VALUES(luong_theo_cong),
+            tien_tang_ca       = VALUES(tien_tang_ca),
+            tong_phu_cap       = VALUES(tong_phu_cap),
+            tien_thuong        = VALUES(tien_thuong),
+            luong_gross        = VALUES(luong_gross),
+            bhxh               = VALUES(bhxh),
+            bhyt               = VALUES(bhyt),
+            bhtn               = VALUES(bhtn),
+            giam_tru_gia_canh  = VALUES(giam_tru_gia_canh),
+            thu_nhap_tinh_thue = VALUES(thu_nhap_tinh_thue),
+            thue_tncn          = VALUES(thue_tncn),
+            khau_tru_khac      = VALUES(khau_tru_khac),
+            tong_khau_tru      = VALUES(tong_khau_tru),
+            luong_net          = VALUES(luong_net),
+            ghi_chu            = VALUES(ghi_chu),
+            ngay_cap_nhat      = NOW()
+    """
+    db.execute(text(query), line)
 
 
 def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
@@ -206,11 +200,12 @@ def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
             bl.luong_co_ban, bl.he_so_luong,
-            bl.so_cong_chuan, bl.so_cong_thuc_te,
-            bl.luong_theo_cong,
+            bl.so_cong_chuan, bl.so_cong_thuc_te, bl.so_gio_tang_ca,
+            bl.luong_theo_cong, bl.tien_tang_ca,
             bl.tong_phu_cap, bl.tien_thuong,
             bl.luong_gross,
             bl.bhxh, bl.bhyt, bl.bhtn,
+            bl.giam_tru_gia_canh, bl.thu_nhap_tinh_thue,
             bl.thue_tncn, bl.khau_tru_khac, bl.tong_khau_tru,
             bl.luong_net,
             bl.trang_thai, bl.ghi_chu,
@@ -235,6 +230,7 @@ def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
     tong_bhtn = sum(float(r["bhtn"] or 0) for r in items)
     tong_thue_tncn = sum(float(r["thue_tncn"] or 0) for r in items)
     tong_cong_thuc_te = sum(float(r["so_cong_thuc_te"] or 0) for r in items)
+    tong_gio_tang_ca = sum(float(r["so_gio_tang_ca"] or 0) for r in items)
     ho_ten = items[0]["ho_ten"] if items else ""
 
     return {
@@ -250,6 +246,7 @@ def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
         "tong_bhtn": tong_bhtn,
         "tong_thue_tncn": tong_thue_tncn,
         "tong_cong_thuc_te": tong_cong_thuc_te,
+        "tong_gio_tang_ca": tong_gio_tang_ca,
         "chi_tiet_thang": items,
     }
 

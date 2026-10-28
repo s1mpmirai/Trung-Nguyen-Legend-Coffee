@@ -20,6 +20,7 @@ import {
   TrendingUp,
   RefreshCw,
   ChevronLeft,
+  ChevronRight,
   MapPin,
   Briefcase,
   Trash2,
@@ -30,456 +31,39 @@ import {
 import AddEmployeeModal from "./components/AddEmployeeModal";
 import apiClient from "../../services/apiClient";
 
-// ──────────────── DỮ LIỆU DỰ PHÒNG CHUẨN TỪ CSDL TRUNG NGUYÊN ────────────────
-const DB_FALLBACK_EMPLOYEES = [
-  {
-    id: "NV01",
-    name: "Đặng Lê Nguyên Vũ",
-    email: "vu.dang@trungnguyen.com.vn",
-    initials: "ĐV",
-    role: "Tổng Giám đốc",
-    dept: "Ban Giám đốc",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "postgrad",
-    degreeLabel: "ThS. Quản trị Kinh doanh (MBA)",
-    school: "ĐH Kinh tế TPHCM (2002)",
-    joinDate: "16/06/1996",
-    tenureYears: 28.3,
-    tenureLabel: "28 năm 3 tháng",
-    isCore: true,
-    salaryNum: 71600000,
-    salary: "71,600,000 đ",
-    salaryTier: "above30",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-    isVip: true,
-  },
-  {
-    id: "NV02",
-    name: "Nguyễn Thị Minh Tâm",
-    email: "tam.nguyen@trungnguyen.com.vn",
-    initials: "NT",
-    role: "Trưởng phòng",
-    dept: "Phòng Nhân sự",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "postgrad",
-    degreeLabel: "Thạc sĩ Quản trị Nguồn nhân lực",
-    school: "ĐH Quốc gia TPHCM (2012)",
-    joinDate: "01/03/2010",
-    tenureYears: 14.6,
-    tenureLabel: "14 năm 7 tháng",
-    isCore: true,
-    salaryNum: 30800000,
-    salary: "30,800,000 đ",
-    salaryTier: "above30",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV03",
-    name: "Trần Văn Hùng",
-    email: "hung.tran@trungnguyen.com.vn",
-    initials: "TH",
-    role: "Trưởng phòng",
-    dept: "Phòng Kế toán – Tài chính",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Kế toán - Kiểm toán",
-    school: "ĐH Kinh tế TPHCM (2004)",
-    joinDate: "15/05/2012",
-    tenureYears: 12.4,
-    tenureLabel: "12 năm 5 tháng",
-    isCore: true,
-    salaryNum: 28600000,
-    salary: "28,600,000 đ",
-    salaryTier: "20to30",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV04",
-    name: "Lê Hoàng Phúc",
-    email: "phuc.le@trungnguyen.com.vn",
-    initials: "LP",
-    role: "Trưởng phòng",
-    dept: "Phòng Marketing",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Marketing",
-    school: "ĐH Tài chính - Marketing (2010)",
-    joinDate: "01/09/2015",
-    tenureYears: 9.1,
-    tenureLabel: "9 năm 1 tháng",
-    isCore: true,
-    salaryNum: 27300000,
-    salary: "27,300,000 đ",
-    salaryTier: "20to30",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV05",
-    name: "Phạm Thị Hương",
-    email: "huong.pham@trungnguyen.com.vn",
-    initials: "PH",
-    role: "Trưởng phòng",
-    dept: "Phòng Kinh doanh",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Kinh doanh Quốc tế",
-    school: "ĐH Ngoại thương CS2 (2012)",
-    joinDate: "10/01/2016",
-    tenureYears: 8.7,
-    tenureLabel: "8 năm 8 tháng",
-    isCore: true,
-    salaryNum: 30050000,
-    salary: "30,050,000 đ",
-    salaryTier: "above30",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV06",
-    name: "Hoàng Văn Nam",
-    email: "nam.hoang@trungnguyen.com.vn",
-    initials: "HN",
-    role: "Trưởng phòng",
-    dept: "Phòng IT",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Kỹ thuật Phần mềm",
-    school: "ĐH Bách Khoa TPHCM (2014)",
-    joinDate: "20/04/2017",
-    tenureYears: 7.5,
-    tenureLabel: "7 năm 6 tháng",
-    isCore: true,
-    salaryNum: 31750000,
-    salary: "31,750,000 đ",
-    salaryTier: "above30",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV07",
-    name: "Vũ Đình Trọng",
-    email: "trong.vu@trungnguyen.com.vn",
-    initials: "VT",
-    role: "Quản đốc Xưởng",
-    dept: "Xưởng Sản xuất",
-    location: "Nhà máy Buôn Ma Thuột",
-    degree: "university",
-    degreeLabel: "Đại học Công nghệ Thực phẩm",
-    school: "ĐH Nông Lâm TPHCM (2011)",
-    joinDate: "01/11/2014",
-    tenureYears: 9.9,
-    tenureLabel: "9 năm 11 tháng",
-    isCore: true,
-    salaryNum: 26500000,
-    salary: "26,500,000 đ",
-    salaryTier: "20to30",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV08",
-    name: "Bùi Thị Mai",
-    email: "mai.bui@trungnguyen.com.vn",
-    initials: "BM",
-    role: "Trưởng phòng",
-    dept: "Phòng Kinh doanh Miền Bắc",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Quản trị Kinh doanh",
-    school: "ĐH Kinh tế Quốc dân (2013)",
-    joinDate: "15/03/2018",
-    tenureYears: 6.6,
-    tenureLabel: "6 năm 7 tháng",
-    isCore: true,
-    salaryNum: 25800000,
-    salary: "25,800,000 đ",
-    salaryTier: "20to30",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV09",
-    name: "Đỗ Minh Tuấn",
-    email: "tuan.do@trungnguyen.com.vn",
-    initials: "ĐT",
-    role: "Chuyên viên Tuyển dụng",
-    dept: "Phòng Nhân sự",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Quản trị Nhân lực",
-    school: "ĐH Lao động Xã hội (2018)",
-    joinDate: "01/08/2020",
-    tenureYears: 4.2,
-    tenureLabel: "4 năm 2 tháng",
-    isCore: true,
-    salaryNum: 16500000,
-    salary: "16,500,000 đ",
-    salaryTier: "10to20",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV10",
-    name: "Lê Thị Thu",
-    email: "thu.le@trungnguyen.com.vn",
-    initials: "LT",
-    role: "Chuyên viên C&B",
-    dept: "Phòng Nhân sự",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Quản trị Kinh doanh",
-    school: "ĐH Kinh tế TPHCM (2019)",
-    joinDate: "15/02/2021",
-    tenureYears: 3.6,
-    tenureLabel: "3 năm 7 tháng",
-    isCore: true,
-    salaryNum: 15800000,
-    salary: "15,800,000 đ",
-    salaryTier: "10to20",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV11",
-    name: "Nguyễn Văn An",
-    email: "an.nguyen@trungnguyen.com.vn",
-    initials: "NA",
-    role: "Kế toán tổng hợp",
-    dept: "Phòng Kế toán – Tài chính",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Kế toán Doanh nghiệp",
-    school: "ĐH Sài Gòn (2018)",
-    joinDate: "01/06/2019",
-    tenureYears: 5.3,
-    tenureLabel: "5 năm 4 tháng",
-    isCore: true,
-    salaryNum: 17200000,
-    salary: "17,200,000 đ",
-    salaryTier: "10to20",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV12",
-    name: "Trần Thị Bích",
-    email: "bich.tran@trungnguyen.com.vn",
-    initials: "TB",
-    role: "Chuyên viên Truyền thông",
-    dept: "Phòng Marketing",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Báo chí & Truyền thông",
-    school: "ĐH KHXH&NV TPHCM (2020)",
-    joinDate: "10/10/2021",
-    tenureYears: 3.0,
-    tenureLabel: "3 năm",
-    isCore: true,
-    salaryNum: 16200000,
-    salary: "16,200,000 đ",
-    salaryTier: "10to20",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV13",
-    name: "Võ Minh Trí",
-    email: "tri.vo@trungnguyen.com.vn",
-    initials: "VT",
-    role: "Kỹ sư Hệ thống",
-    dept: "Phòng IT",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Khoa học Máy tính",
-    school: "ĐH Khoa học Tự nhiên TPHCM (2019)",
-    joinDate: "01/04/2021",
-    tenureYears: 3.5,
-    tenureLabel: "3 năm 6 tháng",
-    isCore: true,
-    salaryNum: 21500000,
-    salary: "21,500,000 đ",
-    salaryTier: "20to30",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV14",
-    name: "Đinh Thị Mai",
-    email: "mai.dinh@trungnguyen.com.vn",
-    initials: "ĐM",
-    role: "Lập trình viên",
-    dept: "Phòng IT",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Công nghệ Thông tin",
-    school: "ĐH Công nghệ Thông tin ĐHQG (2021)",
-    joinDate: "15/07/2022",
-    tenureYears: 2.2,
-    tenureLabel: "2 năm 3 tháng",
-    isCore: false,
-    salaryNum: 18000000,
-    salary: "18,000,000 đ",
-    salaryTier: "10to20",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV15",
-    name: "Lý Hoàng Long",
-    email: "long.ly@trungnguyen.com.vn",
-    initials: "LL",
-    role: "Kỹ thuật viên Vận hành",
-    dept: "Xưởng Sản xuất",
-    location: "Nhà máy Buôn Ma Thuột",
-    degree: "college",
-    degreeLabel: "Cao đẳng Cơ khí Chế tạo",
-    school: "CĐ Kỹ thuật Cao Thắng (2017)",
-    joinDate: "01/03/2018",
-    tenureYears: 6.6,
-    tenureLabel: "6 năm 7 tháng",
-    isCore: true,
-    salaryNum: 15500000,
-    salary: "15,500,000 đ",
-    salaryTier: "10to20",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV16",
-    name: "Phan Thị Kim Oanh",
-    email: "oanh.phan@trungnguyen.com.vn",
-    initials: "PO",
-    role: "Kiểm soát Chất lượng (QC)",
-    dept: "Xưởng Sản xuất",
-    location: "Nhà máy Buôn Ma Thuột",
-    degree: "university",
-    degreeLabel: "Đại học Đảm bảo Chất lượng",
-    school: "ĐH Công thương TPHCM (2019)",
-    joinDate: "20/09/2020",
-    tenureYears: 4.0,
-    tenureLabel: "4 năm",
-    isCore: true,
-    salaryNum: 14800000,
-    salary: "14,800,000 đ",
-    salaryTier: "10to20",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV17",
-    name: "Nguyễn Hữu Đạt",
-    email: "dat.nguyen@trungnguyen.com.vn",
-    initials: "NĐ",
-    role: "Nhân viên Kinh doanh",
-    dept: "Phòng Kinh doanh",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Quản trị Kinh doanh",
-    school: "ĐH Tài chính - Marketing (2021)",
-    joinDate: "01/11/2022",
-    tenureYears: 1.9,
-    tenureLabel: "1 năm 11 tháng",
-    isCore: false,
-    salaryNum: 13500000,
-    salary: "13,500,000 đ",
-    salaryTier: "10to20",
-    status: "working",
-    statusText: "Đang làm việc",
-    statusColor: "emerald",
-  },
-  {
-    id: "NV18",
-    name: "Trần Thanh Thảo",
-    email: "thao.tran@trungnguyen.com.vn",
-    initials: "TT",
-    role: "Nhân viên Kinh doanh",
-    dept: "Phòng Kinh doanh Miền Bắc",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "university",
-    degreeLabel: "Đại học Kinh tế Đối ngoại",
-    school: "ĐH Ngoại thương Hà Nội (2022)",
-    joinDate: "15/01/2023",
-    tenureYears: 1.7,
-    tenureLabel: "1 năm 8 tháng",
-    isCore: false,
-    salaryNum: 13200000,
-    salary: "13,200,000 đ",
-    salaryTier: "10to20",
-    status: "leave",
-    statusText: "Nghỉ phép năm",
-    statusColor: "sky",
-  },
-  {
-    id: "NV19",
-    name: "Phạm Minh Trí",
-    email: "tri.pham@trungnguyen.com.vn",
-    initials: "PT",
-    role: "Nhân viên Kinh doanh",
-    dept: "Phòng Kinh doanh",
-    location: "Trụ sở chính Trung Nguyên",
-    degree: "college",
-    degreeLabel: "Cao đẳng Thương mại",
-    school: "CĐ Kinh tế Đối ngoại (2023)",
-    joinDate: "01/06/2024",
-    tenureYears: 0.3,
-    tenureLabel: "4 tháng",
-    isCore: false,
-    salaryNum: 9500000,
-    salary: "9,500,000 đ",
-    salaryTier: "under10",
-    status: "leave",
-    statusText: "Nghỉ thai sản",
-    statusColor: "sky",
-  },
-  {
-    id: "NV20",
-    name: "Lê Văn Cường",
-    email: "cuong.le@trungnguyen.com.vn",
-    initials: "LC",
-    role: "Kỹ sư Bảo trì",
-    dept: "Xưởng Sản xuất",
-    location: "Nhà máy Buôn Ma Thuột",
-    degree: "university",
-    degreeLabel: "Đại học Cơ điện tử",
-    school: "ĐH Bách Khoa Đà Nẵng (2016)",
-    joinDate: "01/05/2017",
-    tenureYears: 7.4,
-    tenureLabel: "7 năm 5 tháng",
-    isCore: true,
-    salaryNum: 16000000,
-    salary: "16,000,000 đ",
-    salaryTier: "10to20",
-    status: "resigned",
-    statusText: "Đã nghỉ việc",
-    statusColor: "rose",
-  },
-];
+// Kỳ báo cáo: 12 tháng gần nhất, định dạng "MM/YYYY"
+const buildReportMonths = () => {
+  const now = new Date();
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    return `${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+  });
+};
+const REPORT_MONTHS = buildReportMonths();
+
+// Xuất danh sách nhân sự ra file CSV (mở được bằng Excel)
+const exportEmployeesCsv = (rows, fileName) => {
+  const header = ["Mã NV", "Họ tên", "Phòng ban", "Chức vụ", "Trình độ", "Ngày vào làm", "Thâm niên", "Lương hợp đồng", "Trạng thái"];
+  const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = rows.map((e) =>
+    [e.id, e.name, e.dept, e.role, e.degreeLabel, e.joinDate, e.tenureLabel, e.salaryNum, e.statusText].map(escape).join(",")
+  );
+  const blob = new Blob(["\uFEFF" + [header.map(escape).join(","), ...lines].join("\n")], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+};
 
 // ──────────────── CÁC HÀM TIỆN ÍCH CHUYỂN ĐỔI CHUẨN XÁC ────────────────
 const calculateTenure = (joinDateStr) => {
-  if (!joinDateStr) return { years: 1.0, label: "1 năm", joinDate: "—" };
+  if (!joinDateStr) return { years: 0, label: "—", joinDate: "—" };
   const join = new Date(joinDateStr);
-  if (isNaN(join.getTime())) return { years: 1.0, label: "1 năm", joinDate: "—" };
+  if (isNaN(join.getTime())) return { years: 0, label: "—", joinDate: "—" };
   const now = new Date();
   const diffMonths = (now.getFullYear() - join.getFullYear()) * 12 + (now.getMonth() - join.getMonth());
   const years = Math.max(0, Math.floor(diffMonths / 12));
@@ -505,7 +89,7 @@ const calculateTenure = (joinDateStr) => {
 };
 
 const formatDegree = (trinhDo) => {
-  if (!trinhDo) return { key: "university", name: "Đại học" };
+  if (!trinhDo) return { key: "unknown", name: "Chưa cập nhật" };
   const td = String(trinhDo).toUpperCase();
   if (td.includes("TIEN_SI") || td.includes("TIẾN SĨ")) return { key: "postgrad", name: "Tiến sĩ" };
   if (td.includes("THAC_SI") || td.includes("THẠC SĨ") || td.includes("THS")) return { key: "postgrad", name: "Thạc sĩ" };
@@ -513,7 +97,8 @@ const formatDegree = (trinhDo) => {
   if (td.includes("CAO_DANG") || td.includes("CAO ĐẲNG")) return { key: "college", name: "Cao đẳng" };
   if (td.includes("TRUNG_CAP") || td.includes("TRUNG CẤP")) return { key: "college", name: "Trung cấp" };
   if (td.includes("CHUNG_CHI") || td.includes("CHỨNG CHỈ")) return { key: "college", name: "Chứng chỉ" };
-  return { key: "university", name: "Đại học" };
+  if (td.includes("THPT")) return { key: "highschool", name: "THPT" };
+  return { key: "unknown", name: "Chưa cập nhật" };
 };
 
 const getInitials = (name) => {
@@ -532,7 +117,6 @@ export default function EmployeeManagement({ initialTab = "list" }) {
   // Quản lý Cho thôi việc / Xóa nhân sự
   const [deactivateModalEmp, setDeactivateModalEmp] = useState(null);
   const [reactivateModalEmp, setReactivateModalEmp] = useState(null);
-  const [deleteMode, setDeleteMode] = useState("soft"); // 'soft' (Thôi việc) | 'hard' (Xóa vĩnh viễn)
   const [deactivateReason, setDeactivateReason] = useState("Nghỉ việc theo nguyện vọng cá nhân");
   const [deactivateNote, setDeactivateNote] = useState("");
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
@@ -553,7 +137,8 @@ export default function EmployeeManagement({ initialTab = "list" }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("10/2026");
+  const [selectedMonth, setSelectedMonth] = useState(REPORT_MONTHS[0]);
+  const [monthlyReport, setMonthlyReport] = useState(null);
 
   const handleTriggerSearch = () => {
     setSearchQuery(searchInput.trim());
@@ -578,7 +163,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 8; // 8 nhân sự mỗi trang giúp hiển thị thoáng đẹp và không cuộn quá dài
 
-  const [employees, setEmployees] = useState(DB_FALLBACK_EMPLOYEES);
+  const [employees, setEmployees] = useState([]);
 
   // Chuẩn hóa một bản ghi nhân sự từ Backend API
   const mapApiEmployee = (item) => {
@@ -603,12 +188,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
     const tenureInfo = calculateTenure(item.ngay_vao_lam);
     const deg = formatDegree(item.trinh_do);
 
-    let salaryNum = 18500000;
-    if (typeof item.muc_luong === "number") salaryNum = item.muc_luong;
-    else if (typeof item.muc_luong === "string") {
-      const p = parseInt(item.muc_luong.replace(/[^\d]/g, ""), 10);
-      if (!isNaN(p) && p > 0) salaryNum = p;
-    }
+    const salaryNum = Number(item.muc_luong) || 0;
 
     let salaryTier = "10to20";
     if (salaryNum < 10000000) salaryTier = "under10";
@@ -627,13 +207,13 @@ export default function EmployeeManagement({ initialTab = "list" }) {
       degreeLabel: item.chuyen_nganh ? `${deg.name} ${item.chuyen_nganh}` : deg.name,
       school: item.noi_dao_tao
         ? `${item.noi_dao_tao} ${item.nam_tot_nghiep ? `(${item.nam_tot_nghiep})` : ""}`
-        : "Đại học chính quy",
+        : "—",
       joinDate: tenureInfo.joinDate,
       tenureYears: tenureInfo.years,
       tenureLabel: tenureInfo.label,
       isCore: tenureInfo.years >= 3.0,
       salaryNum,
-      salary: `${salaryNum.toLocaleString("vi-VN")} đ`,
+      salary: salaryNum > 0 ? `${salaryNum.toLocaleString("vi-VN")} đ` : "Chưa có HĐ",
       salaryTier,
       status,
       statusText,
@@ -649,93 +229,72 @@ export default function EmployeeManagement({ initialTab = "list" }) {
     setIsLoading(true);
     try {
       const res = await apiClient.get("/employees/get_employee_list", {
-        params: { page: 1, page_size: 100 },
+        params: { page: 1, page_size: 200 },
       });
-      const items = res?.items || res?.data?.items || (Array.isArray(res) ? res : []);
-      if (items.length > 0) {
-        setEmployees(items.map(mapApiEmployee));
-      } else {
-        setEmployees(DB_FALLBACK_EMPLOYEES);
-      }
+      setEmployees((res?.items || []).map(mapApiEmployee));
     } catch (err) {
-      console.info("[EmployeeManagement] Dùng dữ liệu đồng bộ chuẩn DB:", err.message);
-      setEmployees(DB_FALLBACK_EMPLOYEES);
+      setEmployees([]);
+      showToast(`Không tải được danh sách nhân sự: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Báo cáo tình hình nhân sự của kỳ được chọn (đang làm / nghỉ phép / nghỉ việc)
+  const fetchMonthlyReport = async (monthKey = selectedMonth) => {
+    const [thang, nam] = monthKey.split("/").map(Number);
+    try {
+      setMonthlyReport(await apiClient.get("/employees/reports/monthly", { params: { thang, nam } }));
+    } catch (err) {
+      setMonthlyReport(null);
+      showToast(`Không tải được báo cáo tháng ${monthKey}: ${err.message}`);
+    }
+  };
+
+  const refreshAll = () => {
+    fetchEmployeesFromDb();
+    fetchMonthlyReport();
   };
 
   useEffect(() => {
     fetchEmployeesFromDb();
   }, []);
 
+  useEffect(() => {
+    fetchMonthlyReport(selectedMonth);
+  }, [selectedMonth]);
+
   // Xử lý thêm nhân sự mới: gọi API POST /employees/create_employee
   const handleAddEmployee = async (newEmp) => {
+    const apiPayload = {
+      ho_ten: newEmp.ho_ten || newEmp.fullName,
+      ngay_sinh: newEmp.ngay_sinh,
+      gioi_tinh: newEmp.gioi_tinh,
+      cccd: newEmp.cccd,
+      sdt: newEmp.sdt,
+      email: newEmp.email,
+      ma_pb: newEmp.ma_pb,
+      ma_cv: newEmp.ma_cv,
+      ngay_vao_lam: newEmp.ngay_vao_lam || new Date().toISOString().split("T")[0],
+      trang_thai: "DANG_LAM",
+      hinh_thuc_lam_viec: "FULL_TIME",
+      muc_luong: newEmp.muc_luong,
+      loai_hd: newEmp.loai_hd,
+      trinh_do: newEmp.trinh_do,
+      chuyen_nganh: newEmp.chuyen_nganh,
+    };
     try {
-      const apiPayload = {
-        ho_ten: newEmp.ho_ten || newEmp.fullName,
-        ngay_sinh: newEmp.ngay_sinh,
-        gioi_tinh: newEmp.gioi_tinh,
-        cccd: newEmp.cccd,
-        sdt: newEmp.sdt,
-        email: newEmp.email,
-        ma_pb: newEmp.ma_pb,
-        ma_cv: newEmp.ma_cv,
-        ngay_vao_lam: newEmp.ngay_vao_lam || new Date().toISOString().split("T")[0],
-        trang_thai: "DANG_LAM",
-        hinh_thuc_lam_viec: "FULL_TIME",
-        muc_luong: newEmp.muc_luong || 18500000,
-      };
-
-      let createdId = newEmp.maNv || `NV${employees.length + 1}`;
-      try {
-        const res = await apiClient.post("/employees/create_employee", apiPayload);
-        if (res && res.ma_nv) {
-          createdId = res.ma_nv;
-        }
-      } catch (apiErr) {
-        console.info("[EmployeeManagement] Tạo cục bộ nhân sự mới:", apiErr.message);
-      }
-
-      const tenureInfo = calculateTenure(apiPayload.ngay_vao_lam);
-      const deg = formatDegree(newEmp.trinh_do);
-      const salNum = Number(newEmp.muc_luong || 18500000);
-
-      const created = {
-        id: createdId,
-        name: newEmp.fullName || newEmp.ho_ten,
-        email: newEmp.email,
-        role: newEmp.roleName || "Chuyên viên",
-        dept: newEmp.deptName || "Khối Văn phòng",
-        location: "Trụ sở chính Trung Nguyên",
-        degree: deg.key,
-        degreeLabel: deg.name,
-        school: "Đại học chính quy",
-        joinDate: tenureInfo.joinDate,
-        tenureYears: tenureInfo.years,
-        tenureLabel: tenureInfo.label,
-        isCore: false,
-        salaryNum: salNum,
-        salary: `${salNum.toLocaleString("vi-VN")} đ`,
-        salaryTier: salNum >= 20000000 ? "20to30" : "10to20",
-        status: "working",
-        statusText: "Đang làm việc",
-        statusColor: "emerald",
-        initials: getInitials(newEmp.fullName || newEmp.ho_ten),
-        isVip: false,
-      };
-
-      setEmployees((prev) => [created, ...prev]);
-      showToast(`Đã thêm thành công nhân sự ${created.name} (${created.id}) vào hệ thống!`);
+      const res = await apiClient.post("/employees/create_employee", apiPayload);
+      showToast(`Đã thêm thành công nhân sự ${res.ho_ten} (${res.ma_nv}) vào hệ thống!`);
+      refreshAll();
     } catch (err) {
-      console.error("Lỗi khi thêm nhân sự:", err);
+      showToast(`Thêm nhân sự thất bại: ${err.message}`);
     }
   };
 
   // Mở modal xác nhận cho thôi việc / xóa
   const handleOpenDeactivateModal = (emp) => {
     setDeactivateModalEmp(emp);
-    setDeleteMode("soft");
     setDeactivateReason("Nghỉ việc theo nguyện vọng cá nhân");
     setDeactivateNote("");
   };
@@ -745,50 +304,19 @@ export default function EmployeeManagement({ initialTab = "list" }) {
     setReactivateModalEmp(emp);
   };
 
-  // Xác nhận thực hiện thôi việc / xóa
+  // Xác nhận xóa nhân sự: chuyển "Đã nghỉ việc" và khóa tài khoản (không xóa dữ liệu, không xóa tài khoản)
   const handleConfirmDeactivate = async () => {
     if (!deactivateModalEmp) return;
     const emp = deactivateModalEmp;
     setIsSubmittingDeactivate(true);
     try {
-      if (deleteMode === "soft") {
-        const fullReason = deactivateNote ? `${deactivateReason}: ${deactivateNote}` : deactivateReason;
-        try {
-          await apiClient.put(`/employees/${emp.id}/deactivate`, null, {
-            params: { ly_do: fullReason },
-          });
-        } catch (apiErr) {
-          console.info("[EmployeeManagement] Cập nhật thôi việc cục bộ:", apiErr.message);
-        }
-
-        setEmployees((prev) =>
-          prev.map((e) =>
-            e.id === emp.id
-              ? {
-                  ...e,
-                  status: "resigned",
-                  statusText: "Đã nghỉ việc",
-                  statusColor: "rose",
-                }
-              : e
-          )
-        );
-        showToast(`Đã ghi nhận thôi việc và khóa tài khoản cho nhân sự ${emp.name} (${emp.id}) thành công!`);
-      } else {
-        // Xóa hoàn toàn (DELETE CASCADE) khỏi CSDL
-        try {
-          await apiClient.delete(`/employees/${emp.id}`);
-        } catch (apiErr) {
-          console.info("[EmployeeManagement] Xóa hoàn toàn cục bộ:", apiErr.message);
-        }
-
-        setEmployees((prev) => prev.filter((e) => e.id !== emp.id));
-        showToast(`Đã xóa hoàn toàn hồ sơ nhân sự ${emp.name} (${emp.id}) khỏi CSDL!`);
-      }
+      const fullReason = deactivateNote ? `${deactivateReason}: ${deactivateNote}` : deactivateReason;
+      await apiClient.delete(`/employees/${emp.id}`, { params: { ly_do: fullReason } });
+      showToast(`Đã xóa nhân sự ${emp.name} (${emp.id}) khỏi danh sách đang làm việc và khóa tài khoản!`);
       setDeactivateModalEmp(null);
+      refreshAll();
     } catch (err) {
-      console.error("Lỗi khi xử lý thôi việc/xóa nhân sự:", err);
-      showToast("Có lỗi xảy ra khi thực hiện thao tác: " + err.message);
+      showToast("Không thể xóa nhân sự: " + err.message);
     } finally {
       setIsSubmittingDeactivate(false);
     }
@@ -800,29 +328,14 @@ export default function EmployeeManagement({ initialTab = "list" }) {
     const emp = reactivateModalEmp;
     setIsSubmittingDeactivate(true);
     try {
-      try {
-        await apiClient.put(`/employees/${emp.id}/status`, {
-          trang_thai: "DANG_LAM",
-          khoa_tai_khoan: false,
-        });
-      } catch (apiErr) {
-        console.info("[EmployeeManagement] Cập nhật khôi phục cục bộ:", apiErr.message);
-      }
-
-      setEmployees((prev) =>
-        prev.map((e) =>
-          e.id === emp.id
-            ? {
-                ...e,
-                status: "working",
-                statusText: "Đang làm việc",
-                statusColor: "emerald",
-              }
-            : e
-        )
-      );
+      // khoa_tai_khoan = true: đồng bộ tài khoản theo trạng thái (Đang làm -> mở khóa đăng nhập)
+      await apiClient.put(`/employees/${emp.id}/status`, {
+        trang_thai: "DANG_LAM",
+        khoa_tai_khoan: true,
+      });
       showToast(`Đã khôi phục trạng thái Đang làm việc cho nhân sự ${emp.name} (${emp.id})!`);
       setReactivateModalEmp(null);
+      refreshAll();
     } catch (err) {
       console.error("Lỗi khi khôi phục nhân sự:", err);
       showToast("Lỗi khi khôi phục trạng thái: " + err.message);
@@ -841,51 +354,44 @@ export default function EmployeeManagement({ initialTab = "list" }) {
     return Array.from(set);
   }, [employees]);
 
-  // Thống kê động cho Tab 1 (Theo tháng)
-  const liveWorkingCount = employees.filter((e) => e.status === "working").length;
-  const liveLeaveCount = employees.filter((e) => e.status === "leave").length;
-  const liveResignedCount = employees.filter((e) => e.status === "resigned").length;
-  const liveTotalCount = employees.length;
-
-  const monthlyStatsData = {
-    "10/2026": {
-      total: liveTotalCount,
-      working: liveWorkingCount,
-      leave: liveLeaveCount,
-      resigned: liveResignedCount,
-    },
-    "09/2026": { total: 1266, working: 1205, leave: 28, resigned: 33 },
-    "08/2026": { total: 1250, working: 1192, leave: 31, resigned: 27 },
-    "07/2026": { total: 1240, working: 1185, leave: 25, resigned: 30 },
+  // Thống kê Tab 1 lấy từ báo cáo tháng của backend; map trạng thái của từng nhân sự trong kỳ
+  const currentMonthStats = {
+    total: monthlyReport?.tong_nhan_su ?? 0,
+    working: monthlyReport?.so_dang_lam ?? 0,
+    leave: monthlyReport?.so_nghi_phep ?? 0,
+    resigned: monthlyReport?.so_da_nghi_viec ?? 0,
   };
-  const currentMonthStats = monthlyStatsData[selectedMonth] || monthlyStatsData["10/2026"];
+  const monthlyStatusMap = useMemo(() => {
+    const map = {};
+    if (!monthlyReport) return map;
+    monthlyReport.danh_sach_dang_lam.forEach((e) => (map[e.ma_nv] = "working"));
+    monthlyReport.danh_sach_nghi_phep.forEach((e) => (map[e.ma_nv] = "leave"));
+    monthlyReport.danh_sach_da_nghi_viec.forEach((e) => (map[e.ma_nv] = "resigned"));
+    return map;
+  }, [monthlyReport]);
 
   // Thống kê động cho Tab 2 (Chuyên sâu học vấn, thâm niên, mặt bằng lương)
   const reportStats = useMemo(() => {
-    if (employees.length === 0) {
-      return {
-        degreePct: 85,
-        avgTenure: "3.5",
-        avgSalary: "18.500.000",
-        minSalary: "9.5tr",
-        maxSalary: "71.6tr",
-      };
+    // Chỉ thống kê nhân sự còn làm việc; bỏ qua người chưa có dữ liệu lương / ngày vào làm
+    const active = employees.filter((e) => e.status !== "resigned");
+    const withSalary = active.filter((e) => e.salaryNum > 0);
+    const withTenure = active.filter((e) => e.joinDate !== "—");
+    if (active.length === 0 || withSalary.length === 0) {
+      return { degreePct: 0, avgTenure: "0", avgSalary: "0", minSalary: "0tr", maxSalary: "0tr" };
     }
 
-    const total = employees.length;
-    const uniOrPost = employees.filter(
+    const uniOrPost = active.filter(
       (e) => e.degree === "university" || e.degree === "postgrad"
     ).length;
-    const degreePct = Math.round((uniOrPost / total) * 100);
+    const degreePct = Math.round((uniOrPost / active.length) * 100);
 
-    const sumTenure = employees.reduce((acc, e) => acc + (e.tenureYears || 1), 0);
-    const avgTenure = (sumTenure / total).toFixed(1);
+    const sumTenure = withTenure.reduce((acc, e) => acc + e.tenureYears, 0);
+    const avgTenure = withTenure.length ? (sumTenure / withTenure.length).toFixed(1) : "0";
 
-    const sumSalary = employees.reduce((acc, e) => acc + (e.salaryNum || 18500000), 0);
-    const avgSalaryNum = Math.round(sumSalary / total);
-    const avgSalary = avgSalaryNum.toLocaleString("vi-VN");
+    const sumSalary = withSalary.reduce((acc, e) => acc + e.salaryNum, 0);
+    const avgSalary = Math.round(sumSalary / withSalary.length).toLocaleString("vi-VN");
 
-    const salaries = employees.map((e) => e.salaryNum || 18500000);
+    const salaries = withSalary.map((e) => e.salaryNum);
     const minSal = Math.min(...salaries);
     const maxSal = Math.max(...salaries);
 
@@ -922,9 +428,11 @@ export default function EmployeeManagement({ initialTab = "list" }) {
         }
       }
 
-      // 3. Nếu đang ở TAB 1 (Hồ sơ & Biến động): Lọc theo Trạng thái làm việc
-      if (activeSubTab === "list") {
-        if (statusFilter && emp.status !== statusFilter) {
+      // 3. TAB 1: lọc theo tình trạng của nhân sự TRONG KỲ BÁO CÁO đã chọn
+      if (activeSubTab === "list" && monthlyReport) {
+        const monthStatus = monthlyStatusMap[emp.id];
+        if (!monthStatus) return false; // chưa vào làm hoặc đã nghỉ trước kỳ này
+        if (statusFilter && monthStatus !== statusFilter) {
           return false;
         }
       }
@@ -957,6 +465,8 @@ export default function EmployeeManagement({ initialTab = "list" }) {
     selectedDegree,
     selectedTenure,
     selectedSalaryRange,
+    monthlyReport,
+    monthlyStatusMap,
   ]);
 
   // Tự động quay về trang 1 khi thay đổi tab hoặc điều kiện lọc
@@ -1044,10 +554,12 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="px-3 py-1.5 bg-white border border-slate-200 text-slate-800 rounded-xl text-xs font-semibold focus:outline-none focus:border-sky-500 cursor-pointer shadow-2xs"
                 >
-                  <option value="10/2026">Tháng 10/2026 (Hiện tại)</option>
-                  <option value="09/2026">Tháng 09/2026</option>
-                  <option value="08/2026">Tháng 08/2026</option>
-                  <option value="07/2026">Tháng 07/2026</option>
+                  {REPORT_MONTHS.map((m, idx) => (
+                    <option key={m} value={m}>
+                      Tháng {m}
+                      {idx === 0 ? " (Hiện tại)" : ""}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1056,7 +568,9 @@ export default function EmployeeManagement({ initialTab = "list" }) {
 
               <button
                 type="button"
-                onClick={() => showToast("Đã xuất danh sách nhân sự sang file Excel thành công!")}
+                onClick={() =>
+                  exportEmployeesCsv(filteredEmployees, `danh-sach-nhan-su-${selectedMonth.replace("/", "-")}.csv`)
+                }
                 className="px-3.5 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -1276,7 +790,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
               </button>
               <button
                 type="button"
-                onClick={() => showToast("Đã xuất dữ liệu Báo cáo Phân tích Nhân sự sang file Excel!")}
+                onClick={() => exportEmployeesCsv(filteredEmployees, "bao-cao-phan-tich-nhan-su.csv")}
                 className="px-3.5 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
@@ -1284,7 +798,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
               </button>
               <button
                 type="button"
-                onClick={() => showToast("Đã tạo báo cáo tổng hợp dạng PDF sẵn sàng in ấn!")}
+                onClick={() => window.print()}
                 className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -1824,49 +1338,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                 </div>
               </div>
 
-              {/* Lựa chọn phương thức: Xóa mềm (chuẩn HRM) hay Xóa hẳn */}
-              <div className="flex flex-col gap-1.5">
-                <label className="font-bold text-slate-700">Hình thức xử lý:</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteMode("soft")}
-                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                      deleteMode === "soft"
-                        ? "bg-rose-50/70 border-rose-300 text-rose-800 ring-1 ring-rose-400/30"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="font-bold text-[11px] flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5 text-rose-600" />
-                      <span>Cho thôi việc (Chuẩn HRM)</span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-1 leading-normal">
-                      Khóa tài khoản, lưu ngày thôi việc, bảo toàn toàn bộ lịch sử chấm công & bảng lương.
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setDeleteMode("hard")}
-                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                      deleteMode === "hard"
-                        ? "bg-rose-50/70 border-rose-300 text-rose-800 ring-1 ring-rose-400/30"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div className="font-bold text-[11px] flex items-center gap-1.5">
-                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                      <span>Xóa hoàn toàn CSDL</span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 mt-1 leading-normal">
-                      Xóa vĩnh viễn hồ sơ (DELETE CASCADE) khỏi cơ sở dữ liệu.
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {deleteMode === "soft" && (
+              {(
                 <div className="flex flex-col gap-1.5">
                   <label className="font-bold text-slate-700">Lý do thôi việc:</label>
                   <select
@@ -1898,9 +1370,8 @@ export default function EmployeeManagement({ initialTab = "list" }) {
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-[11px] leading-relaxed flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <span>
-                  {deleteMode === "soft"
-                    ? "Theo chuẩn quản trị nhân sự: Nhân viên sẽ chuyển trạng thái sang 'Đã nghỉ việc', tự động khóa đăng nhập nhưng giữ nguyên dữ liệu công lương để đối soát."
-                    : "Cảnh báo: Hành động xóa vĩnh viễn sẽ xóa hoàn toàn nhân sự và dữ liệu liên quan khỏi CSDL, không thể hoàn tác."}
+                  Nhân sự sẽ chuyển sang 'Đã nghỉ việc' và tài khoản đăng nhập bị KHÓA (không xóa tài khoản).
+                  Toàn bộ hồ sơ, hợp đồng, chấm công, bảng lương được giữ lại để đối soát và báo cáo.
                 </span>
               </div>
             </div>
@@ -1929,7 +1400,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                 ) : (
                   <>
                     <UserX className="w-3.5 h-3.5" />
-                    <span>{deleteMode === "soft" ? "Xác nhận Cho thôi việc" : "Xóa vĩnh viễn"}</span>
+                    <span>Xác nhận xóa nhân sự</span>
                   </>
                 )}
               </button>

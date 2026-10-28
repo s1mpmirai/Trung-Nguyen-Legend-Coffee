@@ -6,31 +6,6 @@
 
 import apiClient from "./apiClient";
 
-// Dữ liệu mẫu dự phòng khi chưa kết nối CSDL hoặc API đang offline (Đồng bộ chuẩn NV02 trong Database)
-export const FALLBACK_EMPLOYEE_PROFILE = {
-  id: "NV02",
-  fullName: "Nguyễn Thị Minh Tâm",
-  birthDate: "15/05/1985",
-  birthDateRaw: "1985-05-15",
-  gender: "Nữ",
-  genderRaw: "Nu",
-  jobTitle: "Trưởng phòng Quản trị Nguồn nhân lực",
-  department: "Quản trị Nguồn nhân lực",
-  departmentFull: "Phòng Quản trị Nguồn nhân lực",
-  startDate: "01/03/2010",
-  status: "Nhân viên chính thức",
-  workingType: "FULL_TIME",
-  workingTypeLabel: "Toàn thời gian (Full-time)",
-  contractType: "Không xác định thời hạn",
-  contractCode: "HD-002",
-  contractStatus: "Hiệu lực",
-  seniority: "14 năm",
-  phone: "0912 345 678",
-  email: "tamntm@trungnguyen.com",
-  personalEmail: "minhtam.nguyen85@gmail.com",
-  lastPasswordChange: "45 ngày trước",
-};
-
 /**
  * Tính thâm niên từ ngày vào làm (định dạng YYYY-MM-DD hoặc Date)
  */
@@ -89,7 +64,7 @@ export function formatPasswordLastChanged(dateStr) {
  * Map dữ liệu trả về từ Backend (snake_case chuẩn CSDL) sang format UI Frontend
  */
 export function mapBackendToProfile(data) {
-  if (!data) return FALLBACK_EMPLOYEE_PROFILE;
+  if (!data) return null;
 
   const contractMap = {
     KHONG_XAC_DINH: "Không xác định thời hạn",
@@ -167,13 +142,13 @@ export function mapBackendToProfile(data) {
  * Lấy thông tin hồ sơ nhân viên
  * @param {string} maNv - Mã nhân viên (ví dụ: 'NV01', 'NV10'...)
  */
-export async function getEmployeeProfile(maNv = "NV01") {
+export async function getEmployeeProfile(maNv) {
   try {
     const data = await apiClient.get(`/employees/profile/${maNv}`);
     return mapBackendToProfile(data);
   } catch (error) {
-    console.info(`[employeeService] Sử dụng dữ liệu dự phòng cho nhân viên ${maNv}:`, error.message);
-    return FALLBACK_EMPLOYEE_PROFILE;
+    console.error(`[employeeService] Không tải được hồ sơ nhân viên ${maNv}:`, error.message);
+    return null;
   }
 }
 
@@ -194,7 +169,7 @@ export async function updateEmployeeContact(maNv, contactData) {
  * Đổi mật khẩu tài khoản
  */
 export async function changePassword({ ma_nv, mat_khau_cu, mat_khau_moi }) {
-  return apiClient.post("/auth/change-password", {
+  return apiClient.post("/accounts/change-password", {
     ma_nv,
     mat_khau_cu,
     mat_khau_moi,

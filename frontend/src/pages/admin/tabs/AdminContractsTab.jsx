@@ -21,7 +21,8 @@ import {
   CreditCard,
   RefreshCw,
   X,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from "lucide-react";
 import {
   getContracts,
@@ -30,8 +31,10 @@ import {
   updateContract,
   liquidateContract,
   deleteContract,
+  restoreContract,
   getEmployeesList,
 } from "../../../services/adminService";
+import SortableHeader, { nextSort } from "../../../components/common/SortableHeader";
 
 export default function AdminContractsTab() {
   const [contracts, setContracts] = useState([]);
@@ -49,6 +52,12 @@ export default function AdminContractsTab() {
   const [expiringOnly, setExpiringOnly] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 10;
+  const [sort, setSort] = useState({ by: "", order: "asc" });
+
+  const handleSort = (field) => {
+    setSort((prev) => nextSort(prev, field));
+    setPage(1);
+  };
 
   const handleTriggerSearch = () => {
     setSearch(searchInput.trim());
@@ -108,6 +117,10 @@ export default function AdminContractsTab() {
       if (loaiHdFilter) params.loai_hd = loaiHdFilter;
       if (trangThaiFilter) params.trang_thai = trangThaiFilter;
       if (expiringOnly) params.expiring_days = 30;
+      if (sort.by) {
+        params.sort_by = sort.by;
+        params.sort_order = sort.order;
+      }
 
       const res = await getContracts(params);
       const data = res.data || res;
@@ -124,7 +137,7 @@ export default function AdminContractsTab() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, loaiHdFilter, trangThaiFilter, expiringOnly]);
+  }, [page, search, loaiHdFilter, trangThaiFilter, expiringOnly, sort]);
 
   useEffect(() => {
     fetchContracts();
@@ -225,11 +238,22 @@ export default function AdminContractsTab() {
   const handleDeleteSubmit = async () => {
     try {
       await deleteContract(selectedContract.ma_hd);
-      showToastSuccess(`Đã xóa hợp đồng ${selectedContract.ma_hd} thành công!`);
+      showToastSuccess(`Đã xóa hợp đồng ${selectedContract.ma_hd} (chuyển sang Đã hủy)`);
       setShowDeleteModal(false);
       fetchContracts();
     } catch (err) {
       alert("Lỗi khi xóa hợp đồng: " + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  // Khôi phục hợp đồng đã xóa mềm
+  const handleRestore = async (c) => {
+    try {
+      await restoreContract(c.ma_hd);
+      showToastSuccess(`Đã khôi phục hợp đồng ${c.ma_hd}`);
+      fetchContracts();
+    } catch (err) {
+      alert("Lỗi khi khôi phục hợp đồng: " + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -283,6 +307,13 @@ export default function AdminContractsTab() {
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
             <Clock className="w-3.5 h-3.5 text-amber-600" />
             Tạm hoãn
+          </span>
+        );
+      case "DA_HUY":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 line-through">
+            <Trash2 className="w-3.5 h-3.5" />
+            Đã xóa
           </span>
         );
       default:
@@ -477,6 +508,7 @@ export default function AdminContractsTab() {
               <option value="HET_HAN">Hết hạn</option>
               <option value="DA_THANH_LY">Đã thanh lý</option>
               <option value="TAM_HOAN">Tạm hoãn</option>
+              <option value="DA_HUY">Đã xóa (có thể khôi phục)</option>
             </select>
           </div>
         </div>
@@ -504,12 +536,12 @@ export default function AdminContractsTab() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-['Plus_Jakarta_Sans',sans-serif]">
-                <th className="py-3.5 px-4">Mã HĐ</th>
-                <th className="py-3.5 px-4">Nhân sự thụ hưởng</th>
-                <th className="py-3.5 px-4">Loại hợp đồng</th>
-                <th className="py-3.5 px-4">Thời hạn HĐ</th>
-                <th className="py-3.5 px-4">Lương thỏa thuận</th>
-                <th className="py-3.5 px-4">Trạng thái</th>
+                <SortableHeader className="py-3.5 px-4" label="Mã HĐ" field="ma_hd" sort={sort} onSort={handleSort} />
+                <SortableHeader className="py-3.5 px-4" label="Nhân sự thụ hưởng" field="ho_ten" sort={sort} onSort={handleSort} />
+                <SortableHeader className="py-3.5 px-4" label="Loại hợp đồng" field="loai_hd" sort={sort} onSort={handleSort} />
+                <SortableHeader className="py-3.5 px-4" label="Thời hạn HĐ" field="ngay_ket_thuc" sort={sort} onSort={handleSort} />
+                <SortableHeader className="py-3.5 px-4" label="Lương thỏa thuận" field="luong_co_ban" sort={sort} onSort={handleSort} />
+                <SortableHeader className="py-3.5 px-4" label="Trạng thái" field="trang_thai" sort={sort} onSort={handleSort} />
                 <th className="py-3.5 px-4 text-center">Thao tác</th>
               </tr>
             </thead>
@@ -613,17 +645,27 @@ export default function AdminContractsTab() {
                             </button>
                           )}
 
-                          {/* Xóa */}
-                          <button
-                            onClick={() => {
-                              setSelectedContract(c);
-                              setShowDeleteModal(true);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                            title="Xóa hợp đồng"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {/* Xóa mềm / Khôi phục */}
+                          {c.trang_thai === "DA_HUY" ? (
+                            <button
+                              onClick={() => handleRestore(c)}
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                              title="Khôi phục hợp đồng"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSelectedContract(c);
+                                setShowDeleteModal(true);
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                              title="Xóa hợp đồng (có thể khôi phục)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1153,7 +1195,8 @@ export default function AdminContractsTab() {
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed mb-6">
-              Bạn có chắc chắn muốn xóa bản ghi hợp đồng lao động này khỏi hệ thống? Thao tác này không thể hoàn tác.
+              Hợp đồng sẽ chuyển sang trạng thái "Đã xóa": không còn tính vào thâm niên, lương và báo cáo,
+              nhưng bản ghi vẫn được giữ lại và có thể khôi phục. Hợp đồng đang hiệu lực cần thanh lý trước khi xóa.
             </p>
 
             <div className="flex justify-end gap-3">
@@ -1169,7 +1212,7 @@ export default function AdminContractsTab() {
                 onClick={handleDeleteSubmit}
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl cursor-pointer text-xs"
               >
-                Xóa vĩnh viễn
+                Xác nhận xóa
               </button>
             </div>
           </div>

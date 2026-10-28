@@ -2,6 +2,17 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.account_model import TaiKhoan
+from app.utils.sorting import build_order_by
+
+ACCOUNT_SORT_COLUMNS = {
+    "ma_nv": "CAST(SUBSTRING(tk.ma_nv, 3) AS UNSIGNED)",
+    "ho_ten": "nv.ho_ten",
+    "ten_pb": "pb.ten_pb",
+    "ma_vai_tro": "tk.ma_vai_tro",
+    "trang_thai": "tk.trang_thai",
+    "lan_dn_cuoi": "tk.lan_dn_cuoi",
+    "ngay_tao": "tk.ngay_tao",
+}
 
 
 def get_by_ma_nv(db: Session, ma_nv: str) -> TaiKhoan | None:
@@ -66,6 +77,8 @@ def get_accounts_list(
     search: str | None = None,
     ma_vai_tro: str | None = None,
     trang_thai: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = None,
 ) -> dict:
     offset = (page - 1) * page_size
     conditions = ["1=1"]
@@ -114,7 +127,7 @@ def get_accounts_list(
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
         LEFT JOIN vai_tro vt ON tk.ma_vai_tro = vt.ma_vai_tro
         WHERE {where_sql}
-        ORDER BY tk.ngay_tao DESC
+        {build_order_by(sort_by, sort_order, ACCOUNT_SORT_COLUMNS, "tk.ngay_tao DESC, tk.ma_tk DESC")}
         LIMIT :limit OFFSET :offset
     """
     params["limit"] = page_size

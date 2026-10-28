@@ -12,6 +12,7 @@ import {
   X,
   TrendingUp,
   Layers,
+  RotateCcw,
 } from "lucide-react";
 import {
   getPositions,
@@ -20,12 +21,16 @@ import {
   deletePosition,
   createSalaryScale,
 } from "../../../services/adminService";
+import SortableHeader, { nextSort } from "../../../components/common/SortableHeader";
 
 export default function AdminPositionsTab() {
   const [positions, setPositions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState({ by: "", order: "asc" });
+
+  const handleSort = (field) => setSort((prev) => nextSort(prev, field));
 
   const handleTriggerSearch = () => {
     setSearchTerm(searchInput.trim());
@@ -74,7 +79,10 @@ export default function AdminPositionsTab() {
   const fetchPositions = async () => {
     setIsLoading(true);
     try {
-      const data = await getPositions();
+      const data = await getPositions({
+        sort_by: sort.by || undefined,
+        sort_order: sort.by ? sort.order : undefined,
+      });
       setPositions(data || []);
     } catch (err) {
       console.error("Lỗi khi tải danh sách chức vụ:", err);
@@ -86,7 +94,7 @@ export default function AdminPositionsTab() {
 
   useEffect(() => {
     fetchPositions();
-  }, []);
+  }, [sort]);
 
   const handleOpenCreate = () => {
     setModalMode("create");
@@ -153,16 +161,31 @@ export default function AdminPositionsTab() {
       return;
     }
 
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa chức vụ "${cv.ten_cv}" (${cv.ma_cv})?`)) {
+    if (
+      !window.confirm(
+        `Xóa chức vụ "${cv.ten_cv}" (${cv.ma_cv})?\nChức vụ sẽ chuyển sang "Ngừng sử dụng", thang bậc lương vẫn được giữ lại và có thể khôi phục.`
+      )
+    ) {
       return;
     }
 
     try {
       await deletePosition(cv.ma_cv);
-      showToast(`Đã xóa chức vụ ${cv.ten_cv} thành công!`);
+      showToast(`Đã xóa chức vụ ${cv.ten_cv} (chuyển sang Ngừng sử dụng)`);
       fetchPositions();
     } catch (err) {
       showToast(err.message || "Xóa chức vụ thất bại", "error");
+    }
+  };
+
+  // Khôi phục chức vụ đã xóa mềm
+  const handleRestore = async (cv) => {
+    try {
+      await updatePosition(cv.ma_cv, { trang_thai: 1 });
+      showToast(`Đã khôi phục chức vụ ${cv.ten_cv}`);
+      fetchPositions();
+    } catch (err) {
+      showToast(err.message || "Khôi phục chức vụ thất bại", "error");
     }
   };
 
@@ -298,11 +321,11 @@ export default function AdminPositionsTab() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-3 px-4">Mã CV</th>
-                  <th className="py-3 px-4">Tên chức vụ</th>
-                  <th className="py-3 px-4">Cấp bậc</th>
-                  <th className="py-3 px-4">Phụ cấp chức vụ</th>
-                  <th className="py-3 px-4">Số nhân sự</th>
+                  <SortableHeader className="py-3 px-4" label="Mã CV" field="ma_cv" sort={sort} onSort={handleSort} />
+                  <SortableHeader className="py-3 px-4" label="Tên chức vụ" field="ten_cv" sort={sort} onSort={handleSort} />
+                  <SortableHeader className="py-3 px-4" label="Cấp bậc" field="cap_bac" sort={sort} onSort={handleSort} />
+                  <SortableHeader className="py-3 px-4" label="Phụ cấp chức vụ" field="phu_cap_chuc_vu" sort={sort} onSort={handleSort} />
+                  <SortableHeader className="py-3 px-4" label="Số nhân sự" field="so_luong_nv" sort={sort} onSort={handleSort} />
                   <th className="py-3 px-4">Thang bậc lương</th>
                   <th className="py-3 px-4 text-center">Thao tác</th>
                 </tr>
@@ -312,7 +335,14 @@ export default function AdminPositionsTab() {
                   <tr key={cv.ma_cv} className="hover:bg-slate-50/60 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{cv.ma_cv}</td>
 
-                    <td className="py-3.5 px-4 font-bold text-slate-800">{cv.ten_cv}</td>
+                    <td className="py-3.5 px-4">
+                      <span className="font-bold text-slate-800">{cv.ten_cv}</span>
+                      {Number(cv.trang_thai) === 0 && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                          Ngừng sử dụng
+                        </span>
+                      )}
+                    </td>
 
                     <td className="py-3.5 px-4">
                       <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
@@ -353,14 +383,25 @@ export default function AdminPositionsTab() {
                           <Edit size={15} />
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(cv)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Xóa chức vụ"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {Number(cv.trang_thai) === 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRestore(cv)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
+                            title="Khôi phục chức vụ"
+                          >
+                            <RotateCcw size={15} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(cv)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Xóa chức vụ (ngừng sử dụng, có thể khôi phục)"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

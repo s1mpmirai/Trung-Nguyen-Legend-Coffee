@@ -28,7 +28,7 @@ def get_admin_dashboard_stats(db: Session) -> dict:
 
     # 2. Thống kê phòng ban & chức vụ
     tong_phong_ban = db.execute(text("SELECT COUNT(*) FROM phong_ban WHERE trang_thai = 1")).scalar() or 0
-    tong_chuc_vu = db.execute(text("SELECT COUNT(*) FROM chuc_vu")).scalar() or 0
+    tong_chuc_vu = db.execute(text("SELECT COUNT(*) FROM chuc_vu WHERE trang_thai = 1")).scalar() or 0
 
     # 3. Thống kê tài khoản
     acc_stats = db.execute(text("""
@@ -82,15 +82,6 @@ def get_admin_dashboard_stats(db: Session) -> dict:
     """)).mappings().all()
     phan_bo_chuc_vu = [dict(r) for r in pos_rows]
 
-    # Các giá trị mặc định cho module sản phẩm / nhà cung cấp đã loại bỏ
-    tong_nha_cung_cap = 0
-    ncc_dang_hop_tac = 0
-    tong_san_pham = 0
-    san_pham_dang_ban = 0
-    tong_so_luong_ton_kho = 0
-    tong_gia_tri_kho = 0.0
-    san_pham_canh_bao_ton_it = 0
-
     # 5. Thống kê hợp đồng
     hd_stats = db.execute(text("""
         SELECT 
@@ -98,6 +89,7 @@ def get_admin_dashboard_stats(db: Session) -> dict:
             SUM(CASE WHEN trang_thai = 'HIEU_LUC' THEN 1 ELSE 0 END) AS hieu_luc,
             SUM(CASE WHEN trang_thai = 'HIEU_LUC' AND ngay_ket_thuc IS NOT NULL AND DATEDIFF(ngay_ket_thuc, CURDATE()) BETWEEN 0 AND 30 THEN 1 ELSE 0 END) AS sap_het_han_30
         FROM hop_dong_lao_dong
+        WHERE trang_thai <> 'DA_HUY'
     """)).mappings().first()
 
     tong_hop_dong = hd_stats["tong_hd"] or 0
@@ -163,13 +155,6 @@ def get_admin_dashboard_stats(db: Session) -> dict:
         "tai_khoan_hoat_dong": tai_khoan_hoat_dong,
         "tai_khoan_khoa": tai_khoan_khoa,
         "nhan_su_chua_co_tai_khoan": nhan_su_chua_co_tai_khoan,
-        "tong_nha_cung_cap": tong_nha_cung_cap,
-        "ncc_dang_hop_tac": ncc_dang_hop_tac,
-        "tong_san_pham": tong_san_pham,
-        "san_pham_dang_ban": san_pham_dang_ban,
-        "tong_so_luong_ton_kho": tong_so_luong_ton_kho,
-        "tong_gia_tri_kho": tong_gia_tri_kho,
-        "san_pham_canh_bao_ton_it": san_pham_canh_bao_ton_it,
         "tong_hop_dong": tong_hop_dong,
         "hop_dong_hieu_luc": hop_dong_hieu_luc,
         "hop_dong_sap_het_han_30_ngay": hop_dong_sap_het_han_30_ngay,

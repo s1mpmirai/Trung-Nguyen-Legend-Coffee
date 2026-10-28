@@ -89,7 +89,7 @@ def get_role_matrix(db: Session) -> dict[str, Any]:
             "so_quyen": len(manager_perms),
             "quyen_hien_tai": list(manager_perms),
             "quyen_duoc_bo_sung_khi_len_quan_ly": added_for_manager,
-            "mo_ta": "Cấp quản trị phòng ban/chi nhánh: Thêm/sửa nhân sự, tính và duyệt lương, quản lý kho/nhà cung cấp.",
+            "mo_ta": "Cấp quản trị phòng ban/chi nhánh: Thêm/sửa nhân sự, duyệt đơn, quản lý chấm công, tính và duyệt lương.",
         },
     }
 
@@ -183,25 +183,31 @@ def assign_role_to_employee(
         {"ma_nv": ma_nv},
     ).mappings().first()
 
-    if tk_row:
+    if not tk_row:
+        raise ValueError("Nhân sự chưa có tài khoản đăng nhập. Vui lòng đề nghị Admin cấp tài khoản trước khi phân quyền.")
+
+    db.execute(
+        text("""
+            UPDATE tai_khoan
+            SET ma_vai_tro = :ma_vai_tro,
+                ngay_cap_nhat = :now
+            WHERE ma_nv = :ma_nv
+        """),
+        {"ma_vai_tro": ma_vai_tro, "now": now_vn, "ma_nv": ma_nv},
+    )
+
+    # Thăng lên Trưởng nhóm: đồng bộ chức vụ Tổ trưởng / Trưởng nhóm (CV03) nếu chức vụ hiện tại thấp hơn
+    if ma_vai_tro == "TRUONG_NHOM":
         db.execute(
             text("""
-                UPDATE tai_khoan
-                SET ma_vai_tro = :ma_vai_tro,
-                    ngay_cap_nhat = :now
-                WHERE ma_nv = :ma_nv
+                UPDATE nhan_vien nv
+                JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+                SET nv.ma_cv = 'CV03',
+                    nv.ma_bac = (SELECT ma_bac FROM bac_luong WHERE ma_cv = 'CV03' ORDER BY bac LIMIT 1),
+                    nv.ngay_cap_nhat = :now
+                WHERE nv.ma_nv = :ma_nv AND cv.cap_bac < 2
             """),
-            {"ma_vai_tro": ma_vai_tro, "now": now_vn, "ma_nv": ma_nv},
-        )
-    else:
-        # Nếu chưa có tài khoản, tự động tạo tài khoản với mật khẩu mặc định là '1'
-        default_pwd = "1"
-        db.execute(
-            text("""
-                INSERT INTO tai_khoan (ma_nv, mat_khau, ma_vai_tro, trang_thai, ngay_tao)
-                VALUES (:ma_nv, :mat_khau, :ma_vai_tro, 'HOAT_DONG', :now)
-            """),
-            {"ma_nv": ma_nv, "mat_khau": default_pwd, "ma_vai_tro": ma_vai_tro, "now": now_vn},
+            {"now": now_vn, "ma_nv": ma_nv},
         )
 
     db.commit()
@@ -218,12 +224,7 @@ def update_employee_custom_permissions(
     ).mappings().first()
 
     if not tk_row:
-        # Nếu chưa có tài khoản, gán vai trò mặc định NHAN_VIEN rồi cấp quyền riêng
-        assign_role_to_employee(db, ma_nv, "NHAN_VIEN")
-        tk_row = db.execute(
-            text("SELECT ma_tk FROM tai_khoan WHERE ma_nv = :ma_nv"),
-            {"ma_nv": ma_nv},
-        ).mappings().first()
+        raise ValueError("Nhân sự chưa có tài khoản đăng nhập. Vui lòng đề nghị Admin cấp tài khoản trước khi phân quyền.")
 
     ma_tk = tk_row["ma_tk"]
     now_vn = get_vietnam_now()

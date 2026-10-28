@@ -12,6 +12,22 @@ if (BASE_URL.startsWith("http") && !BASE_URL.includes("/api/v1")) {
   BASE_URL = `${BASE_URL.replace(/\/+$/, "")}/api/v1`;
 }
 
+const SESSION_KEYS = [
+  "user_ma_nv",
+  "ma_nv",
+  "auth_token",
+  "access_token",
+  "user_role",
+  "user_permissions",
+  "auth_portal",
+];
+
+function handleSessionExpired() {
+  const portal = localStorage.getItem("auth_portal");
+  SESSION_KEYS.forEach((key) => localStorage.removeItem(key));
+  window.location.assign(portal === "manage" ? "/login-manage" : "/login");
+}
+
 export async function request(endpoint, options = {}) {
   const token = localStorage.getItem("access_token");
 
@@ -57,6 +73,11 @@ export async function request(endpoint, options = {}) {
     }
 
     const data = await response.json().catch(() => null);
+
+    // Token hết hạn / không hợp lệ: xóa phiên và đưa về trang đăng nhập tương ứng
+    if (response.status === 401 && !cleanEndpoint.startsWith("/auth/")) {
+      handleSessionExpired();
+    }
 
     if (!response.ok) {
       const errorMessage =

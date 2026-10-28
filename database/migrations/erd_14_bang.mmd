@@ -1,5 +1,5 @@
 ---
-title: "LƯỢC ĐỒ QUAN HỆ THỰC THỂ (ERD) — CSDL HRM TRUNG NGUYÊN (13 BẢNG)"
+title: "LƯỢC ĐỒ QUAN HỆ THỰC THỂ (ERD) — CSDL HRM TRUNG NGUYÊN (18 BẢNG)"
 config:
   theme: base
   themeVariables:
@@ -27,25 +27,37 @@ erDiagram
     %% TẦNG 2 VÀO TÂM ĐIỂM NHÂN VIÊN
     phong_ban ||--o{ nhan_vien : "co_nhan_su"
     chuc_vu ||--o{ nhan_vien : "dam_nhiem"
+    bac_luong |o--o{ nhan_vien : "xep_bac"
 
-    %% QUAN HỆ VÒNG TỐI GIẢN (Trưởng phòng)
-    nhan_vien ||--o| phong_ban : "lam_truong_phong"
+    %% QUAN HỆ VÒNG (Trưởng phòng, Quản lý trực tiếp)
+    nhan_vien |o--o{ phong_ban : "lam_truong_phong"
+    nhan_vien |o--o{ nhan_vien : "quan_ly_truc_tiep"
 
-    %% TỪ NHÂN VIÊN TỎA RA CÁC PHÂN HỆ VỆ TINH (Không giao chéo)
+    %% TỪ NHÂN VIÊN TỎA RA CÁC PHÂN HỆ VỆ TINH
     nhan_vien ||--o{ bang_cap : "trinh_do"
     nhan_vien ||--o{ hop_dong_lao_dong : "ky_hop_dong"
     nhan_vien ||--o{ don_tu : "nop_don"
+    nhan_vien |o--o{ don_tu : "duyet_don"
     nhan_vien ||--o| tai_khoan : "tai_khoan"
     nhan_vien ||--o{ bang_luong : "bang_luong"
+    nhan_vien ||--o{ yeu_cau_cap_nhat_ho_so : "gui_yeu_cau"
+    nhan_vien |o--o{ yeu_cau_cap_nhat_ho_so : "duyet_yeu_cau"
 
     %% CHẤM CÔNG (Nằm ở nhánh nghiệp vụ)
-    ca_lam_viec ||--o{ bang_cham_cong : "theo_ca"
+    ca_lam_viec |o--o{ bang_cham_cong : "theo_ca"
     nhan_vien ||--o{ bang_cham_cong : "cham_cong"
-    don_tu ||--o{ bang_cham_cong : "nghi_co_don"
+    don_tu |o--o{ bang_cham_cong : "nghi_co_don"
+    bang_cham_cong ||--o{ lich_su_dieu_chinh_cong : "dieu_chinh"
+    nhan_vien ||--o{ lich_su_dieu_chinh_cong : "bi_dieu_chinh"
+    nhan_vien |o--o{ chot_cong_thang : "chot_cong"
 
-    %% CỤM ADMIN: SẢN PHẨM & NHÀ CUNG CẤP
-    nhan_vien ||--o{ nha_cung_cap : "phu_trach"
-    nha_cung_cap ||--o{ san_pham : "cung_cap"
+    %% PHÂN QUYỀN (RBAC)
+    vai_tro ||--o{ tai_khoan : "gan_vai_tro"
+    vai_tro ||--o{ vai_tro_quyen : "co_quyen"
+    quyen ||--o{ vai_tro_quyen : "thuoc_vai_tro"
+    tai_khoan ||--o{ tai_khoan_quyen : "quyen_rieng"
+    quyen ||--o{ tai_khoan_quyen : "cap_cho_tk"
+
 
 
     %% =========================================================================
@@ -56,19 +68,21 @@ erDiagram
         varchar ma_pb PK "Mã phòng ban"
         varchar ten_pb "Tên phòng ban"
         varchar ma_truong_pb FK "Mã trưởng phòng"
+        tinyint trang_thai "1: Hoạt động, 0: Ngừng"
     }
 
     chuc_vu {
         varchar ma_cv PK "Mã chức vụ"
         varchar ten_cv "Tên chức vụ"
-        int cap_bac "Cấp bậc (1-5)"
+        tinyint cap_bac "Cấp bậc (1-5)"
         decimal phu_cap_chuc_vu "Phụ cấp chức vụ"
+        tinyint trang_thai "1: Hoạt động, 0: Ngừng"
     }
 
     bac_luong {
         int ma_bac PK "Mã bậc lương"
-        varchar ma_cv FK "Thuộc chức vụ"
-        int bac "Bậc 1, 2, 3..."
+        varchar ma_cv FK "Thuộc chức vụ (UK: ma_cv + bac)"
+        tinyint bac "Bậc 1, 2, 3..."
         decimal he_so "Hệ số lương"
         decimal muc_luong "Lương tham chiếu"
     }
@@ -77,17 +91,20 @@ erDiagram
         varchar ma_nv PK "Mã nhân viên"
         varchar ho_ten "Họ và tên"
         date ngay_sinh "Ngày sinh"
-        varchar gioi_tinh "Giới tính"
+        enum gioi_tinh "Nam, Nu, Khac"
         varchar cccd UK "CCCD"
+        varchar email UK "Email"
         varchar ma_pb FK "Phòng ban"
         varchar ma_cv FK "Chức vụ"
-        varchar trang_thai "DANG_LAM, DA_NGHI..."
+        int ma_bac FK "Bậc lương"
+        varchar ma_nql FK "Người quản lý trực tiếp"
+        enum trang_thai "DANG_LAM, NGHI_PHEP, DA_NGHI_VIEC..."
     }
 
     bang_cap {
         int ma_bc PK "Mã bằng cấp"
         varchar ma_nv FK "Mã nhân viên"
-        varchar trinh_do "CĐ, ĐH, Thạc sĩ..."
+        enum trinh_do "CAO_DANG, DAI_HOC, THAC_SI..."
         varchar chuyen_nganh "Chuyên ngành"
         varchar noi_dao_tao "Trường đào tạo"
     }
@@ -95,22 +112,25 @@ erDiagram
     hop_dong_lao_dong {
         varchar ma_hd PK "Mã hợp đồng"
         varchar ma_nv FK "Mã nhân viên"
-        varchar loai_hd "1 năm, 3 năm, VTH..."
+        enum loai_hd "THU_VIEC, XAC_DINH_1_NAM, KHONG_XAC_DINH..."
         date ngay_bat_dau "Ngày bắt đầu (vào làm)"
+        date ngay_ket_thuc "Ngày kết thúc"
         decimal luong_co_ban "Lương cơ bản"
         varchar so_tai_khoan "Số tài khoản"
         varchar ngan_hang "Ngân hàng"
         varchar ma_so_thue "Mã số thuế"
         varchar so_bhxh "Số BHXH"
+        enum trang_thai "HIEU_LUC, HET_HAN, DA_THANH_LY..."
     }
 
     don_tu {
         varchar ma_don PK "Mã đơn"
         varchar ma_nv FK "Người nộp đơn"
-        varchar loai_don "Nghỉ phép, Ốm, Việc..."
+        enum loai_don "NGHI_PHEP, NGHI_OM, NGHI_VIEC..."
         date ngay_bat_dau "Từ ngày"
         date ngay_ket_thuc "Đến ngày"
-        varchar trang_thai "CHO_DUYET, DA_DUYET"
+        enum trang_thai "CHO_DUYET, DA_DUYET, TU_CHOI, DA_HUY"
+        varchar nguoi_duyet FK "Người duyệt"
     }
 
     ca_lam_viec {
@@ -123,40 +143,77 @@ erDiagram
 
     bang_cham_cong {
         bigint ma_cc PK "Mã chấm công"
-        varchar ma_nv FK "Mã nhân viên"
+        varchar ma_nv FK "Mã nhân viên (UK: ma_nv + ngay_cong)"
         date ngay_cong "Ngày làm việc"
         varchar ma_ca FK "Mã ca"
-        varchar loai_cong "Đủ, Nửa, Nghỉ..."
+        enum loai_cong "CONG_DU, DI_TRE, NGHI_PHEP..."
+        enum trang_thai_duyet "CHO_DUYET, DA_DUYET, TU_CHOI"
         varchar ma_don FK "Đơn nghỉ (nếu có)"
+    }
+
+    lich_su_dieu_chinh_cong {
+        bigint ma_ls PK "Mã lịch sử"
+        bigint ma_cc FK "Mã chấm công"
+        varchar ma_nv FK "Mã nhân viên"
+        time gio_vao_moi "Giờ vào sau điều chỉnh"
+        time gio_ra_moi "Giờ ra sau điều chỉnh"
+        varchar ly_do "Lý do điều chỉnh"
+    }
+
+    chot_cong_thang {
+        int id PK "Mã chốt công"
+        tinyint thang "Tháng (UK: thang + nam)"
+        smallint nam "Năm"
+        varchar trang_thai "DA_CHOT, CHO_CHOT"
+        varchar nguoi_chot FK "Người chốt (mã NV)"
     }
 
     bang_luong {
         bigint ma_bl PK "Mã bảng lương"
-        int thang "Tháng (1-12)"
-        int nam "Năm"
+        tinyint thang "Tháng (UK: thang + nam + ma_nv)"
+        smallint nam "Năm"
         varchar ma_nv FK "Mã nhân viên"
         decimal luong_gross "Lương Gross"
         decimal luong_net "Thực lĩnh Net"
+        enum trang_thai "NHAP, DA_DUYET, DA_TRA"
+    }
+
+    yeu_cau_cap_nhat_ho_so {
+        bigint ma_yc PK "Mã yêu cầu"
+        varchar ma_nv FK "Người gửi yêu cầu"
+        longtext thong_tin_moi "Thông tin mới (JSON)"
+        enum trang_thai "CHO_DUYET, DA_DUYET, TU_CHOI, DA_HUY"
+        varchar nguoi_duyet FK "Người duyệt"
     }
 
     tai_khoan {
         int ma_tk PK "Mã tài khoản"
-        varchar ten_dang_nhap UK "Username"
-        varchar ma_nv FK "Mã nhân viên"
-        varchar vai_tro "ADMIN, QUAN_LY, NV..."
+        varchar ma_nv FK, UK "Mã nhân viên (dùng để đăng nhập)"
+        varchar ma_vai_tro FK "Vai trò"
+        enum trang_thai "HOAT_DONG, KHOA, CHO_KICH_HOAT"
     }
 
-    nha_cung_cap {
-        varchar ma_ncc PK "Mã nhà cung cấp"
-        varchar ten_ncc "Tên NCC"
-        varchar loai_hang "Hạt cà phê, Bao bì..."
-        varchar ma_nv_phu_trach FK "NV phụ trách"
+    vai_tro {
+        varchar ma_vai_tro PK "ADMIN, QUAN_LY, TRUONG_NHOM, NHAN_VIEN"
+        varchar ten_vai_tro UK "Tên vai trò"
+        tinyint he_thong "Vai trò hệ thống"
     }
 
-    san_pham {
-        varchar ma_sp PK "Mã sản phẩm"
-        varchar ten_sp "Tên sản phẩm G7..."
-        varchar ma_ncc FK "Cung cấp bởi"
-        decimal gia_ban "Giá bán"
-        int ton_kho "Tồn kho"
+    quyen {
+        varchar ma_quyen PK "Mã quyền"
+        varchar ten_quyen "Tên quyền"
+        varchar nhom_quyen "Nhóm quyền"
     }
+
+    vai_tro_quyen {
+        varchar ma_vai_tro PK, FK "Vai trò"
+        varchar ma_quyen PK, FK "Quyền"
+    }
+
+    tai_khoan_quyen {
+        int ma_tk PK, FK "Tài khoản"
+        varchar ma_quyen PK, FK "Quyền"
+        tinyint duoc_cap "1: Cấp thêm, 0: Thu hồi"
+    }
+
+

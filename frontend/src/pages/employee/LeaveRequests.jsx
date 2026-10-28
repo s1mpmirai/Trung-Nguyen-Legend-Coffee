@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 import logoImg from '../../assets/logo/Logo Trung Nguyên_black.png';
-import { getLeaveHistory } from '../../services/leaveService';
+import { getLeaveHistory, submitLeaveRequest } from '../../services/leaveService';
 import SharedEmployeeHeader from './components/SharedEmployeeHeader';
 import BottomNavBar from './components/BottomNavBar';
 
@@ -39,15 +39,20 @@ export default function LeaveRequests({ userSession, onLogout }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Hàm tính số ngày nghỉ tự động giữa 2 mốc ngày (tính cả ngày bắt đầu và kết thúc)
-  const calculateLeaveDays = (startStr, endStr) => {
+  // Nghỉ thai sản tính theo ngày lịch; các loại nghỉ khác chỉ tính ngày làm việc (T2 - T6)
+  const calculateLeaveDays = (startStr, endStr, loaiDon = formLoaiDon) => {
     if (!startStr || !endStr) return 0;
     const [sY, sM, sD] = startStr.split('-').map(Number);
     const [eY, eM, eD] = endStr.split('-').map(Number);
     const start = new Date(sY, sM - 1, sD);
     const end = new Date(eY, eM - 1, eD);
     if (end < start) return 0;
-    const diffTime = end.getTime() - start.getTime();
-    return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    let days = 0;
+    for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const weekday = d.getDay();
+      if (loaiDon === 'NGHI_THAI_SAN' || (weekday !== 0 && weekday !== 6)) days += 1;
+    }
+    return days;
   };
 
   // Tự động điều chỉnh ngày kết thúc nếu chưa chọn hoặc nhỏ hơn ngày bắt đầu
@@ -100,7 +105,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
-      const data = await getLeaveHistory(userSession?.ma_nv || 'NV10');
+      const data = await getLeaveHistory(userSession?.ma_nv || localStorage.getItem('user_ma_nv'));
       setLeaves(data);
       setIsLoading(false);
     }
@@ -117,12 +122,20 @@ export default function LeaveRequests({ userSession, onLogout }) {
     return dateStr;
   };
 
-  // Tính toán quỹ phép năm thực tế từ bảng don_tu
+  // Tính toán quỹ phép năm hiện tại từ bảng don_tu (đơn chờ duyệt cũng tạm giữ quỹ phép, giống backend)
   const tongPhep = 12.0;
-  const daDung = leaves
-    .filter((l) => l.loai_don === 'NGHI_PHEP' && l.trang_thai === 'DA_DUYET')
-    .reduce((sum, item) => sum + (parseFloat(item.so_ngay) || 0), 0);
-  const conLai = Math.max(0, tongPhep - daDung);
+  const namHienTai = new Date().getFullYear();
+  const sumAnnualLeave = (trangThai) =>
+    leaves
+      .filter(
+        (l) =>
+          l.loai_don === 'NGHI_PHEP' &&
+          l.trang_thai === trangThai &&
+          Number(String(l.ngay_bat_dau).slice(0, 4)) === namHienTai
+      )
+      .reduce((sum, item) => sum + (parseFloat(item.so_ngay) || 0), 0);
+  const daDung = sumAnnualLeave('DA_DUYET');
+  const conLai = Math.max(0, tongPhep - daDung - sumAnnualLeave('CHO_DUYET'));
   const percentDung = Math.min(100, Math.round((daDung / tongPhep) * 100));
 
   // Lọc theo filter
@@ -242,8 +255,12 @@ export default function LeaveRequests({ userSession, onLogout }) {
         return;
       }
       calculatedDays = calculateLeaveDays(formNgayBatDau, formNgayKetThuc);
-      if (calculatedDays <= 0) {
+      if (formNgayKetThuc < formNgayBatDau) {
         showToast('Ngày kết thúc nghỉ phải bằng hoặc sau ngày bắt đầu nghỉ');
+        return;
+      }
+      if (calculatedDays <= 0) {
+        showToast('Khoảng thời gian đã chọn không có ngày làm việc nào (T2 - T6)');
         return;
       }
       if (formLoaiDon === 'NGHI_PHEP' && calculatedDays > conLai) {
@@ -254,31 +271,22 @@ export default function LeaveRequests({ userSession, onLogout }) {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/v1/leaves/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ma_nv: userSession?.ma_nv || 'NV10',
-          loai_don: formLoaiDon,
-          ngay_bat_dau: formNgayBatDau,
-          ngay_ket_thuc: finalEndDate,
-          so_ngay: calculatedDays,
-          ly_do: formLyDo.trim(),
-        }),
+      const maNv = userSession?.ma_nv || localStorage.getItem('user_ma_nv');
+      await submitLeaveRequest({
+        ma_nv: maNv,
+        loai_don: formLoaiDon,
+        ngay_bat_dau: formNgayBatDau,
+        ngay_ket_thuc: finalEndDate,
+        so_ngay: calculatedDays,
+        ly_do: formLyDo.trim(),
       });
-
-      if (res.ok) {
-        showToast('✓ Tạo đơn thành công! Đang chờ duyệt.');
-        setShowCreateModal(false);
-        // Tải lại dữ liệu từ MariaDB
-        const fresh = await getLeaveHistory(userSession?.ma_nv || 'NV10');
-        setLeaves(fresh);
-      } else {
-        showToast('Tạo đơn thất bại, vui lòng thử lại');
-      }
-    } catch (err) {
-      showToast('Đã ghi nhận yêu cầu gửi đơn');
+      showToast('✓ Tạo đơn thành công! Đang chờ duyệt.');
       setShowCreateModal(false);
+      // Tải lại dữ liệu từ MariaDB
+      setLeaves(await getLeaveHistory(maNv));
+    } catch (err) {
+      // Hiển thị đúng lý do từ backend (trùng ngày, hết phép năm...)
+      showToast(`Tạo đơn thất bại: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -488,7 +496,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
                     <span>
                       {item.trang_thai === 'DA_DUYET' ? 'Đã duyệt: ' : 'Người duyệt: '}
                       <strong className="text-slate-700">
-                        {item.ten_nguoi_duyet || (item.trang_thai === 'CHO_DUYET' ? 'Chưa có người duyệt' : 'Không có dữ liệu')}
+                        {item.ten_nguoi_duyet || (item.trang_thai === 'CHO_DUYET' ? 'Chưa có người duyệt' : item.trang_thai === 'DA_DUYET' ? 'Hệ thống (tự động duyệt)' : 'Không có dữ liệu')}
                       </strong>
                     </span>
                   </div>
@@ -580,7 +588,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
               </div>
               <div className="flex justify-between py-1 border-b border-slate-50">
                 <span className="text-slate-400 font-medium">Người duyệt:</span>
-                <span className="font-bold text-slate-800">{selectedLeave.ten_nguoi_duyet || 'Không có dữ liệu'}</span>
+                <span className="font-bold text-slate-800">{selectedLeave.ten_nguoi_duyet || (selectedLeave.trang_thai === 'DA_DUYET' ? 'Hệ thống (tự động duyệt)' : 'Không có dữ liệu')}</span>
               </div>
               <div className="py-1">
                 <span className="text-slate-400 font-medium block mb-1">Ý kiến người duyệt:</span>

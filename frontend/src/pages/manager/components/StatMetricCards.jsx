@@ -3,20 +3,17 @@ import { Users, CheckCircle2, ClockAlert, CreditCard, ArrowUpRight } from "lucid
 
 export default function StatMetricCards({ stats, onNavigateTab }) {
   const data = stats || {
-    totalEmployees: 19,
-    activeStatus: "19 Đang làm • 1 Đã nghỉ",
-    fullTimeCount: 19,
-    partTimeCount: 0,
+    totalEmployees: 0,
+    fullTimeCount: 0,
     attendanceRate: "0.0",
     activeToday: 0,
     onTimeToday: 0,
     lateToday: 0,
-    notCheckedIn: 19,
+    notCheckedIn: 0,
     pendingLeavesCount: 0,
     pendingProfileCount: 0,
     totalPendingCount: 0,
-    monthlyPayroll: "0 đ",
-    payrollStatus: "Đang tải",
+    monthlyPayroll: "—",
   };
 
   return (

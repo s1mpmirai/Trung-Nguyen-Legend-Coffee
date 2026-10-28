@@ -60,7 +60,7 @@ def get_leave_by_id(db: Session, ma_don: str) -> dict | None:
             dt.loai_don, dt.ngay_tao, dt.ngay_bat_dau, dt.ngay_ket_thuc,
             dt.so_ngay, dt.ly_do, dt.trang_thai,
             dt.nguoi_duyet, nd.ho_ten AS ten_nguoi_duyet,
-            dt.ngay_duyet, dt.y_kien_duyet
+            dt.ngay_duyet, dt.y_kien_duyet, nv.ma_nql
         FROM don_tu dt
         JOIN nhan_vien nv ON dt.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
@@ -111,8 +111,8 @@ def cancel_leave(db: Session, ma_don: str, ma_nv: str) -> dict | None:
     return get_leave_by_id(db, ma_don)
 
 
-def get_pending_leaves(db: Session) -> list[dict]:
-    """Quản lý lấy danh sách các đơn đang chờ duyệt."""
+def get_pending_leaves(db: Session, ma_nql: str | None = None) -> list[dict]:
+    """Quản lý lấy danh sách các đơn đang chờ duyệt (ma_nql: chỉ lấy đơn của cấp dưới trực tiếp)."""
     query = """
         SELECT 
             dt.ma_don, dt.ma_nv, nv.ho_ten, pb.ten_pb,
@@ -124,13 +124,14 @@ def get_pending_leaves(db: Session) -> list[dict]:
         JOIN nhan_vien nv ON dt.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         WHERE dt.trang_thai = 'CHO_DUYET'
+          AND (:ma_nql IS NULL OR nv.ma_nql = :ma_nql)
         ORDER BY dt.ngay_tao ASC
     """
-    rows = db.execute(text(query)).mappings().all()
+    rows = db.execute(text(query), {"ma_nql": ma_nql}).mappings().all()
     return [dict(r) for r in rows]
 
 
-def get_all_leaves(db: Session, trang_thai: str = None) -> list[dict]:
+def get_all_leaves(db: Session, trang_thai: str = None, ma_nql: str | None = None) -> list[dict]:
     """Quản lý lấy toàn bộ đơn từ (có thể lọc theo trạng thái)."""
     base_query = """
         SELECT 
@@ -144,9 +145,10 @@ def get_all_leaves(db: Session, trang_thai: str = None) -> list[dict]:
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         LEFT JOIN nhan_vien nd ON dt.nguoi_duyet = nd.ma_nv
         WHERE (:trang_thai IS NULL OR dt.trang_thai = :trang_thai)
+          AND (:ma_nql IS NULL OR nv.ma_nql = :ma_nql)
         ORDER BY dt.ngay_tao DESC
     """
-    rows = db.execute(text(base_query), {"trang_thai": trang_thai}).mappings().all()
+    rows = db.execute(text(base_query), {"trang_thai": trang_thai, "ma_nql": ma_nql}).mappings().all()
     return [dict(r) for r in rows]
 
 
@@ -154,10 +156,10 @@ def review_leave(
     db: Session,
     ma_don: str,
     trang_thai: str,
-    nguoi_duyet: str,
+    nguoi_duyet: str | None,
     y_kien_duyet: str = None
 ) -> dict | None:
-    """Quản lý duyệt hoặc từ chối đơn."""
+    """Quản lý duyệt hoặc từ chối đơn (người gọi chịu trách nhiệm commit transaction)."""
     query = """
         UPDATE don_tu
         SET trang_thai = :trang_thai,
@@ -165,7 +167,7 @@ def review_leave(
             ngay_duyet = NOW(),
             y_kien_duyet = :y_kien_duyet,
             ngay_cap_nhat = NOW()
-        WHERE ma_don = :ma_don
+        WHERE ma_don = :ma_don AND trang_thai = 'CHO_DUYET'
     """
     result = db.execute(
         text(query),
@@ -176,14 +178,13 @@ def review_leave(
             "y_kien_duyet": y_kien_duyet,
         },
     )
-    db.commit()
     if result.rowcount == 0:
-        return None
+        raise ValueError(f"Đơn {ma_don} không còn ở trạng thái chờ duyệt")
 
     updated_leave = get_leave_by_id(db, ma_don)
 
     # Nếu đơn xin thôi việc (NGHI_VIEC) được duyệt -> Tự động chuyển trạng thái nhân sự sang DA_NGHI_VIEC và khóa tài khoản
-    if updated_leave and trang_thai == "DA_DUYET" and updated_leave.get("loai_don") == "NGHI_VIEC":
+    if trang_thai == "DA_DUYET" and updated_leave.get("loai_don") == "NGHI_VIEC":
         ma_nv = updated_leave.get("ma_nv")
         ngay_nghi = updated_leave.get("ngay_ket_thuc") or updated_leave.get("ngay_bat_dau")
         db.execute(
@@ -205,7 +206,39 @@ def review_leave(
             """),
             {"ma_nv": ma_nv},
         )
-        db.commit()
 
     return updated_leave
 
+
+def has_overlapping_leave(db: Session, ma_nv: str, ngay_bat_dau, ngay_ket_thuc) -> bool:
+    """Kiểm tra nhân viên đã có đơn chờ duyệt / đã duyệt trùng khoảng thời gian chưa."""
+    query = """
+        SELECT 1 FROM don_tu
+        WHERE ma_nv = :ma_nv
+          AND trang_thai IN ('CHO_DUYET', 'DA_DUYET')
+          AND ngay_bat_dau <= :ngay_ket_thuc
+          AND ngay_ket_thuc >= :ngay_bat_dau
+        LIMIT 1
+    """
+    row = db.execute(
+        text(query),
+        {"ma_nv": ma_nv, "ngay_bat_dau": ngay_bat_dau, "ngay_ket_thuc": ngay_ket_thuc},
+    ).first()
+    return row is not None
+
+
+def sum_annual_leave_days(db: Session, ma_nv: str, nam: int, exclude_ma_don: str | None = None) -> float:
+    """Tổng số ngày phép năm đã dùng hoặc đang chờ duyệt trong năm."""
+    query = """
+        SELECT COALESCE(SUM(so_ngay), 0)
+        FROM don_tu
+        WHERE ma_nv = :ma_nv
+          AND loai_don = 'NGHI_PHEP'
+          AND trang_thai IN ('CHO_DUYET', 'DA_DUYET')
+          AND YEAR(ngay_bat_dau) = :nam
+          AND (:exclude_ma_don IS NULL OR ma_don <> :exclude_ma_don)
+    """
+    total = db.execute(
+        text(query), {"ma_nv": ma_nv, "nam": nam, "exclude_ma_don": exclude_ma_don}
+    ).scalar()
+    return float(total or 0)

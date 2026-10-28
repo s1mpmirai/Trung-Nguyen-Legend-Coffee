@@ -6,6 +6,9 @@ import StatMetricCards from "./components/StatMetricCards";
 import DepartmentStructureCard from "./components/DepartmentStructureCard";
 import AttendanceTrendCard from "./components/AttendanceTrendCard";
 import ExpiringContractsCard from "./components/ExpiringContractsCard";
+import EducationChartCard from "./components/EducationChartCard";
+import TenureStatsCard from "./components/TenureStatsCard";
+import PayrollDepartmentCard from "./components/PayrollDepartmentCard";
 import EmployeeManagement from "./EmployeeManagement";
 import LeaveApprovals from "./LeaveApprovals";
 import AttendanceManagement from "./AttendanceManagement";
@@ -124,6 +127,13 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
                         contracts={dashboardData?.expiringContracts}
                         onNavigateTab={setActiveTab}
                       />
+                    </div>
+
+                    {/* 3. BÁO CÁO THỐNG KÊ NHÂN SỰ: Trình độ, Thâm niên, Mức lương */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <EducationChartCard educationData={dashboardData?.education} />
+                      <TenureStatsCard tenureData={dashboardData?.tenure} />
+                      <PayrollDepartmentCard payrollData={dashboardData?.salaryByDept} />
                     </div>
                   </>
                 )}

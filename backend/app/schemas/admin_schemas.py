@@ -50,15 +50,6 @@ class AdminDashboardStatsResponse(BaseModel):
     nhan_su_khac: int = Field(0, description="Số nhân sự khác")
     nhan_su_full_time: int = Field(0, description="Số nhân sự toàn thời gian")
     nhan_su_part_time: int = Field(0, description="Số nhân sự bán thời gian")
-    
-    # Kho & Nhà cung cấp (tương thích ngược)
-    tong_nha_cung_cap: int = Field(0, description="Tổng số nhà cung cấp")
-    ncc_dang_hop_tac: int = Field(0, description="Số NCC đang hợp tác")
-    tong_san_pham: int = Field(0, description="Tổng số mặt hàng sản phẩm")
-    san_pham_dang_ban: int = Field(0, description="Sản phẩm đang kinh doanh")
-    tong_so_luong_ton_kho: int = Field(0, description="Tổng số lượng tồn kho")
-    tong_gia_tri_kho: float = Field(0.0, description="Tổng giá trị vốn tồn kho (VNĐ)")
-    san_pham_canh_bao_ton_it: int = Field(0, description="Số sản phẩm tồn kho < 500")
 
     # Hợp đồng & Cảnh báo
     tong_hop_dong: int = Field(0, description="Tổng số hợp đồng")

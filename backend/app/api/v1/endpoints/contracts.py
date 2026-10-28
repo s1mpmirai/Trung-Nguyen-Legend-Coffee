@@ -25,6 +25,8 @@ def list_contracts_endpoint(
     loai_hd: Optional[str] = Query(None, description="THU_VIEC, XAC_DINH_1_NAM, XAC_DINH_3_NAM, KHONG_XAC_DINH, THOI_VU"),
     trang_thai: Optional[str] = Query(None, description="HIEU_LUC, HET_HAN, DA_THANH_LY, TAM_HOAN"),
     expiring_days: Optional[int] = Query(None, description="Lọc hợp đồng sắp hết hạn trong N ngày (vd: 30)"),
+    sort_by: Optional[str] = Query(None, description="Trường sắp xếp: ma_hd, ma_nv, ho_ten, loai_hd, ngay_ky, ngay_bat_dau, ngay_ket_thuc, luong_co_ban, trang_thai"),
+    sort_order: Optional[str] = Query("asc", description="Thứ tự sắp xếp: asc hoặc desc"),
 ):
     """Lấy danh sách hợp đồng lao động của toàn bộ nhân sự (Admin & Quản lý)."""
     return contract_repository.get_contract_list(
@@ -35,6 +37,8 @@ def list_contracts_endpoint(
         loai_hd=loai_hd,
         trang_thai=trang_thai,
         expiring_days=expiring_days,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
 
 
@@ -79,6 +83,8 @@ def update_contract_endpoint(ma_hd: str, data: ContractUpdate, db: DbSession):
                 detail=f"Không tìm thấy hợp đồng {ma_hd}",
             )
         return contract
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -101,9 +107,21 @@ def liquidate_contract_endpoint(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
-@router.delete("/{ma_hd}", summary="Xóa hợp đồng")
+@router.put("/{ma_hd}/restore", response_model=ContractResponse, summary="Khôi phục hợp đồng đã xóa")
+def restore_contract_endpoint(ma_hd: str, db: DbSession):
+    """Khôi phục hợp đồng đang ở trạng thái DA_HUY."""
+    contract = contract_repository.restore_contract(db, ma_hd)
+    if not contract:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Hợp đồng {ma_hd} không tồn tại hoặc chưa bị xóa",
+        )
+    return contract
+
+
+@router.delete("/{ma_hd}", summary="Xóa hợp đồng (xóa mềm: chuyển sang Đã hủy)")
 def delete_contract_endpoint(ma_hd: str, db: DbSession):
-    """Xóa hợp đồng khỏi hệ thống."""
+    """Xóa mềm hợp đồng không còn hiệu lực: giữ bản ghi, không tính vào thâm niên / lương."""
     try:
         contract = contract_repository.get_contract_by_id(db, ma_hd)
         if not contract:
@@ -112,6 +130,10 @@ def delete_contract_endpoint(ma_hd: str, db: DbSession):
                 detail=f"Không tìm thấy hợp đồng {ma_hd}",
             )
         contract_repository.delete_contract(db, ma_hd)
-        return {"success": True, "message": f"Đã xóa thành công hợp đồng {ma_hd}"}
+        return {"success": True, "message": f"Đã xóa hợp đồng {ma_hd} (chuyển sang Đã hủy, có thể khôi phục)"}
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

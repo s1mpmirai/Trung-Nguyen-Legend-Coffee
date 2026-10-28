@@ -3,6 +3,12 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.permissions import (
+    CurrentAccount,
+    ensure_self_or_permission,
+    normalize_ma_nv,
+    require_permission,
+)
 from app.db.session import get_db
 from app.schemas.employee_schemas import (
     employee_contact_update,
@@ -23,6 +29,7 @@ from app.services.employee_service import (
     deactivate_employee,
     employee_list,
     get_employee_profile,
+    get_hr_statistics,
     get_monthly_personnel_report,
     get_pending_profile_update,
     get_profile_requests_manager,
@@ -35,12 +42,21 @@ from app.services.employee_service import (
 router = APIRouter()
 
 DbSession = Annotated[Session, Depends(get_db)]
+EmployeeViewer = Annotated[dict, Depends(require_permission("EMPLOYEE_VIEW", "ACCOUNT_MANAGE", "PERMISSION_ASSIGN"))]
+EmployeeUpdater = Annotated[dict, Depends(require_permission("EMPLOYEE_UPDATE"))]
+EmployeeRemover = Annotated[dict, Depends(require_permission("EMPLOYEE_DELETE"))]
+
+
+def _forbid_self_action(account: dict, ma_nv: str) -> None:
+    if normalize_ma_nv(ma_nv) == account["ma_nv"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không thể tự thay đổi trạng thái của chính mình")
 
 
 @router.post("/create_employee", response_model=employee_profile_response)
 def create_employee(
     data: employee_profile_create,
-        db: DbSession,
+    db: DbSession,
+    account: Annotated[dict, Depends(require_permission("EMPLOYEE_CREATE"))],
 ):
     try:
         return create_employee_service(db, data)
@@ -50,6 +66,7 @@ def create_employee(
 @router.get("/get_employee_list", response_model=employee_list_response)
 def get_employee_list(
     db: DbSession,
+    account: EmployeeViewer,
     page: int = Query(1, ge=1, description="Số trang (bắt đầu từ 1)"),
     page_size: int = Query(50, ge=1, le=200, description="Số lượng nhân viên trên mỗi trang"),
     q: Optional[str] = Query(None, description="Từ khóa tìm kiếm (mã NV, họ tên, email, sđt, CCCD)"),
@@ -89,9 +106,11 @@ def get_employee_list(
 def get_profile(
     ma_nv: str,
     db: DbSession,
+    account: CurrentAccount,
 ):
+    clean_id = ensure_self_or_permission(account, ma_nv, "EMPLOYEE_VIEW")
     try:
-        return get_employee_profile(db, ma_nv)
+        return get_employee_profile(db, clean_id)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
 
@@ -100,9 +119,11 @@ def update_profile(
     ma_nv: str,
     data: employee_contact_update,
     db: DbSession,
+    account: CurrentAccount,
 ):
+    clean_id = ensure_self_or_permission(account, ma_nv, "EMPLOYEE_UPDATE")
     try:
-        return update_employee_contact(db, ma_nv, data)
+        return update_employee_contact(db, clean_id, data)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
 
@@ -118,14 +139,16 @@ def request_profile_update_endpoint(
     ma_nv: str,
     data: profile_update_request_create,
     db: DbSession,
+    account: CurrentAccount,
 ):
     """
     Nhân viên gửi yêu cầu chỉnh sửa thông tin cá nhân.
     Dữ liệu sẽ KHÔNG được lưu ngay vào bảng nhan_vien mà lưu ở bảng yêu cầu với trạng thái CHO_DUYET.
     Chỉ khi Quản lý phê duyệt (DA_DUYET) thì thông tin mới được cập nhật vào database chính thức.
     """
+    clean_id = ensure_self_or_permission(account, ma_nv)
     try:
-        return request_profile_update(db, ma_nv, data)
+        return request_profile_update(db, clean_id, data)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
@@ -138,9 +161,11 @@ def request_profile_update_endpoint(
 def get_pending_profile_request_endpoint(
     ma_nv: str,
     db: DbSession,
+    account: CurrentAccount,
 ):
     """Kiểm tra xem nhân viên có yêu cầu cập nhật thông tin nào đang ở trạng thái CHO_DUYET hay không."""
-    return get_pending_profile_update(db, ma_nv)
+    clean_id = ensure_self_or_permission(account, ma_nv, "EMPLOYEE_UPDATE")
+    return get_pending_profile_update(db, clean_id)
 
 
 @router.put(
@@ -151,11 +176,11 @@ def get_pending_profile_request_endpoint(
 def cancel_profile_request_endpoint(
     ma_yc: int,
     db: DbSession,
-    ma_nv: Optional[str] = Query(None, description="Mã nhân viên yêu cầu hủy (tùy chọn để kiểm tra bảo mật)"),
+    account: CurrentAccount,
 ):
     """Nhân viên tự hủy yêu cầu chỉnh sửa thông tin đang chờ Quản lý xử lý."""
     try:
-        return cancel_profile_update(db, ma_yc, ma_nv)
+        return cancel_profile_update(db, ma_yc, account["ma_nv"])
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
@@ -167,6 +192,7 @@ def cancel_profile_request_endpoint(
 )
 def get_profile_requests_manager_endpoint(
     db: DbSession,
+    account: EmployeeUpdater,
     trang_thai: Optional[str] = Query(
         None, description="Lọc theo trạng thái: CHO_DUYET, DA_DUYET, TU_CHOI, DA_HUY"
     ),
@@ -184,12 +210,14 @@ def review_profile_request_endpoint(
     ma_yc: int,
     data: profile_update_review_request,
     db: DbSession,
+    account: EmployeeUpdater,
 ):
     """
     Quản lý xét duyệt yêu cầu cập nhật hồ sơ:
     - Nếu DA_DUYET: Hệ thống tự động ghi đè thông tin mới vào bảng nhan_vien trong DB và đổi trạng thái yêu cầu sang DA_DUYET.
     - Nếu TU_CHOI: Bảng nhan_vien giữ nguyên không đổi, trạng thái yêu cầu chuyển sang TU_CHOI.
     """
+    data.nguoi_duyet = account["ma_nv"]
     try:
         return review_profile_update(db, ma_yc, data)
     except ValueError as error:
@@ -204,6 +232,7 @@ def review_profile_request_endpoint(
 )
 def get_monthly_personnel_report_endpoint(
     db: DbSession,
+    account: Annotated[dict, Depends(require_permission("EMPLOYEE_VIEW"))],
     thang: int = Query(..., ge=1, le=12, description="Tháng cần báo cáo (1-12)"),
     nam: int = Query(..., ge=2000, description="Năm cần báo cáo (>= 2000)"),
     ma_pb: Optional[str] = Query(None, description="Lọc theo mã phòng ban"),
@@ -219,6 +248,20 @@ def get_monthly_personnel_report_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
 
+@router.get(
+    "/reports/statistics",
+    summary="[Quản lý] Báo cáo thống kê nhân sự: trình độ, mức lương, thâm niên",
+)
+def get_hr_statistics_endpoint(
+    db: DbSession,
+    account: Annotated[dict, Depends(require_permission("EMPLOYEE_VIEW"))],
+    ma_pb: Optional[str] = Query(None, description="Lọc theo mã phòng ban"),
+    so_ngay_het_han: int = Query(60, ge=1, le=365, description="Cảnh báo hợp đồng hết hạn trong N ngày tới"),
+):
+    """Thống kê nhân sự đang làm việc theo trình độ, thâm niên, khung lương, quỹ lương phòng ban và hợp đồng sắp hết hạn."""
+    return get_hr_statistics(db, ma_pb, so_ngay_het_han)
+
+
 @router.put(
     "/{ma_nv}/status",
     response_model=employee_detail_response,
@@ -228,6 +271,7 @@ def update_employee_status_endpoint(
     ma_nv: str,
     data: employee_status_update,
     db: DbSession,
+    account: EmployeeUpdater,
 ):
     """
     Quản lý cập nhật trạng thái làm việc của nhân viên:
@@ -236,6 +280,7 @@ def update_employee_status_endpoint(
     - DANG_LAM: Khôi phục trạng thái làm việc bình thường, tự động mở khóa tài khoản.
     - NGHI_PHEP / NGHI_THAI_SAN: Cập nhật trạng thái nghỉ phép/thai sản dài ngày.
     """
+    _forbid_self_action(account, ma_nv)
     try:
         return change_employee_status(db, ma_nv, data)
     except ValueError as error:
@@ -250,6 +295,7 @@ def update_employee_status_endpoint(
 def deactivate_employee_endpoint(
     ma_nv: str,
     db: DbSession,
+    account: EmployeeRemover,
     ly_do: Optional[str] = Query(None, description="Lý do cho thôi việc / khóa nhân sự"),
 ):
     """
@@ -259,6 +305,7 @@ def deactivate_employee_endpoint(
     - Tự động khóa tài khoản đăng nhập tương ứng trong bảng tai_khoan.
     - Giữ nguyên toàn bộ lịch sử chấm công, bảng lương và hợp đồng trong CSDL.
     """
+    _forbid_self_action(account, ma_nv)
     try:
         return deactivate_employee(db, ma_nv, ly_do)
     except ValueError as error:
@@ -267,18 +314,21 @@ def deactivate_employee_endpoint(
 
 @router.delete(
     "/{ma_nv}",
-    summary="[Quản lý/Admin] Xóa hoàn toàn nhân sự khỏi CSDL",
+    summary="[Quản lý] Xóa nhân sự (xóa mềm: cho thôi việc và khóa tài khoản)",
 )
 def delete_employee_endpoint(
     ma_nv: str,
     db: DbSession,
+    account: EmployeeRemover,
+    ly_do: Optional[str] = Query(None, description="Lý do xóa nhân sự"),
 ):
     """
-    Xóa vĩnh viễn nhân sự khỏi CSDL (DELETE CASCADE).
-    Xóa sạch bản ghi nhân viên và các dữ liệu liên kết theo cấu hình cascade của CSDL.
+    Xóa nhân sự khỏi danh sách đang làm việc: trạng thái DA_NGHI_VIEC và khóa tài khoản đăng nhập.
+    Không xóa bản ghi hay tài khoản để giữ lịch sử chấm công, bảng lương, hợp đồng.
     """
+    _forbid_self_action(account, ma_nv)
     try:
-        return delete_employee(db, ma_nv)
+        return delete_employee(db, ma_nv, ly_do)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 

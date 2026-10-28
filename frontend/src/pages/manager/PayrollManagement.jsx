@@ -102,7 +102,7 @@ export default function PayrollManagement() {
           role: item.ten_cv || "Nhân viên",
           dept: item.ten_pb ? item.ten_pb.toLowerCase() : "hq",
           deptLabel: item.ten_pb || "Trụ sở chính",
-          standardDays: Number(item.so_cong_chuan) || 26,
+          standardDays: Number(item.so_cong_chuan) || 0,
           actualDays: Number(item.so_cong_thuc_te) || 0,
           baseSalary: Number(item.luong_co_ban) || 0,
           allowance: Number(item.tong_phu_cap) || 0,
@@ -122,7 +122,7 @@ export default function PayrollManagement() {
               : item.trang_thai === "DA_DUYET"
               ? "Đã duyệt chi"
               : "Chờ kiểm tra",
-          bankAccount: "Vietcombank • **** 6889",
+          bankAccount: item.tai_khoan_nhan_luong || "Chưa cập nhật",
         }));
 
         setPayrollData(mapped);
@@ -182,10 +182,11 @@ export default function PayrollManagement() {
     try {
       const isCurrentlyApproved = payrollData.every((r) => r.status === "ready" || r.status === "paid");
       const targetStatus = isCurrentlyApproved ? "NHAP" : "DA_DUYET";
+      // Chỉ chuyển các phiếu đang ở trạng thái liền trước (Chờ kiểm tra <-> Đã duyệt); phiếu đã chi trả giữ nguyên
+      const fromStatus = targetStatus === "DA_DUYET" ? "pending" : "ready";
 
-      // Cập nhật từng bản ghi
       for (const item of payrollData) {
-        if (item.ma_bl) {
+        if (item.ma_bl && item.status === fromStatus) {
           await updatePayrollStatus(item.ma_bl, targetStatus);
         }
       }
@@ -203,8 +204,9 @@ export default function PayrollManagement() {
     }
   };
 
+  // Hệ thống chưa tích hợp email: nhân viên xem / in phiếu lương trực tiếp tại Cổng nhân viên
   const handleSendEmail = (name) => {
-    showToast(`Đã gửi email phiếu lương điện tử bảo mật đến hòm thư của ${name}!`);
+    showToast(`${name} có thể xem và in phiếu lương tại Cổng nhân viên (mục Bảng lương) sau khi bảng lương được duyệt.`);
   };
 
   const filteredData = payrollData.filter((item) => {

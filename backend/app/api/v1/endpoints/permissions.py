@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.permissions import CurrentAccount, ensure_self_or_permission, require_permission
 from app.db.session import get_db
 from app.schemas.permission_schemas import (
     AssignRoleRequest,
@@ -16,6 +17,8 @@ from app.services import permission_service
 
 router = APIRouter()
 DbSession = Annotated[Session, Depends(get_db)]
+PermissionViewer = Annotated[dict, Depends(require_permission("PERMISSION_ASSIGN", "EMPLOYEE_VIEW"))]
+PermissionAssigner = Annotated[dict, Depends(require_permission("PERMISSION_ASSIGN"))]
 
 
 @router.get(
@@ -25,6 +28,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 )
 def get_roles_endpoint(
     db: DbSession,
+    account: PermissionViewer,
 ):
     """
     Lấy danh mục các vai trò trong hệ thống (ADMIN, QUAN_LY, TRUONG_NHOM, NHAN_VIEN)
@@ -36,12 +40,13 @@ def get_roles_endpoint(
 @router.get(
     "/all-permissions",
     response_model=list[PermissionItem],
-    summary="[Phân quyền] Danh sách tất cả 16 quyền chức năng trong hệ thống",
+    summary="[Phân quyền] Danh sách tất cả quyền chức năng trong hệ thống",
 )
 def get_all_permissions_endpoint(
     db: DbSession,
+    account: PermissionViewer,
 ):
-    """Lấy danh sách tất cả các quyền chức năng (NHAN_SU, DON_TU, CHAM_CONG, LUONG, KHO, PHAN_QUYEN)."""
+    """Lấy danh sách tất cả các quyền chức năng (NHAN_SU, DON_TU, CHAM_CONG, LUONG, PHAN_QUYEN)."""
     return permission_service.get_all_permissions(db)
 
 
@@ -52,6 +57,7 @@ def get_all_permissions_endpoint(
 )
 def get_role_matrix_endpoint(
     db: DbSession,
+    account: PermissionViewer,
 ):
     """
     Lấy toàn bộ Ma trận phân quyền (Vai trò x Quyền) phục vụ trực tiếp cho giao diện RolePermissions:
@@ -70,6 +76,7 @@ def get_role_matrix_endpoint(
 def get_employee_permissions_endpoint(
     ma_nv: str,
     db: DbSession,
+    account: CurrentAccount,
 ):
     """
     Kiểm tra chi tiết quyền của một nhân viên cụ thể:
@@ -78,8 +85,9 @@ def get_employee_permissions_endpoint(
     - Các quyền tùy chỉnh riêng được cấp thêm hoặc bị thu hồi.
     - Danh sách toàn bộ các quyền thực tế có hiệu lực.
     """
+    clean_id = ensure_self_or_permission(account, ma_nv, "PERMISSION_ASSIGN", "EMPLOYEE_VIEW")
     try:
-        return permission_service.get_employee_permissions(db, ma_nv)
+        return permission_service.get_employee_permissions(db, clean_id)
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err)) from err
 
@@ -93,6 +101,7 @@ def assign_role_endpoint(
     ma_nv: str,
     data: AssignRoleRequest,
     db: DbSession,
+    account: PermissionAssigner,
 ):
     """
     Cấp hoặc thay đổi vai trò hệ thống cho nhân viên:
@@ -100,7 +109,9 @@ def assign_role_endpoint(
     - Hệ thống tự động kích hoạt quyền tương ứng của vai trò mới và đồng bộ tài khoản đăng nhập.
     """
     try:
-        return permission_service.assign_role_to_employee(db, ma_nv, data)
+        return permission_service.assign_role_to_employee(db, ma_nv, data, actor=account)
+    except PermissionError as err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
 
@@ -114,12 +125,15 @@ def update_custom_permissions_endpoint(
     ma_nv: str,
     data: CustomPermissionBatchRequest,
     db: DbSession,
+    account: PermissionAssigner,
 ):
     """
     Cấp thêm quyền đặc thù hoặc thu hồi quyền cụ thể của một nhân sự
     (ghi nhận vào bảng tai_khoan_quyen mà không cần thay đổi vai trò chính).
     """
     try:
-        return permission_service.update_custom_permissions(db, ma_nv, data)
+        return permission_service.update_custom_permissions(db, ma_nv, data, actor=account)
+    except PermissionError as err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err

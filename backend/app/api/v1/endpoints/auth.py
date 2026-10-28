@@ -81,17 +81,8 @@ def employee_login(
     if user is None:
         raise HTTPException(status_code=401, detail="Mã nhân viên hoặc mật khẩu không chính xác")
 
-    role = str(user.get("ma_vai_tro") or "").upper()
-    # Chặn hoàn toàn Admin, Quản lý, Trưởng nhóm đăng nhập từ Cổng nhân viên
-    if role in {"ADMIN", "QUAN_LY", "TRUONG_NHOM"}:
-        raise HTTPException(
-            status_code=403,
-            detail="Tài khoản Quản lý / Quản trị viên không được phép đăng nhập tại đây. Vui lòng sử dụng Cổng Điều Hành (/login-manage)"
-        )
-
-    if role != "NHAN_VIEN":
-        raise HTTPException(status_code=403, detail="Tài khoản không có quyền truy cập Cổng nhân viên")
-
+    # Mọi nhân sự có tài khoản (kể cả Admin, Quản lý, Trưởng nhóm) đều chấm công và nhận lương theo công,
+    # nên đều được đăng nhập Cổng nhân viên. Quyền quản lý chỉ quyết định việc vào Cổng Điều hành.
     return user
 
 

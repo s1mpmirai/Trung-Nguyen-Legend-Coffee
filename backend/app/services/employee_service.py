@@ -1,19 +1,24 @@
 from sqlalchemy.orm import Session
 
+from app.core.datetime_utils import get_vietnam_today
 from app.repositories.employee_repository import (
     cancel_profile_update_request,
     create,
     create_profile_update_request,
+    get_active_employees_for_statistics,
     get_by_cccd,
     get_by_ma_nv,
+    get_degrees_of_employees,
     get_employee_list,
+    get_expiring_contracts,
     get_monthly_personnel_report as repo_get_monthly_report,
     get_pending_profile_request_by_employee,
     get_profile_requests_for_manager,
+    is_active_department,
+    is_active_position,
     review_profile_update_request,
     update_contact,
     update_employee_status as repo_update_status,
-    repo_delete_employee,
 )
 from app.schemas.employee_schemas import (
     employee_contact_update,
@@ -29,6 +34,10 @@ from app.utils.auto_gen import generate_employee_code
 def create_employee(db: Session, data: employee_profile_create) -> dict:
     if data.cccd and get_by_cccd(db, data.cccd) is not None:
         raise ValueError("CCCD đã tồn tại")
+    if not is_active_department(db, data.ma_pb):
+        raise ValueError(f"Phòng ban {data.ma_pb} không tồn tại hoặc đã ngừng hoạt động")
+    if not is_active_position(db, data.ma_cv):
+        raise ValueError(f"Chức vụ {data.ma_cv} không tồn tại hoặc đã ngừng sử dụng")
 
     ma_nv = generate_employee_code(db)
     employee_data = data.model_dump(exclude={"ma_nv", "ma_ngl"})
@@ -183,17 +192,99 @@ def get_monthly_personnel_report(
     return repo_get_monthly_report(db, thang, nam, ma_pb)
 
 
-def delete_employee(db: Session, ma_nv: str) -> dict:
-    """Xóa hoàn toàn nhân sự khỏi hệ thống (DELETE CASCADE)."""
+def delete_employee(db: Session, ma_nv: str, ly_do: str | None = None) -> dict:
+    """
+    Xóa nhân sự theo hình thức xóa mềm: cho thôi việc và KHÓA tài khoản (không xóa tài khoản).
+    Hồ sơ, hợp đồng, chấm công, bảng lương được giữ lại để tra cứu và báo cáo lịch sử.
+    """
+    deactivate_employee(db, ma_nv, ly_do or "Xóa nhân sự khỏi danh sách đang làm việc")
     clean_id = ma_nv.strip().upper().replace("-", "")
-    emp = get_by_ma_nv(db, clean_id)
-    if not emp:
-        raise ValueError(f"Không tìm thấy nhân viên có mã {clean_id}")
-
-    success = repo_delete_employee(db, clean_id)
-    if not success:
-        raise ValueError(f"Không thể xóa nhân sự {clean_id}")
-    return {"message": f"Đã xóa hoàn toàn nhân sự {clean_id} khỏi hệ thống", "ma_nv": clean_id}
+    return {
+        "message": f"Đã xóa nhân sự {clean_id} khỏi danh sách đang làm việc và khóa tài khoản đăng nhập",
+        "ma_nv": clean_id,
+    }
 
 
-
+TRINH_DO_LABELS = {
+    "TIEN_SI": "Tiến sĩ", "THAC_SI": "Thạc sĩ", "DAI_HOC": "Đại học", "CAO_DANG": "Cao đẳng",
+    "TRUNG_CAP": "Trung cấp", "CHUNG_CHI": "Chứng chỉ nghề", "THPT": "THPT", None: "Chưa cập nhật",
+}
+THAM_NIEN_BUCKETS = [(0, 1, "Dưới 1 năm"), (1, 3, "1 – 3 năm"), (3, 5, "3 – 5 năm"), (5, None, "Trên 5 năm")]
+MUC_LUONG_BUCKETS = [
+    (0, 10_000_000, "Dưới 10 triệu"),
+    (10_000_000, 20_000_000, "10 – 20 triệu"),
+    (20_000_000, 30_000_000, "20 – 30 triệu"),
+    (30_000_000, None, "Trên 30 triệu"),
+]
+
+
+def _bucket_label(value: float, buckets: list) -> str:
+    for low, high, label in buckets:
+        if value >= low and (high is None or value < high):
+            return label
+    return buckets[-1][2]
+
+
+def _distribution(labels_in_order: list[str], values: list[str]) -> list[dict]:
+    total = max(len(values), 1)
+    return [
+        {"nhom": label, "so_luong": values.count(label), "ty_le": round(values.count(label) * 100 / total, 1)}
+        for label in labels_in_order
+    ]
+
+
+def get_hr_statistics(db: Session, ma_pb: str | None = None, so_ngay_het_han: int = 60) -> dict:
+    """Thống kê nhân sự đang làm việc theo trình độ, thâm niên, mức lương và hợp đồng sắp hết hạn."""
+    today = get_vietnam_today()
+    employees = get_active_employees_for_statistics(db, ma_pb)
+    degrees = get_degrees_of_employees(db, [e["ma_nv"] for e in employees])
+
+    trinh_do_values, tham_nien_values, luong_values = [], [], []
+    tham_nien_years, luong_list = [], []
+    phong_ban: dict[str, dict] = {}
+    for e in employees:
+        trinh_do_values.append(TRINH_DO_LABELS.get(degrees.get(e["ma_nv"]), "Chưa cập nhật"))
+
+        if e["ngay_vao_lam"]:
+            years = (today - e["ngay_vao_lam"]).days / 365.25
+            tham_nien_years.append(years)
+            tham_nien_values.append(_bucket_label(years, THAM_NIEN_BUCKETS))
+
+        luong = float(e["luong_co_ban"] or 0)
+        if luong > 0:
+            luong_list.append(luong)
+            luong_values.append(_bucket_label(luong, MUC_LUONG_BUCKETS))
+            pb = phong_ban.setdefault(e["ten_pb"] or e["ma_pb"], {"luong": []})
+            pb["luong"].append(luong)
+
+    trinh_do_order = [TRINH_DO_LABELS[k] for k in TRINH_DO_LABELS]
+    luong_theo_phong_ban = sorted(
+        (
+            {
+                "ten_pb": ten_pb,
+                "so_nhan_su": len(v["luong"]),
+                "tong_quy_luong": sum(v["luong"]),
+                "luong_trung_binh": round(sum(v["luong"]) / len(v["luong"])),
+                "luong_thap_nhat": min(v["luong"]),
+                "luong_cao_nhat": max(v["luong"]),
+            }
+            for ten_pb, v in phong_ban.items()
+        ),
+        key=lambda x: x["tong_quy_luong"],
+        reverse=True,
+    )
+
+    return {
+        "ngay_thong_ke": today,
+        "tong_nhan_su": len(employees),
+        "tham_nien_trung_binh": round(sum(tham_nien_years) / len(tham_nien_years), 1) if tham_nien_years else 0,
+        "luong_trung_binh": round(sum(luong_list) / len(luong_list)) if luong_list else 0,
+        "luong_thap_nhat": min(luong_list) if luong_list else 0,
+        "luong_cao_nhat": max(luong_list) if luong_list else 0,
+        "trinh_do": [d for d in _distribution(trinh_do_order, trinh_do_values) if d["so_luong"] > 0],
+        "tham_nien": _distribution([b[2] for b in THAM_NIEN_BUCKETS], tham_nien_values),
+        "muc_luong": _distribution([b[2] for b in MUC_LUONG_BUCKETS], luong_values),
+        "luong_theo_phong_ban": luong_theo_phong_ban,
+        "hop_dong_sap_het_han": get_expiring_contracts(db, today, so_ngay_het_han, ma_pb),
+    }
+

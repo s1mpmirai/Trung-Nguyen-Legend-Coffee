@@ -2,6 +2,19 @@ from datetime import date
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.core.datetime_utils import get_vietnam_now
+from app.utils.sorting import build_order_by
+
+CONTRACT_SORT_COLUMNS = {
+    "ma_hd": "hd.ma_hd",
+    "ma_nv": "hd.ma_nv",
+    "ho_ten": "nv.ho_ten",
+    "loai_hd": "hd.loai_hd",
+    "ngay_ky": "hd.ngay_ky",
+    "ngay_bat_dau": "hd.ngay_bat_dau",
+    "ngay_ket_thuc": "hd.ngay_ket_thuc",
+    "luong_co_ban": "hd.luong_co_ban",
+    "trang_thai": "hd.trang_thai",
+}
 
 
 def generate_contract_code(db: Session) -> str:
@@ -27,6 +40,8 @@ def get_contract_list(
     loai_hd: str | None = None,
     trang_thai: str | None = None,
     expiring_days: int | None = None,
+    sort_by: str | None = None,
+    sort_order: str | None = None,
 ) -> dict:
     offset = (page - 1) * page_size
     conditions = ["1=1"]
@@ -43,6 +58,9 @@ def get_contract_list(
     if trang_thai:
         conditions.append("hd.trang_thai = :trang_thai")
         params["trang_thai"] = trang_thai.strip()
+    else:
+        # Hợp đồng đã hủy (xóa mềm) chỉ hiện khi lọc đúng trạng thái DA_HUY
+        conditions.append("hd.trang_thai <> 'DA_HUY'")
 
     if expiring_days is not None:
         conditions.append("hd.trang_thai = 'HIEU_LUC' AND hd.ngay_ket_thuc IS NOT NULL AND DATEDIFF(hd.ngay_ket_thuc, CURDATE()) BETWEEN 0 AND :expiring_days")
@@ -66,6 +84,8 @@ def get_contract_list(
         FROM hop_dong_lao_dong
     """
     stats_row = db.execute(text(stats_query)).mappings().first()
+
+    order_sql = build_order_by(sort_by, sort_order, CONTRACT_SORT_COLUMNS, "hd.ngay_bat_dau DESC, hd.ma_hd ASC")
 
     query = f"""
         SELECT 
@@ -99,7 +119,7 @@ def get_contract_list(
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
         WHERE {where_sql}
-        ORDER BY hd.ngay_bat_dau DESC
+        {order_sql}
         LIMIT :limit OFFSET :offset
     """
     params["limit"] = page_size
@@ -251,6 +271,44 @@ def liquidate_contract(db: Session, ma_hd: str, ngay_ket_thuc: date | None = Non
 
 
 def delete_contract(db: Session, ma_hd: str) -> bool:
-    db.execute(text("DELETE FROM hop_dong_lao_dong WHERE ma_hd = :ma_hd"), {"ma_hd": ma_hd})
+    trang_thai = db.execute(
+        text("SELECT trang_thai FROM hop_dong_lao_dong WHERE ma_hd = :ma_hd"),
+        {"ma_hd": ma_hd},
+    ).scalar()
+    if trang_thai == "HIEU_LUC":
+        raise ValueError(
+            f"Không thể xóa hợp đồng {ma_hd} đang hiệu lực. Vui lòng thanh lý hợp đồng trước khi xóa!"
+        )
+
+    if trang_thai is None:
+        return False
+    if trang_thai == "DA_HUY":
+        raise ValueError(f"Hợp đồng {ma_hd} đã được xóa trước đó.")
+
+    # Xóa mềm: giữ bản ghi để tra cứu lịch sử, không còn tính vào thâm niên / lương
+    db.execute(
+        text("UPDATE hop_dong_lao_dong SET trang_thai = 'DA_HUY', ngay_cap_nhat = :now WHERE ma_hd = :ma_hd"),
+        {"ma_hd": ma_hd, "now": get_vietnam_now()},
+    )
     db.commit()
     return True
+
+
+def restore_contract(db: Session, ma_hd: str) -> dict | None:
+    """Khôi phục hợp đồng đã xóa: hết hạn nếu đã qua ngày kết thúc, ngược lại về trạng thái đã thanh lý."""
+    result = db.execute(
+        text("""
+            UPDATE hop_dong_lao_dong
+            SET trang_thai = CASE
+                    WHEN ngay_ket_thuc IS NOT NULL AND ngay_ket_thuc < CURDATE() THEN 'HET_HAN'
+                    ELSE 'DA_THANH_LY'
+                END,
+                ngay_cap_nhat = :now
+            WHERE ma_hd = :ma_hd AND trang_thai = 'DA_HUY'
+        """),
+        {"ma_hd": ma_hd, "now": get_vietnam_now()},
+    )
+    db.commit()
+    if result.rowcount == 0:
+        return None
+    return get_contract_by_id(db, ma_hd)

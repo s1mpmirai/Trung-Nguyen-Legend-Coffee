@@ -44,11 +44,12 @@ class employee_profile(BaseModel):
 class employee_profile_create(employee_profile):
     """Schema tạo mới nhân viên (mã nhân viên được sinh tự động bởi hệ thống)."""
     ma_nv: Optional[str] = Field(None, description="Tự động sinh (bỏ trống khi tạo)")
+    loai_hd: Optional[str] = Field("THU_VIEC", description="Loại hợp đồng ký khi tiếp nhận")
 
 
 class employee_profile_response(employee_profile):
     """Schema trả về thông tin cơ bản nhân viên."""
-    pass
+    loai_hd: Optional[str] = Field(None, description="Loại hợp đồng hiện hành")
 
 
 class employee_list_response(BaseModel):

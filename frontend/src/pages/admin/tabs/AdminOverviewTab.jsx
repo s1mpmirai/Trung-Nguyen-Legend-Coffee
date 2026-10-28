@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import {
   Users,
   KeyRound,
-  Package,
+  Building2,
+  AlertCircle,
   FileText,
-  CheckCircle2,
   ShieldCheck,
   Sparkles,
   Loader2,
@@ -50,7 +50,8 @@ export default function AdminOverviewTab({ onNavigateTab }) {
   }
 
   const summary = stats || {};
-  const totalEmployees = summary.tong_nhan_su || 20;
+  // Phân bố phòng ban chỉ đếm nhân sự đang làm việc nên tỷ lệ % tính trên cùng mẫu số
+  const activeEmployees = summary.nhan_su_dang_lam || 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -91,6 +92,13 @@ export default function AdminOverviewTab({ onNavigateTab }) {
         </div>
       </div>
 
+      {errorMessage && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl flex items-center gap-3 text-xs font-semibold">
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
       {/* ───────────────── 1. BỐN THẺ CHỈ SỐ CỐT LÕI (4 KEY METRIC CARDS) ───────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* Metric 1: Tổng nhân sự */}
@@ -105,12 +113,12 @@ export default function AdminOverviewTab({ onNavigateTab }) {
           </div>
           <div className="mt-4">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-3xl text-slate-900 tracking-tight">
-              {summary.tong_nhan_su || 20}
+              {summary.tong_nhan_su ?? 0}
             </span>
             <div className="flex items-center gap-2 mt-1.5 text-xs">
-              <span className="text-emerald-600 font-semibold">{summary.nhan_su_dang_lam || 19} đang làm</span>
+              <span className="text-emerald-600 font-semibold">{summary.nhan_su_dang_lam ?? 0} đang làm</span>
               <span className="text-slate-300">•</span>
-              <span className="text-sky-600 font-medium">{summary.nhan_su_thu_viec || 1} thử việc</span>
+              <span className="text-sky-600 font-medium">{summary.nhan_su_thu_viec ?? 0} thử việc</span>
             </div>
           </div>
         </div>
@@ -128,34 +136,35 @@ export default function AdminOverviewTab({ onNavigateTab }) {
           </div>
           <div className="mt-4">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-3xl text-slate-900 tracking-tight">
-              {summary.tong_tai_khoan || 9}
+              {summary.tong_tai_khoan ?? 0}
             </span>
             <div className="flex items-center gap-2 mt-1.5 text-xs">
-              <span className="text-emerald-600 font-semibold">{summary.tai_khoan_hoat_dong || 9} hoạt động</span>
+              <span className="text-emerald-600 font-semibold">{summary.tai_khoan_hoat_dong ?? 0} hoạt động</span>
               <span className="text-slate-300">•</span>
-              <span className="text-amber-600 font-medium">{summary.nhan_su_chua_co_tai_khoan || 10} chưa cấp</span>
+              <span className="text-amber-600 font-medium">{summary.nhan_su_chua_co_tai_khoan ?? 0} chưa cấp</span>
             </div>
           </div>
         </div>
 
-        {/* Metric 3: Kho hàng & Sản phẩm */}
+        {/* Metric 3: Cơ cấu tổ chức */}
         <div
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between cursor-default"
+          onClick={() => onNavigateTab("departments")}
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-sky-300 transition-all cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Kho hàng & Mặt hàng</span>
+            <span className="text-xs font-semibold text-slate-500">Cơ cấu tổ chức</span>
             <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-              <Package size={18} />
+              <Building2 size={18} />
             </div>
           </div>
           <div className="mt-4">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-3xl text-slate-900 tracking-tight">
-              {summary.tong_san_pham || 10}
+              {summary.tong_phong_ban ?? 0}
             </span>
             <div className="flex items-center gap-2 mt-1.5 text-xs">
-              <span className="text-slate-600 font-medium">Tồn: {new Intl.NumberFormat("vi-VN").format(summary.tong_so_luong_ton_kho || 9900)}</span>
+              <span className="text-slate-600 font-medium">phòng ban hoạt động</span>
               <span className="text-slate-300">•</span>
-              <span className="text-rose-600 font-semibold">{summary.san_pham_canh_bao_ton_it || 2} ít hàng</span>
+              <span className="text-sky-600 font-semibold">{summary.tong_chuc_vu ?? 0} chức vụ</span>
             </div>
           </div>
         </div>
@@ -172,12 +181,12 @@ export default function AdminOverviewTab({ onNavigateTab }) {
           </div>
           <div className="mt-4">
             <span className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-3xl text-slate-900 tracking-tight">
-              {summary.tong_hop_dong || 20}
+              {summary.tong_hop_dong ?? 0}
             </span>
             <div className="flex items-center gap-2 mt-1.5 text-xs">
-              <span className="text-emerald-600 font-semibold">{summary.hop_dong_hieu_luc || 19} hiệu lực</span>
+              <span className="text-emerald-600 font-semibold">{summary.hop_dong_hieu_luc ?? 0} hiệu lực</span>
               <span className="text-slate-300">•</span>
-              <span className="text-amber-600 font-medium">{summary.hop_dong_sap_het_han_30_ngay || 0} sắp hết</span>
+              <span className="text-amber-600 font-medium">{summary.hop_dong_sap_het_han_30_ngay ?? 0} sắp hết</span>
             </div>
           </div>
         </div>
@@ -192,13 +201,13 @@ export default function AdminOverviewTab({ onNavigateTab }) {
               <h3 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-base text-slate-900">
                 Cơ Cấu Nhân Sự Theo Phòng Ban
               </h3>
-              <p className="text-xs text-slate-500">Phân bố {totalEmployees} nhân sự trong 8 phòng ban</p>
+              <p className="text-xs text-slate-500">Phân bố {activeEmployees} nhân sự đang làm việc trong {summary.tong_phong_ban ?? 0} phòng ban</p>
             </div>
           </div>
 
           <div className="space-y-3.5 mt-3">
             {(summary.phan_bo_phong_ban || []).map((pb) => {
-              const percent = Math.round((pb.so_luong_nv / (totalEmployees || 1)) * 100);
+              const percent = Math.round((pb.so_luong_nv / (activeEmployees || 1)) * 100);
               return (
                 <div key={pb.ma_pb} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
@@ -306,13 +315,14 @@ export default function AdminOverviewTab({ onNavigateTab }) {
                 <span className="text-[11px] text-slate-400">Đồng bộ tức thời</span>
               </button>
 
-              <div
-                className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-1.5 text-left cursor-default"
+              <button
+                onClick={() => onNavigateTab("employees")}
+                className="p-3 rounded-xl border border-slate-200 hover:border-sky-300 hover:bg-sky-50/50 flex flex-col gap-1.5 transition text-left cursor-pointer"
               >
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                <span className="font-semibold text-xs text-slate-800">Hệ thống ổn định</span>
-                <span className="text-[11px] text-emerald-600 font-medium">Hoạt động 100%</span>
-              </div>
+                <Users className="w-5 h-5 text-sky-600" />
+                <span className="font-semibold text-xs text-slate-800">Danh bạ nhân sự</span>
+                <span className="text-[11px] text-slate-400">Tìm kiếm nâng cao & sắp xếp</span>
+              </button>
             </div>
           </div>
         </div>

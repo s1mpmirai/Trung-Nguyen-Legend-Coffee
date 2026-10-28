@@ -42,5 +42,5 @@ class leave_response(BaseModel):
 class leave_review_request(BaseModel):
     """Schema duyệt hoặc từ chối đơn từ của Quản lý."""
     trang_thai: str = Field(..., description="Trạng thái: DA_DUYET hoặc TU_CHOI")
-    nguoi_duyet: str = Field(..., description="Mã quản lý duyệt đơn (vd: NV01, NV02)")
+    nguoi_duyet: Optional[str] = Field(None, description="Bỏ qua: người duyệt luôn lấy từ tài khoản đang đăng nhập")
     y_kien_duyet: Optional[str] = Field(None, description="Ý kiến phản hồi của quản lý")
