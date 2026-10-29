@@ -34,6 +34,7 @@ CREATE TABLE chuc_vu (
     cap_bac TINYINT DEFAULT 1 COMMENT '1=NV, 2=Tổ trưởng, 3=Phó/Trưởng phòng, 4=Phó GĐ, 5=Ban GĐ',
     phu_cap_chuc_vu DECIMAL(12,0) DEFAULT 0,
     mo_ta VARCHAR(255),
+    trang_thai TINYINT(1) DEFAULT 1,
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB COMMENT='Danh mục chức vụ';
@@ -49,7 +50,7 @@ CREATE TABLE bac_luong (
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE (ma_cv, bac),
-    CONSTRAINT fk_bl_chucvu FOREIGN KEY (ma_cv) REFERENCES chuc_vu(ma_cv) ON UPDATE CASCADE ON DELETE CASCADE
+    CONSTRAINT fk_bl_chucvu FOREIGN KEY (ma_cv) REFERENCES chuc_vu(ma_cv) ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB COMMENT='Hệ số lương theo chức vụ và bậc';
 
 -- 5. Hồ sơ nhân viên
@@ -95,7 +96,7 @@ CREATE TABLE bang_cap (
     ghi_chu VARCHAR(255),
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_bc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE
+    CONSTRAINT fk_bc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB COMMENT='Trình độ bằng cấp nhân sự';
 
 -- 7. Hợp đồng lao động
@@ -116,7 +117,7 @@ CREATE TABLE hop_dong_lao_dong (
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT ck_hd_luong CHECK (luong_co_ban > 0),
-    CONSTRAINT fk_hd_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE
+    CONSTRAINT fk_hd_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB COMMENT='Hợp đồng lao động';
 
 -- 8. Đơn từ
@@ -136,7 +137,7 @@ CREATE TABLE don_tu (
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT ck_don_songay CHECK (so_ngay > 0),
     CONSTRAINT ck_don_ngay CHECK (ngay_ket_thuc >= ngay_bat_dau),
-    CONSTRAINT fk_don_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_don_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_don_nguoiduyet FOREIGN KEY (nguoi_duyet) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Đơn từ nghỉ phép';
 
@@ -170,7 +171,7 @@ CREATE TABLE bang_cham_cong (
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE (ma_nv, ngay_cong),
-    CONSTRAINT fk_cc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_cc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_cc_ca FOREIGN KEY (ma_ca) REFERENCES ca_lam_viec(ma_ca) ON UPDATE CASCADE ON DELETE SET NULL,
     CONSTRAINT fk_cc_don FOREIGN KEY (ma_don) REFERENCES don_tu(ma_don) ON UPDATE CASCADE ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Bảng chấm công hàng ngày';
@@ -188,8 +189,8 @@ CREATE TABLE IF NOT EXISTS lich_su_dieu_chinh_cong (
     gio_ra_moi TIME NULL,
     ly_do VARCHAR(255) NULL,
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_ls_cc FOREIGN KEY (ma_cc) REFERENCES bang_cham_cong(ma_cc) ON DELETE CASCADE,
-    CONSTRAINT fk_ls_nv FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON DELETE CASCADE
+    CONSTRAINT fk_ls_cc FOREIGN KEY (ma_cc) REFERENCES bang_cham_cong(ma_cc) ON DELETE RESTRICT,
+    CONSTRAINT fk_ls_nv FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON DELETE RESTRICT
 ) ENGINE=InnoDB COMMENT='Lịch sử quản lý sửa chấm công nhân viên';
 
 -- 10.2. Yêu cầu cập nhật hồ sơ cá nhân nhân viên (Chờ Quản lý phê duyệt mới lưu DB)
@@ -205,7 +206,7 @@ CREATE TABLE IF NOT EXISTS yeu_cau_cap_nhat_ho_so (
     y_kien_duyet VARCHAR(500) NULL,
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_yc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON DELETE CASCADE,
+    CONSTRAINT fk_yc_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON DELETE RESTRICT,
     CONSTRAINT fk_yc_nguoiduyet FOREIGN KEY (nguoi_duyet) REFERENCES nhan_vien(ma_nv) ON DELETE SET NULL
 ) ENGINE=InnoDB COMMENT='Yêu cầu cập nhật hồ sơ cá nhân nhân viên';
 
@@ -234,13 +235,17 @@ CREATE TABLE bang_luong (
     he_so_luong DECIMAL(4,2) DEFAULT 1.00,
     so_cong_chuan DECIMAL(4,1) NOT NULL DEFAULT 26.0,
     so_cong_thuc_te DECIMAL(4,1) DEFAULT 0,
+    so_gio_tang_ca DECIMAL(5,2) DEFAULT 0 COMMENT 'Không dùng: đề tài không tính làm thêm giờ',
     luong_theo_cong DECIMAL(12,0) DEFAULT 0,
+    tien_tang_ca DECIMAL(12,0) DEFAULT 0 COMMENT 'Không dùng: đề tài không tính làm thêm giờ',
     tong_phu_cap DECIMAL(12,0) DEFAULT 0,
     tien_thuong DECIMAL(12,0) DEFAULT 0,
     luong_gross DECIMAL(12,0) DEFAULT 0,
     bhxh DECIMAL(12,0) DEFAULT 0,
     bhyt DECIMAL(12,0) DEFAULT 0,
     bhtn DECIMAL(12,0) DEFAULT 0,
+    giam_tru_gia_canh DECIMAL(12,0) DEFAULT 0,
+    thu_nhap_tinh_thue DECIMAL(12,0) DEFAULT 0,
     thue_tncn DECIMAL(12,0) DEFAULT 0,
     khau_tru_khac DECIMAL(12,0) DEFAULT 0,
     tong_khau_tru DECIMAL(12,0) DEFAULT 0,
@@ -251,7 +256,7 @@ CREATE TABLE bang_luong (
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE (thang, nam, ma_nv),
     CONSTRAINT ck_bl_thang CHECK (thang BETWEEN 1 AND 12),
-    CONSTRAINT fk_bl_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE
+    CONSTRAINT fk_bl_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB COMMENT='Bảng tính lương tháng nhân viên';
 
 -- 12. Vai trò hệ thống
@@ -284,7 +289,7 @@ CREATE TABLE tai_khoan (
     lan_dn_cuoi DATETIME NULL,
     ngay_tao DATETIME DEFAULT CURRENT_TIMESTAMP,
     ngay_cap_nhat DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_tk_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_tk_nhanvien FOREIGN KEY (ma_nv) REFERENCES nhan_vien(ma_nv) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT fk_tk_vaitro FOREIGN KEY (ma_vai_tro) REFERENCES vai_tro(ma_vai_tro) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
@@ -444,13 +449,13 @@ INSERT INTO hop_dong_lao_dong (ma_hd, ma_nv, loai_hd, ngay_ky, ngay_bat_dau, nga
 -- 8. Đơn từ
 INSERT INTO don_tu (ma_don, ma_nv, loai_don, ngay_bat_dau, ngay_ket_thuc, so_ngay, ly_do,
   trang_thai, nguoi_duyet, ngay_duyet, y_kien_duyet) VALUES
-('DT-001','NV10','NGHI_PHEP',        '2026-09-05','2026-09-06',   2.0,'Nghỉ phép năm đi du lịch',               'DA_DUYET', 'NV02','2026-08-26 09:00:00','Đồng ý'),
+('DT-001','NV10','NGHI_PHEP',        '2026-09-07','2026-09-08',   2.0,'Nghỉ phép năm đi du lịch',               'DA_DUYET', 'NV02','2026-08-26 09:00:00','Đồng ý'),
 ('DT-002','NV12','NGHI_OM',          '2026-09-10','2026-09-11',   2.0,'Nghỉ ốm sốt siêu vi, có giấy bác sĩ',  'DA_DUYET', 'NV04','2026-09-10 08:30:00','Đồng ý, nghỉ dưỡng bệnh'),
 ('DT-003','NV14','NGHI_PHEP',        '2026-09-15','2026-09-15',   1.0,'Nghỉ phép giải quyết việc gia đình',     'DA_DUYET', 'NV06','2026-09-14 15:00:00','OK'),
 ('DT-004','NV08','NGHI_PHEP',        '2026-09-20','2026-09-22',   3.0,'Đi công tác kết hợp nghỉ phép',          'CHO_DUYET',NULL,  NULL,                  NULL),
 ('DT-005','NV18','NGHI_PHEP',        '2026-09-25','2026-09-25',   1.0,'Nghỉ phép việc gia đình',                'CHO_DUYET',NULL,  NULL,                  NULL),
 ('DT-006','NV19','NGHI_KHONG_LUONG', '2026-09-30','2026-09-30',   1.0,'Nghỉ không lương giải quyết việc riêng', 'TU_CHOI',   'NV05','2026-09-16 08:00:00','Từ chối — cuối tháng cần nhân sự'),
-('DT-007','NV11','NGHI_THAI_SAN',    '2026-10-01','2027-03-31', 182.0,'Nghỉ thai sản theo chế độ nhà nước',    'DA_DUYET', 'NV02','2026-09-05 10:00:00','Đồng ý theo chế độ BHXH'),
+('DT-007','NV12','NGHI_THAI_SAN',    '2026-10-01','2027-03-31', 182.0,'Nghỉ thai sản theo chế độ nhà nước',    'DA_DUYET', 'NV04','2026-09-05 10:00:00','Đồng ý theo chế độ BHXH'),
 ('DT-008','NV20','NGHI_VIEC',        '2025-12-01','2025-12-31',  30.0,'Xin nghỉ việc theo nguyện vọng cá nhân', 'DA_DUYET', 'NV02','2025-12-05 14:00:00','Đã thanh lý hợp đồng');
 
 -- 9. Ca làm việc
@@ -460,38 +465,39 @@ INSERT INTO ca_lam_viec (ma_ca, ten_ca, gio_vao, gio_ra, so_gio_chuan, he_so) VA
 ('CA03', 'Ca chiều',   '14:00:00', '22:00:00', 8.00, 1.00);
 
 -- 10. Chấm công
-INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_vao, gio_ra, so_gio_lam, so_gio_tang_ca, loai_cong, so_cong, ghi_chu) VALUES
-('NV02','2026-09-01','CA01','07:55:00','17:05:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV02','2026-09-02','CA01','07:50:00','17:10:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV02','2026-09-03','CA01','08:15:00','17:00:00',7.75,0.00,'DI_TRE', 0.50,'Đi trễ 15 phút'),
-('NV02','2026-09-04','CA01','07:58:00','17:00:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV10','2026-09-01','CA01','07:50:00','17:00:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV10','2026-09-02','CA01','07:55:00','17:05:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV10','2026-09-05',NULL,  NULL,      NULL,      0.00,0.00,'NGHI_PHEP',0.00,'Nghỉ phép năm'),
-('NV10','2026-09-06',NULL,  NULL,      NULL,      0.00,0.00,'NGHI_PHEP',0.00,'Nghỉ phép năm'),
-('NV07','2026-09-01','CA02','05:50:00','14:05:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV07','2026-09-02','CA02','05:45:00','14:00:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV07','2026-09-03','CA02','05:55:00','16:00:00',8.00,2.00,'CONG_DU',1.00,'OT 2 giờ'),
-('NV15','2026-09-01','CA03','13:50:00','22:05:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV15','2026-09-02','CA03','13:45:00','22:00:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV09','2026-09-01','CA01','07:58:00','17:00:00',8.00,0.00,'CONG_DU',1.00,NULL),
-('NV09','2026-09-03','CA01','07:50:00','20:00:00',8.00,3.00,'CONG_DU',1.00,'OT 3 giờ deploy');
+INSERT INTO bang_cham_cong (ma_nv, ngay_cong, ma_ca, gio_vao, gio_ra, so_gio_lam, so_gio_tang_ca, loai_cong, so_cong, trang_thai_duyet, ma_don, ghi_chu) VALUES
+('NV02','2026-09-03','CA01','07:55:00','17:05:00',8.00,0.00,'CONG_DU',1.00,'DA_DUYET',NULL,NULL),
+('NV02','2026-09-04','CA01','08:25:00','17:00:00',8.00,0.00,'DI_TRE', 1.00,'DA_DUYET',NULL,'Đi muộn 25p (Hành chính - Lần 1/3 trong tháng)'),
+('NV02','2026-09-07','CA01','07:58:00','17:00:00',8.00,0.00,'CONG_DU',1.00,'DA_DUYET',NULL,NULL),
+('NV02','2026-09-08','CA01','07:50:00','17:10:00',8.00,0.00,'CONG_DU',1.00,'DA_DUYET',NULL,NULL),
+('NV10','2026-09-03','CA01','07:50:00','17:00:00',8.00,0.00,'CONG_DU',1.00,'CHO_DUYET',NULL,NULL),
+('NV10','2026-09-04','CA01','07:55:00','17:05:00',8.00,0.00,'CONG_DU',1.00,'CHO_DUYET',NULL,NULL),
+('NV10','2026-09-07',NULL,  NULL,      NULL,      0.00,0.00,'NGHI_PHEP',1.00,'DA_DUYET','DT-001','Nghỉ phép năm có lương'),
+('NV10','2026-09-08',NULL,  NULL,      NULL,      0.00,0.00,'NGHI_PHEP',1.00,'DA_DUYET','DT-001','Nghỉ phép năm có lương'),
+('NV07','2026-09-03','CA02','05:50:00','14:05:00',8.00,0.00,'CONG_DU',1.00,'CHO_DUYET',NULL,NULL),
+('NV07','2026-09-04','CA02','05:45:00','14:00:00',8.00,0.00,'CONG_DU',1.00,'CHO_DUYET',NULL,NULL),
+('NV07','2026-09-07','CA02','05:55:00','13:30:00',7.58,0.00,'VE_SOM', 1.00,'CHO_DUYET',NULL,'Về sớm 30p (7.6h)'),
+('NV15','2026-09-03','CA03','13:50:00','22:05:00',8.00,0.00,'CONG_DU',1.00,'CHO_DUYET',NULL,NULL),
+('NV15','2026-09-04','CA03','13:45:00','22:00:00',8.00,0.00,'CONG_DU',1.00,'CHO_DUYET',NULL,NULL),
+('NV09','2026-09-03','CA01','07:58:00','17:00:00',8.00,0.00,'CONG_DU',1.00,'CHO_DUYET',NULL,NULL),
+('NV09','2026-09-04','CA01','07:50:00','17:05:00',8.00,0.00,'CONG_DU',1.00,'CHO_DUYET',NULL,NULL);
 
 -- 11. Bảng lương
+-- Tháng 8/2026: 21 công chuẩn (T2-T6, không có ngày lễ). Số liệu sinh bằng payroll_service.compute_payroll_line.
 INSERT INTO bang_luong (thang, nam, ma_nv, luong_co_ban, he_so_luong, so_cong_chuan, so_cong_thuc_te,
   luong_theo_cong, tong_phu_cap, tien_thuong,
-  luong_gross, bhxh, bhyt, bhtn, thue_tncn, khau_tru_khac, tong_khau_tru, luong_net,
+  luong_gross, bhxh, bhyt, bhtn, giam_tru_gia_canh, thu_nhap_tinh_thue, thue_tncn, khau_tru_khac, tong_khau_tru, luong_net,
   trang_thai, ghi_chu) VALUES
-(8,2026,'NV01',80000000,5.00,22.0,22.0,80000000,15000000,5000000,100000000,6400000,1200000,800000,20000000,0,28400000,71600000,'DA_DUYET','Tổng Giám đốc'),
-(8,2026,'NV02',35000000,2.20,22.0,22.0,35000000, 3000000,      0, 38000000,2800000, 525000,350000, 4000000,0, 7675000,30325000,'DA_DUYET',NULL),
-(8,2026,'NV03',32000000,2.20,22.0,22.0,32000000, 3000000,      0, 35000000,2560000, 480000,320000, 3000000,0, 6360000,28640000,'DA_DUYET',NULL),
-(8,2026,'NV04',30000000,2.20,22.0,22.0,30000000, 3000000,      0, 33000000,2400000, 450000,300000, 2500000,0, 5650000,27350000,'DA_DUYET',NULL),
-(8,2026,'NV05',30000000,2.20,22.0,22.0,30000000, 3000000,3000000, 36000000,2400000, 450000,300000, 2800000,0, 5950000,30050000,'DA_DUYET','Thưởng doanh số'),
-(8,2026,'NV06',33000000,2.20,22.0,22.0,33000000, 3000000,      0, 36000000,2640000, 495000,330000, 3200000,0, 6665000,29335000,'DA_DUYET',NULL),
-(8,2026,'NV07',25000000,2.20,22.0,22.0,25000000, 3000000,1000000, 29000000,2000000, 375000,250000, 1500000,0, 4125000,24875000,'DA_DUYET',NULL),
-(8,2026,'NV08',18000000,1.80,22.0,22.0,18000000, 2000000,      0, 20000000,1440000, 270000,180000,  500000,0, 2390000,17610000,'DA_DUYET',NULL),
-(8,2026,'NV09',15000000,1.50,22.0,22.0,15000000, 1000000,      0, 16000000,1200000, 225000,150000,  100000,0, 1675000,14325000,'DA_DUYET',NULL),
-(8,2026,'NV10',10000000,1.00,22.0,20.0, 9090909,       0, 500000,  9590909, 800000, 150000,100000,       0,0, 1050000, 8540909,'DA_DUYET',NULL);
+(8,2026,'NV01',80000000,5.00,21.0,21.0,80000000,15000000,5000000,100000000,3744000,702000,950000,27900000,66704000,10511200,0,15907200,84092800,'DA_TRA','Tổng Giám đốc'),
+(8,2026,'NV02',35000000,2.20,21.0,21.0,35000000,3000000,0,38000000,3040000,570000,380000,21700000,12310000,731000,0,4721000,33279000,'DA_TRA',NULL),
+(8,2026,'NV03',32000000,2.20,21.0,21.0,32000000,3000000,0,35000000,2800000,525000,350000,15500000,15825000,1082500,0,4757500,30242500,'DA_TRA',NULL),
+(8,2026,'NV04',30000000,2.20,21.0,21.0,30000000,3000000,0,33000000,2640000,495000,330000,21700000,7835000,391750,0,3856750,29143250,'DA_TRA',NULL),
+(8,2026,'NV05',30000000,2.20,21.0,21.0,30000000,3000000,3000000,36000000,2640000,495000,330000,15500000,17035000,1203500,0,4668500,31331500,'DA_TRA','Thưởng doanh số'),
+(8,2026,'NV06',33000000,2.20,21.0,21.0,33000000,3000000,0,36000000,2880000,540000,360000,27900000,4320000,216000,0,3996000,32004000,'DA_TRA',NULL),
+(8,2026,'NV07',25000000,2.20,21.0,21.0,25000000,3000000,1000000,29000000,2240000,420000,280000,21700000,4360000,218000,0,3158000,25842000,'DA_TRA',NULL),
+(8,2026,'NV08',18000000,1.80,21.0,21.0,18000000,2000000,0,20000000,1600000,300000,200000,15500000,2400000,120000,0,2220000,17780000,'DA_TRA',NULL),
+(8,2026,'NV09',15000000,1.50,21.0,21.0,15000000,1000000,0,16000000,1280000,240000,160000,15500000,0,0,0,1680000,14320000,'DA_TRA',NULL),
+(8,2026,'NV10',10000000,1.00,21.0,20.0,9523810,0,500000,10023810,800000,150000,100000,15500000,0,0,0,1050000,8973810,'DA_TRA','Nghỉ 1 ngày không lương');
 
 -- 12. Vai trò
 INSERT INTO vai_tro (ma_vai_tro, ten_vai_tro, mo_ta, he_thong) VALUES
