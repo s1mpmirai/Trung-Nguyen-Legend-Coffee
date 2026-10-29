@@ -46,8 +46,8 @@ docker-compose.override.yml
 # ─── Database ─────────────────────────────────────────────────
 *.sql.gz
 *.dump
-database/backup/*
-!database/backup/.gitkeep
+# Chỉ bỏ qua các bản sao lưu (chứa dữ liệu cá nhân, lương); script sao lưu/phục hồi vẫn được commit
+database/backup/files/
 
 # ─── IDE / Editor ─────────────────────────────────────────────
 .vscode/
