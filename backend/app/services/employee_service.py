@@ -1,3 +1,5 @@
+from datetime import date
+
 from sqlalchemy.orm import Session
 
 from app.core.datetime_utils import get_vietnam_today
@@ -40,7 +42,7 @@ def create_employee(db: Session, data: employee_profile_create) -> dict:
         raise ValueError(f"Chức vụ {data.ma_cv} không tồn tại hoặc đã ngừng sử dụng")
 
     ma_nv = generate_employee_code(db)
-    employee_data = data.model_dump(exclude={"ma_nv", "ma_ngl"})
+    employee_data = data.model_dump(exclude={"ma_nv", "ten_nql"})
     employee_data["ma_nv"] = ma_nv
 
     try:
@@ -161,19 +163,28 @@ def change_employee_status(db: Session, ma_nv: str, data: employee_status_update
     return updated
 
 
-def deactivate_employee(db: Session, ma_nv: str, ly_do: str | None = None) -> dict:
-    """Thôi việc / Khóa tài khoản nhân sự (xóa mềm an toàn)."""
+def deactivate_employee(
+    db: Session, ma_nv: str, ly_do: str | None = None, ngay_hieu_luc: date | None = None
+) -> dict:
+    """
+    Cho thôi việc (xóa mềm an toàn) với ngày hiệu lực:
+    - Hôm nay hoặc quá khứ: chuyển DA_NGHI_VIEC, khóa tài khoản, thanh lý HĐ ngay.
+    - Tương lai: lên lịch; đến đúng ngày hệ thống mới chuyển trạng thái và khóa tài khoản.
+    """
     clean_id = ma_nv.strip().upper().replace("-", "")
     emp = get_by_ma_nv(db, clean_id)
     if not emp:
         raise ValueError(f"Không tìm thấy nhân viên có mã {clean_id}")
+    if emp.get("trang_thai") == "DA_NGHI_VIEC":
+        raise ValueError(f"Nhân sự {clean_id} đã nghỉ việc.")
 
     return repo_update_status(
         db=db,
         ma_nv=clean_id,
         trang_thai="DA_NGHI_VIEC",
+        ngay_nghi_viec=ngay_hieu_luc,
         khoa_tai_khoan=True,
-        ly_do=ly_do or "Cho thôi việc / Khóa hồ sơ",
+        ly_do=ly_do or "Cho thôi việc",
     )
 
 
@@ -192,17 +203,20 @@ def get_monthly_personnel_report(
     return repo_get_monthly_report(db, thang, nam, ma_pb)
 
 
-def delete_employee(db: Session, ma_nv: str, ly_do: str | None = None) -> dict:
+def delete_employee(
+    db: Session, ma_nv: str, ly_do: str | None = None, ngay_hieu_luc: date | None = None
+) -> dict:
     """
     Xóa nhân sự theo hình thức xóa mềm: cho thôi việc và KHÓA tài khoản (không xóa tài khoản).
     Hồ sơ, hợp đồng, chấm công, bảng lương được giữ lại để tra cứu và báo cáo lịch sử.
     """
-    deactivate_employee(db, ma_nv, ly_do or "Xóa nhân sự khỏi danh sách đang làm việc")
+    updated = deactivate_employee(db, ma_nv, ly_do or "Xóa nhân sự khỏi danh sách đang làm việc", ngay_hieu_luc)
     clean_id = ma_nv.strip().upper().replace("-", "")
-    return {
-        "message": f"Đã xóa nhân sự {clean_id} khỏi danh sách đang làm việc và khóa tài khoản đăng nhập",
-        "ma_nv": clean_id,
-    }
+    if updated and updated.get("trang_thai") != "DA_NGHI_VIEC":
+        message = f"Đã lên lịch thôi việc cho {clean_id} từ ngày {updated['ngay_nghi_viec']:%d/%m/%Y}"
+    else:
+        message = f"Đã xóa nhân sự {clean_id} khỏi danh sách đang làm việc và khóa tài khoản đăng nhập"
+    return {"message": message, "ma_nv": clean_id, "ngay_nghi_viec": updated.get("ngay_nghi_viec") if updated else None}
 
 
 TRINH_DO_LABELS = {

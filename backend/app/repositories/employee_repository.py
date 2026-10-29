@@ -7,6 +7,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from app.core.datetime_utils import get_vietnam_now
+from app.repositories.holiday_repository import get_holidays
 from app.utils.work_calendar import count_working_days, month_bounds
 
 
@@ -53,9 +54,25 @@ def contract_end_date(start: date, loai_hd: str) -> date | None:
     return date(year, month, min(start.day, last_day)) - timedelta(days=1)
 
 
+def resolve_direct_manager(db: Session, ma_pb: str, ma_nql: str | None) -> str | None:
+    """Quản lý trực tiếp của nhân sự mới: mã được chọn, mặc định là trưởng phòng ban."""
+    if ma_nql:
+        row = db.execute(
+            text("SELECT ma_nv FROM nhan_vien WHERE ma_nv = :ma_nv AND trang_thai <> 'DA_NGHI_VIEC'"),
+            {"ma_nv": ma_nql.strip().upper()},
+        ).scalar()
+        if row is None:
+            raise ValueError(f"Quản lý trực tiếp {ma_nql} không tồn tại hoặc đã nghỉ việc")
+        return row
+    return db.execute(
+        text("SELECT ma_truong_pb FROM phong_ban WHERE ma_pb = :ma_pb"), {"ma_pb": ma_pb}
+    ).scalar()
+
+
 def create(db: Session, employee: dict) -> dict:
     if "hinh_thuc_lam_viec" not in employee or not employee["hinh_thuc_lam_viec"]:
         employee["hinh_thuc_lam_viec"] = "FULL_TIME"
+    employee["ma_nql"] = resolve_direct_manager(db, employee["ma_pb"], employee.get("ma_nql"))
     
     nv_data = {
         "ma_nv": employee["ma_nv"],
@@ -69,6 +86,7 @@ def create(db: Session, employee: dict) -> dict:
         "so_nguoi_pt": employee.get("so_nguoi_pt", 0),
         "ma_pb": employee["ma_pb"],
         "ma_cv": employee["ma_cv"],
+        "ma_nql": employee["ma_nql"],
         "ngay_nghi_viec": employee.get("ngay_nghi_viec"),
         "trang_thai": employee.get("trang_thai", "DANG_LAM"),
         "hinh_thuc_lam_viec": employee.get("hinh_thuc_lam_viec", "FULL_TIME"),
@@ -83,11 +101,11 @@ def create(db: Session, employee: dict) -> dict:
             """
             INSERT INTO nhan_vien (
                 ma_nv, ho_ten, ngay_sinh, gioi_tinh, cccd, dia_chi, sdt, email,
-                so_nguoi_pt, ma_pb, ma_cv, ma_bac, ngay_nghi_viec,
+                so_nguoi_pt, ma_pb, ma_cv, ma_bac, ma_nql, ngay_nghi_viec,
                 trang_thai, hinh_thuc_lam_viec
             ) VALUES (
                 :ma_nv, :ho_ten, :ngay_sinh, :gioi_tinh, :cccd, :dia_chi, :sdt, :email,
-                :so_nguoi_pt, :ma_pb, :ma_cv, :ma_bac, :ngay_nghi_viec,
+                :so_nguoi_pt, :ma_pb, :ma_cv, :ma_bac, :ma_nql, :ngay_nghi_viec,
                 :trang_thai, :hinh_thuc_lam_viec
             )
             """
@@ -313,12 +331,24 @@ def get_employee_list(
 TOP_LEVEL_AUTO_APPROVE_NOTE = "Tự động duyệt - không có cấp trên"
 
 
+TOP_LEVEL_CAP_BAC = 5
+
+
 def is_top_level_employee(db: Session, ma_nv: str) -> bool:
-    """Nhân sự cấp cao nhất: tồn tại nhưng không có quản lý trực tiếp (ma_nql trống)."""
+    """
+    Nhân sự cấp cao nhất (Ban Giám đốc): không có quản lý trực tiếp VÀ chức vụ cấp 5.
+    Nhân sự thiếu ma_nql do nhập liệu sót KHÔNG được tự duyệt: đơn/công của họ chờ Quản lý duyệt.
+    """
     row = db.execute(
-        text("SELECT ma_nql FROM nhan_vien WHERE ma_nv = :ma_nv"), {"ma_nv": ma_nv}
+        text("""
+            SELECT nv.ma_nql, cv.cap_bac
+            FROM nhan_vien nv
+            LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+            WHERE nv.ma_nv = :ma_nv
+        """),
+        {"ma_nv": ma_nv},
     ).fetchone()
-    return row is not None and row[0] is None
+    return row is not None and row[0] is None and (row[1] or 0) >= TOP_LEVEL_CAP_BAC
 
 
 def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
@@ -339,6 +369,9 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
             cv.ten_cv,
             hd.ngay_bat_dau AS ngay_vao_lam,
             nv.ngay_nghi_viec,
+            nv.ly_do_nghi_viec,
+            nv.ma_nql,
+            ql.ho_ten AS ten_nql,
             nv.trang_thai,
             COALESCE(nv.hinh_thuc_lam_viec, 'FULL_TIME') AS hinh_thuc_lam_viec,
             hd.so_tai_khoan,
@@ -365,6 +398,7 @@ def get_by_ma_nv(db: Session, ma_nv: str) -> dict | None:
             WHERE hd1.trang_thai <> 'DA_HUY'
         ) hd ON hd.ma_nv = nv.ma_nv
         LEFT JOIN tai_khoan tk ON tk.ma_nv = nv.ma_nv
+        LEFT JOIN nhan_vien ql ON ql.ma_nv = nv.ma_nql
         WHERE nv.ma_nv = :ma_nv
         LIMIT 1
     """
@@ -471,7 +505,7 @@ def create_profile_update_request(
 
     allowed_fields = [
         "ngay_sinh", "gioi_tinh", "sdt", "email", "dia_chi",
-        "so_tai_khoan", "ngan_hang", "hinh_thuc_lam_viec", "ma_so_thue", "so_bhxh"
+        "so_tai_khoan", "ngan_hang", "ma_so_thue", "so_bhxh"
     ]
     
     clean_thong_tin_moi = {}
@@ -635,6 +669,8 @@ def review_profile_update_request(
         raise ValueError(f"Không tìm thấy yêu cầu #{ma_yc}")
     if req["trang_thai"] != "CHO_DUYET":
         raise ValueError(f"Yêu cầu #{ma_yc} đã được xử lý (trạng thái: {req['trang_thai']})")
+    if nguoi_duyet and req["ma_nv"] == nguoi_duyet:
+        raise ValueError("Bạn không thể tự duyệt yêu cầu sửa hồ sơ của chính mình.")
 
     now_vn = get_vietnam_now()
 
@@ -666,6 +702,61 @@ def review_profile_update_request(
     return get_profile_request_by_id(db, ma_yc)
 
 
+def apply_due_terminations(db: Session, ma_nv: str | None = None) -> int:
+    """
+    Áp dụng các quyết định thôi việc đã đến ngày hiệu lực (ngay_nghi_viec <= hôm nay):
+    chuyển DA_NGHI_VIEC, khóa tài khoản, thanh lý hợp đồng còn hiệu lực.
+    Gọi khi đăng nhập, ở mỗi request (theo ma_nv) và định kỳ hằng giờ (toàn bộ nhân sự).
+    """
+    today = get_vietnam_now().date()
+    where_nv = "AND nv.ma_nv = :ma_nv" if ma_nv else ""
+    due = db.execute(
+        text(f"""
+            SELECT nv.ma_nv, nv.ngay_nghi_viec
+            FROM nhan_vien nv
+            WHERE nv.ngay_nghi_viec IS NOT NULL
+              AND nv.ngay_nghi_viec <= :today
+              AND (
+                    nv.trang_thai <> 'DA_NGHI_VIEC'
+                 OR EXISTS (SELECT 1 FROM tai_khoan tk WHERE tk.ma_nv = nv.ma_nv AND tk.trang_thai <> 'KHOA')
+                 OR EXISTS (SELECT 1 FROM hop_dong_lao_dong h
+                            WHERE h.ma_nv = nv.ma_nv AND h.trang_thai IN ('HIEU_LUC', 'TAM_HOAN'))
+              )
+              {where_nv}
+        """),
+        {"today": today, "ma_nv": ma_nv},
+    ).mappings().all()
+    if not due:
+        return 0
+
+    now_vn = get_vietnam_now()
+    for row in due:
+        params = {"ma_nv": row["ma_nv"], "ngay": row["ngay_nghi_viec"], "now": now_vn}
+        db.execute(
+            text("UPDATE nhan_vien SET trang_thai = 'DA_NGHI_VIEC', ngay_cap_nhat = :now WHERE ma_nv = :ma_nv"),
+            params,
+        )
+        db.execute(
+            text("UPDATE tai_khoan SET trang_thai = 'KHOA', ngay_cap_nhat = :now WHERE ma_nv = :ma_nv"),
+            params,
+        )
+        db.execute(
+            text("""
+                UPDATE hop_dong_lao_dong
+                SET trang_thai = 'DA_THANH_LY',
+                    ngay_ket_thuc = CASE
+                        WHEN ngay_ket_thuc IS NULL OR ngay_ket_thuc > :ngay THEN :ngay
+                        ELSE ngay_ket_thuc
+                    END,
+                    ngay_cap_nhat = :now
+                WHERE ma_nv = :ma_nv AND trang_thai IN ('HIEU_LUC', 'TAM_HOAN')
+            """),
+            params,
+        )
+    db.commit()
+    return len(due)
+
+
 def update_employee_status(
     db: Session,
     ma_nv: str,
@@ -674,34 +765,41 @@ def update_employee_status(
     khoa_tai_khoan: bool = True,
     ly_do: str | None = None,
 ) -> dict | None:
-    """Cập nhật trạng thái nhân viên (khóa / thôi việc / tạm hoãn / đi làm lại)."""
+    """
+    Cập nhật trạng thái nhân viên (thôi việc / tạm hoãn / đi làm lại / nghỉ dài ngày).
+    Thôi việc có ngày hiệu lực trong tương lai: chỉ lưu lịch, nhân sự vẫn làm việc và đăng nhập bình thường;
+    đến đúng ngày hiệu lực mới chuyển DA_NGHI_VIEC + khóa tài khoản + thanh lý HĐ (apply_due_terminations).
+    """
     now_vn = get_vietnam_now()
     today_vn = now_vn.date()
 
-    if trang_thai == "DA_NGHI_VIEC" and not ngay_nghi_viec:
-        ngay_nghi_viec = today_vn
-    elif trang_thai == "DANG_LAM":
-        ngay_nghi_viec = None
+    if trang_thai == "DA_NGHI_VIEC":
+        db.execute(
+            text("""
+                UPDATE nhan_vien
+                SET ngay_nghi_viec = :ngay, ly_do_nghi_viec = :ly_do, ngay_cap_nhat = :now
+                WHERE ma_nv = :ma_nv
+            """),
+            {"ma_nv": ma_nv, "ngay": ngay_nghi_viec or today_vn, "ly_do": ly_do, "now": now_vn},
+        )
+        db.commit()
+        apply_due_terminations(db, ma_nv)
+        return get_by_ma_nv(db, ma_nv)
 
+    # Đi làm lại thì hủy luôn lịch thôi việc (nếu có)
+    clear_termination = ", ngay_nghi_viec = NULL, ly_do_nghi_viec = NULL" if trang_thai == "DANG_LAM" else ""
     db.execute(
-        text("""
+        text(f"""
             UPDATE nhan_vien
-            SET trang_thai = :trang_thai,
-                ngay_nghi_viec = :ngay_nghi_viec,
-                ngay_cap_nhat = :ngay_cap_nhat
+            SET trang_thai = :trang_thai, ngay_cap_nhat = :ngay_cap_nhat{clear_termination}
             WHERE ma_nv = :ma_nv
         """),
-        {
-            "ma_nv": ma_nv,
-            "trang_thai": trang_thai,
-            "ngay_nghi_viec": ngay_nghi_viec,
-            "ngay_cap_nhat": now_vn,
-        },
+        {"ma_nv": ma_nv, "trang_thai": trang_thai, "ngay_cap_nhat": now_vn},
     )
 
     # Nếu chọn khóa/mở khóa tài khoản kèm theo
     if khoa_tai_khoan:
-        if trang_thai in ["DA_NGHI_VIEC", "TAM_HOAN_HD"]:
+        if trang_thai == "TAM_HOAN_HD":
             db.execute(
                 text("""
                     UPDATE tai_khoan
@@ -784,12 +882,13 @@ def get_monthly_personnel_report(
           {where_pb}
     """)
     leave_map: dict[str, float] = {}
+    holidays = get_holidays(db, start, end)
     for lv in db.execute(leave_query, params).mappings().all():
         if lv["ngay_bat_dau"] >= start and lv["ngay_ket_thuc"] <= end:
             days = float(lv["so_ngay"])
         else:
             # Đơn kéo dài qua nhiều tháng: chỉ tính số ngày làm việc nằm trong tháng này
-            days = float(count_working_days(max(lv["ngay_bat_dau"], start), min(lv["ngay_ket_thuc"], end)))
+            days = float(count_working_days(max(lv["ngay_bat_dau"], start), min(lv["ngay_ket_thuc"], end), holidays))
         leave_map[lv["ma_nv"]] = leave_map.get(lv["ma_nv"], 0.0) + days
 
     danh_sach_dang_lam = []

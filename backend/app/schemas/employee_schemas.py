@@ -17,7 +17,8 @@ class employee_profile(BaseModel):
     so_nguoi_pt: Optional[int] = Field(0, description="Số người phụ thuộc")
     ma_pb: str = Field(..., description="Mã phòng ban")
     ma_cv: str = Field(..., description="Mã chức vụ")
-    ma_ngl: Optional[str] = Field(None, description="Mã ngạch lương")
+    ma_nql: Optional[str] = Field(None, description="Mã quản lý trực tiếp (bỏ trống = trưởng phòng ban)")
+    ten_nql: Optional[str] = Field(None, description="Họ tên quản lý trực tiếp")
     ngay_vao_lam: Optional[date] = Field(None, description="Ngày vào làm / bắt đầu HĐ (từ hợp đồng lao động)")
     ngay_nghi_viec: Optional[date] = Field(None, description="Ngày nghỉ việc")
     trang_thai: str = Field("DANG_LAM", description="Trạng thái: DANG_LAM, NGHI_PHEP, DA_NGHI_VIEC")
@@ -77,7 +78,10 @@ class employee_detail_response(BaseModel):
     ma_cv: Optional[str] = None
     ten_cv: Optional[str] = None
     ngay_vao_lam: Optional[date] = None
-    ngay_nghi_viec: Optional[date] = None
+    ngay_nghi_viec: Optional[date] = Field(None, description="Ngày hiệu lực thôi việc (có thể ở tương lai)")
+    ly_do_nghi_viec: Optional[str] = None
+    ma_nql: Optional[str] = None
+    ten_nql: Optional[str] = None
     trang_thai: Optional[str] = "DANG_LAM"
     so_tai_khoan: Optional[str] = None
     ngan_hang: Optional[str] = None
@@ -147,7 +151,7 @@ class profile_update_request_response(BaseModel):
 class employee_status_update(BaseModel):
     """Schema cho Quản lý khóa hoặc cập nhật trạng thái nhân viên."""
     trang_thai: str = Field(..., description="Trạng thái: DANG_LAM, DA_NGHI_VIEC, TAM_HOAN_HD, NGHI_PHEP, NGHI_THAI_SAN")
-    ngay_nghi_viec: Optional[date] = Field(None, description="Ngày thôi việc (mặc định hôm nay nếu trạng thái là DA_NGHI_VIEC)")
+    ngay_nghi_viec: Optional[date] = Field(None, description="Ngày hiệu lực thôi việc (mặc định hôm nay; ngày tương lai = lên lịch, chưa khóa tài khoản)")
     khoa_tai_khoan: bool = Field(True, description="Tự động khóa tài khoản đăng nhập nếu cho thôi việc hoặc tạm hoãn")
     ly_do: Optional[str] = Field(None, description="Lý do khóa / thay đổi trạng thái nhân sự")
 

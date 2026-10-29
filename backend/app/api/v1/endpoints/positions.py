@@ -2,6 +2,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.permissions import CurrentAccount, require_permission
 from app.db.session import get_db
 from app.repositories import department_repository
 from app.schemas.department_schemas import (
@@ -13,11 +14,14 @@ from app.schemas.department_schemas import (
 
 router = APIRouter()
 DbSession = Annotated[Session, Depends(get_db)]
+# Đọc danh mục: mọi tài khoản đã đăng nhập; thêm/sửa/xóa: quyền quản lý cơ cấu tổ chức
+OrgManager = Annotated[dict, Depends(require_permission("ORG_MANAGE"))]
 
 
 @router.get("", response_model=list[PositionResponse], summary="Danh sách chức vụ")
 def list_positions_endpoint(
     db: DbSession,
+    account: CurrentAccount,
     search: Optional[str] = Query(None, description="Tìm theo mã hoặc tên chức vụ"),
     sort_by: Optional[str] = Query(None, description="Trường sắp xếp: ma_cv, ten_cv, cap_bac, phu_cap_chuc_vu, so_luong_nv"),
     sort_order: Optional[str] = Query("asc", description="Thứ tự sắp xếp: asc hoặc desc"),
@@ -30,7 +34,7 @@ def list_positions_endpoint(
 
 
 @router.get("/{ma_cv}", response_model=PositionResponse, summary="Chi tiết chức vụ")
-def get_position_endpoint(ma_cv: str, db: DbSession):
+def get_position_endpoint(ma_cv: str, db: DbSession, account: CurrentAccount):
     """Xem chi tiết chức vụ và các bậc lương tương ứng."""
     pos = department_repository.get_position_by_id(db, ma_cv)
     if not pos:
@@ -42,7 +46,7 @@ def get_position_endpoint(ma_cv: str, db: DbSession):
 
 
 @router.post("", response_model=PositionResponse, status_code=status.HTTP_201_CREATED, summary="Thêm chức vụ mới")
-def create_position_endpoint(data: PositionCreate, db: DbSession):
+def create_position_endpoint(data: PositionCreate, db: DbSession, account: OrgManager):
     """Tạo chức vụ mới (Admin)."""
     try:
         return department_repository.create_position(db, data.model_dump())
@@ -54,7 +58,7 @@ def create_position_endpoint(data: PositionCreate, db: DbSession):
 
 
 @router.put("/{ma_cv}", response_model=PositionResponse, summary="Cập nhật chức vụ")
-def update_position_endpoint(ma_cv: str, data: PositionUpdate, db: DbSession):
+def update_position_endpoint(ma_cv: str, data: PositionUpdate, db: DbSession, account: OrgManager):
     """Cập nhật thông tin chức vụ, phụ cấp chức vụ."""
     try:
         pos = department_repository.update_position(db, ma_cv, data.model_dump(exclude_unset=True))
@@ -74,7 +78,7 @@ def update_position_endpoint(ma_cv: str, data: PositionUpdate, db: DbSession):
 
 
 @router.delete("/{ma_cv}", summary="Xóa chức vụ (xóa mềm: chuyển sang Ngừng sử dụng)")
-def delete_position_endpoint(ma_cv: str, db: DbSession):
+def delete_position_endpoint(ma_cv: str, db: DbSession, account: OrgManager):
     """Xóa mềm chức vụ khi không còn nhân sự đang giữ chức vụ. Khôi phục bằng PUT trang_thai = 1."""
     try:
         pos = department_repository.get_position_by_id(db, ma_cv)
@@ -94,13 +98,13 @@ def delete_position_endpoint(ma_cv: str, db: DbSession):
 
 
 @router.get("/{ma_cv}/salary-scales", response_model=list[SalaryScaleItem], summary="Thang bậc lương chức vụ")
-def get_salary_scales_endpoint(ma_cv: str, db: DbSession):
+def get_salary_scales_endpoint(ma_cv: str, db: DbSession, account: CurrentAccount):
     """Xem danh sách các bậc lương theo chức vụ."""
     return department_repository.get_salary_scales(db, ma_cv)
 
 
 @router.post("/{ma_cv}/salary-scales", response_model=SalaryScaleItem, status_code=status.HTTP_201_CREATED, summary="Thêm bậc lương")
-def create_salary_scale_endpoint(ma_cv: str, data: SalaryScaleItem, db: DbSession):
+def create_salary_scale_endpoint(ma_cv: str, data: SalaryScaleItem, db: DbSession, account: OrgManager):
     """Thêm một bậc lương mới cho chức vụ."""
     try:
         data_dict = data.model_dump()

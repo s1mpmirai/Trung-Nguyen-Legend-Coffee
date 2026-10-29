@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -45,6 +46,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 EmployeeViewer = Annotated[dict, Depends(require_permission("EMPLOYEE_VIEW", "ACCOUNT_MANAGE", "PERMISSION_ASSIGN"))]
 EmployeeUpdater = Annotated[dict, Depends(require_permission("EMPLOYEE_UPDATE"))]
 EmployeeRemover = Annotated[dict, Depends(require_permission("EMPLOYEE_DELETE"))]
+ReportViewer = Annotated[dict, Depends(require_permission("REPORT_VIEW"))]
 
 
 def _forbid_self_action(account: dict, ma_nv: str) -> None:
@@ -119,9 +121,13 @@ def update_profile(
     ma_nv: str,
     data: employee_contact_update,
     db: DbSession,
-    account: CurrentAccount,
+    account: EmployeeUpdater,
 ):
-    clean_id = ensure_self_or_permission(account, ma_nv, "EMPLOYEE_UPDATE")
+    """
+    [Quản lý] Ghi trực tiếp thông tin liên hệ/ngân hàng vào hồ sơ.
+    Nhân viên tự sửa hồ sơ phải dùng POST /profile/{ma_nv}/request-update (chờ Quản lý duyệt).
+    """
+    clean_id = normalize_ma_nv(ma_nv)
     try:
         return update_employee_contact(db, clean_id, data)
     except ValueError as error:
@@ -232,7 +238,7 @@ def review_profile_request_endpoint(
 )
 def get_monthly_personnel_report_endpoint(
     db: DbSession,
-    account: Annotated[dict, Depends(require_permission("EMPLOYEE_VIEW"))],
+    account: ReportViewer,
     thang: int = Query(..., ge=1, le=12, description="Tháng cần báo cáo (1-12)"),
     nam: int = Query(..., ge=2000, description="Năm cần báo cáo (>= 2000)"),
     ma_pb: Optional[str] = Query(None, description="Lọc theo mã phòng ban"),
@@ -254,7 +260,7 @@ def get_monthly_personnel_report_endpoint(
 )
 def get_hr_statistics_endpoint(
     db: DbSession,
-    account: Annotated[dict, Depends(require_permission("EMPLOYEE_VIEW"))],
+    account: ReportViewer,
     ma_pb: Optional[str] = Query(None, description="Lọc theo mã phòng ban"),
     so_ngay_het_han: int = Query(60, ge=1, le=365, description="Cảnh báo hợp đồng hết hạn trong N ngày tới"),
 ):
@@ -297,6 +303,7 @@ def deactivate_employee_endpoint(
     db: DbSession,
     account: EmployeeRemover,
     ly_do: Optional[str] = Query(None, description="Lý do cho thôi việc / khóa nhân sự"),
+    ngay_hieu_luc: Optional[date] = Query(None, description="Ngày hiệu lực thôi việc (YYYY-MM-DD, mặc định hôm nay)"),
 ):
     """
     Thực hiện thôi việc / khóa nhân viên một chạm:
@@ -307,7 +314,7 @@ def deactivate_employee_endpoint(
     """
     _forbid_self_action(account, ma_nv)
     try:
-        return deactivate_employee(db, ma_nv, ly_do)
+        return deactivate_employee(db, ma_nv, ly_do, ngay_hieu_luc)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
@@ -321,6 +328,7 @@ def delete_employee_endpoint(
     db: DbSession,
     account: EmployeeRemover,
     ly_do: Optional[str] = Query(None, description="Lý do xóa nhân sự"),
+    ngay_hieu_luc: Optional[date] = Query(None, description="Ngày hiệu lực thôi việc (YYYY-MM-DD, mặc định hôm nay)"),
 ):
     """
     Xóa nhân sự khỏi danh sách đang làm việc: trạng thái DA_NGHI_VIEC và khóa tài khoản đăng nhập.
@@ -328,7 +336,7 @@ def delete_employee_endpoint(
     """
     _forbid_self_action(account, ma_nv)
     try:
-        return delete_employee(db, ma_nv, ly_do)
+        return delete_employee(db, ma_nv, ly_do, ngay_hieu_luc)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 

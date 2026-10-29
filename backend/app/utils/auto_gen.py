@@ -1,3 +1,5 @@
+import secrets
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -22,5 +24,10 @@ def generate_employee_code(db: Session) -> str:
 
     return f"NV{next_number:02d}"
 
-def define_pass(): # tư động lấy pass = 1
-    return "1"
+def define_pass(length: int = 10) -> str:
+    """Sinh mật khẩu tạm ngẫu nhiên (chữ + số, bỏ ký tự dễ nhầm 0/O, 1/l/I)."""
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
+    while True:
+        password = "".join(secrets.choice(alphabet) for _ in range(length))
+        if any(c.isdigit() for c in password) and any(c.isalpha() for c in password):
+            return password

@@ -3,6 +3,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.permissions import CurrentAccount, ensure_self_or_permission, require_permission
 from app.db.session import get_db
 from app.repositories import contract_repository
 from app.schemas.contract_schemas import (
@@ -14,11 +15,14 @@ from app.schemas.contract_schemas import (
 
 router = APIRouter()
 DbSession = Annotated[Session, Depends(get_db)]
+# Hợp đồng chứa lương, số tài khoản, MST, số BHXH: chỉ người có quyền quản lý hợp đồng
+ContractManager = Annotated[dict, Depends(require_permission("CONTRACT_MANAGE"))]
 
 
 @router.get("", response_model=ContractListResponse, summary="Danh sách hợp đồng lao động")
 def list_contracts_endpoint(
     db: DbSession,
+    account: ContractManager,
     page: int = Query(1, ge=1, description="Trang hiện tại"),
     page_size: int = Query(10, ge=1, le=100, description="Số lượng mỗi trang"),
     search: Optional[str] = Query(None, description="Tìm theo mã HĐ, mã NV, họ tên hoặc CCCD"),
@@ -43,7 +47,7 @@ def list_contracts_endpoint(
 
 
 @router.get("/{ma_hd}", response_model=ContractResponse, summary="Chi tiết hợp đồng")
-def get_contract_endpoint(ma_hd: str, db: DbSession):
+def get_contract_endpoint(ma_hd: str, db: DbSession, account: ContractManager):
     """Xem chi tiết một hợp đồng lao động."""
     contract = contract_repository.get_contract_by_id(db, ma_hd)
     if not contract:
@@ -55,13 +59,14 @@ def get_contract_endpoint(ma_hd: str, db: DbSession):
 
 
 @router.get("/employee/{ma_nv}", response_model=list[ContractResponse], summary="Lịch sử hợp đồng của nhân viên")
-def get_employee_contracts_endpoint(ma_nv: str, db: DbSession):
-    """Lấy toàn bộ các hợp đồng lao động từ trước đến nay của một nhân viên."""
-    return contract_repository.get_contracts_by_employee(db, ma_nv)
+def get_employee_contracts_endpoint(ma_nv: str, db: DbSession, account: CurrentAccount):
+    """Lấy toàn bộ các hợp đồng lao động từ trước đến nay của một nhân viên (chính mình hoặc có CONTRACT_MANAGE)."""
+    clean_id = ensure_self_or_permission(account, ma_nv, "CONTRACT_MANAGE")
+    return contract_repository.get_contracts_by_employee(db, clean_id)
 
 
 @router.post("", response_model=ContractResponse, status_code=status.HTTP_201_CREATED, summary="Ký mới hợp đồng")
-def create_contract_endpoint(data: ContractCreate, db: DbSession):
+def create_contract_endpoint(data: ContractCreate, db: DbSession, account: ContractManager):
     """Tạo mới / ký hợp đồng lao động cho nhân sự."""
     try:
         return contract_repository.create_contract(db, data.model_dump())
@@ -73,7 +78,7 @@ def create_contract_endpoint(data: ContractCreate, db: DbSession):
 
 
 @router.put("/{ma_hd}", response_model=ContractResponse, summary="Cập nhật hợp đồng")
-def update_contract_endpoint(ma_hd: str, data: ContractUpdate, db: DbSession):
+def update_contract_endpoint(ma_hd: str, data: ContractUpdate, db: DbSession, account: ContractManager):
     """Cập nhật thông tin hợp đồng (lương cơ bản, tỷ lệ hưởng, STK, ngân hàng, MST, số BHXH)."""
     try:
         contract = contract_repository.update_contract(db, ma_hd, data.model_dump(exclude_unset=True))
@@ -94,6 +99,7 @@ def update_contract_endpoint(ma_hd: str, data: ContractUpdate, db: DbSession):
 
 @router.put("/{ma_hd}/liquidate", response_model=ContractResponse, summary="Thanh lý hợp đồng")
 def liquidate_contract_endpoint(
+    account: ContractManager,
     ma_hd: str,
     ngay_ket_thuc: Optional[date] = Query(None, description="Ngày kết thúc thanh lý (mặc định hôm nay)"),
     db: DbSession = None,
@@ -108,7 +114,7 @@ def liquidate_contract_endpoint(
 
 
 @router.put("/{ma_hd}/restore", response_model=ContractResponse, summary="Khôi phục hợp đồng đã xóa")
-def restore_contract_endpoint(ma_hd: str, db: DbSession):
+def restore_contract_endpoint(ma_hd: str, db: DbSession, account: ContractManager):
     """Khôi phục hợp đồng đang ở trạng thái DA_HUY."""
     contract = contract_repository.restore_contract(db, ma_hd)
     if not contract:
@@ -120,7 +126,7 @@ def restore_contract_endpoint(ma_hd: str, db: DbSession):
 
 
 @router.delete("/{ma_hd}", summary="Xóa hợp đồng (xóa mềm: chuyển sang Đã hủy)")
-def delete_contract_endpoint(ma_hd: str, db: DbSession):
+def delete_contract_endpoint(ma_hd: str, db: DbSession, account: ContractManager):
     """Xóa mềm hợp đồng không còn hiệu lực: giữ bản ghi, không tính vào thâm niên / lương."""
     try:
         contract = contract_repository.get_contract_by_id(db, ma_hd)
