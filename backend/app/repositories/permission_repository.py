@@ -250,3 +250,17 @@ def update_employee_custom_permissions(
 
     db.commit()
     return get_employee_permissions(db, ma_nv)
+
+
+def set_role_permissions(db: Session, ma_vai_tro: str, ma_quyen_list: list[str]) -> None:
+    """Thay toàn bộ quyền mặc định của một vai trò (ma trận vai trò x quyền). Người gọi commit."""
+    db.execute(text("DELETE FROM vai_tro_quyen WHERE ma_vai_tro = :ma_vai_tro"), {"ma_vai_tro": ma_vai_tro})
+    now_vn = get_vietnam_now()
+    for ma_quyen in ma_quyen_list:
+        db.execute(
+            text("""
+                INSERT INTO vai_tro_quyen (ma_vai_tro, ma_quyen, ngay_tao, ngay_cap_nhat)
+                VALUES (:ma_vai_tro, :ma_quyen, :now, :now)
+            """),
+            {"ma_vai_tro": ma_vai_tro, "ma_quyen": ma_quyen, "now": now_vn},
+        )

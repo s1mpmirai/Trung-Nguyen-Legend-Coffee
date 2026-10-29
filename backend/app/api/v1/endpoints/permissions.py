@@ -12,6 +12,7 @@ from app.schemas.permission_schemas import (
     PermissionItem,
     RoleItem,
     RoleMatrixResponse,
+    RolePermissionsUpdate,
 )
 from app.services import permission_service
 
@@ -133,6 +134,25 @@ def update_custom_permissions_endpoint(
     """
     try:
         return permission_service.update_custom_permissions(db, ma_nv, data, actor=account)
+    except PermissionError as err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
+
+
+@router.put(
+    "/roles/{ma_vai_tro}",
+    summary="[Phân quyền - Admin] Chỉnh quyền mặc định của một vai trò trong ma trận",
+)
+def update_role_permissions_endpoint(
+    ma_vai_tro: str,
+    data: RolePermissionsUpdate,
+    db: DbSession,
+    account: PermissionAssigner,
+):
+    """Thay toàn bộ quyền mặc định của vai trò (không áp dụng cho ADMIN). Trả về ma trận sau khi cập nhật."""
+    try:
+        return permission_service.update_role_permissions(db, ma_vai_tro, data, actor=account)
     except PermissionError as err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err
     except ValueError as err:

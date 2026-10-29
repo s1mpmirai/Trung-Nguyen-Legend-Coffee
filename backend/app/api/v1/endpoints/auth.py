@@ -1,13 +1,14 @@
 from typing import Annotated
-from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.permissions import CurrentAccount
 from app.db.session import get_db
 from app.schemas.auth_schemas import (
+    first_time_password_request,
     request_login,
 )
-from app.services.auth_service import login_for_portal
+from app.services.auth_service import first_time_change_password, get_me
 
 router = APIRouter()
 
@@ -86,18 +87,20 @@ def employee_login(
     return user
 
 
-class FirstTimePasswordRequest(BaseModel):
-    ma_nv: str
-    mat_khau_moi: str
+@router.get("/me", summary="Thông tin phiên đăng nhập hiện tại (vai trò, quyền, họ tên)")
+def read_current_session(account: CurrentAccount, db: DbSession):
+    """Frontend dùng để kiểm tra quyền vào từng cổng thay vì tin dữ liệu lưu ở localStorage."""
+    return get_me(db, account)
 
 
 @router.post("/first-time-change-password")
 def api_first_time_change_password(
-    request: FirstTimePasswordRequest,
+    request: first_time_password_request,
+    account: CurrentAccount,
     db: DbSession,
 ):
+    """Đổi mật khẩu tạm ở lần đăng nhập đầu: bắt buộc có token, mã NV lấy từ token (bỏ qua body)."""
     try:
-        from app.services.auth_service import first_time_change_password
-        return first_time_change_password(db, request.ma_nv, request.mat_khau_moi)
+        return first_time_change_password(db, account["ma_nv"], request.mat_khau_moi)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e

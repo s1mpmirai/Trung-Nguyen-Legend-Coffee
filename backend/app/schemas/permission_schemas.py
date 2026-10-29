@@ -69,3 +69,8 @@ class CustomPermissionItem(BaseModel):
 class CustomPermissionBatchRequest(BaseModel):
     """Cấp hoặc thu hồi quyền riêng cho tài khoản nhân sự."""
     permissions: list[CustomPermissionItem]
+
+
+class RolePermissionsUpdate(BaseModel):
+    """Danh sách mã quyền mặc định mới của một vai trò (thay thế toàn bộ)."""
+    ma_quyen: list[str] = Field(default_factory=list, description="Các mã quyền vai trò được hưởng")

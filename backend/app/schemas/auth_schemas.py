@@ -9,9 +9,9 @@ class request_login(BaseModel):
 
 class account_create(BaseModel):
     ma_nv: str = Field(..., description="Mã nhân viên")
-    mat_khau: str = Field(..., description="Mật khẩu")
+    mat_khau: str | None = Field(None, description="Bỏ qua: hệ thống tự sinh mật khẩu tạm ngẫu nhiên")
     ma_vai_tro: str = Field(..., description="Mã vai trò")
-    trang_thai: str = Field(..., description="Trạng thái")
+    trang_thai: str = Field("HOAT_DONG", description="Trạng thái")
 
 class account_update_status(BaseModel):
     trang_thai: str = Field(..., description="Trạng thái mới: HOAT_DONG hoặc KHOA")
@@ -25,8 +25,13 @@ class account_response(BaseModel):
     class Config:
         from_attributes = True
 
+
+class account_create_response(account_response):
+    mat_khau_tam: str = Field(..., description="Mật khẩu tạm (chỉ hiển thị một lần, bắt buộc đổi khi đăng nhập lần đầu)")
+
+
 class change_password_request(BaseModel):
-    ma_nv: str = Field(..., description="Mã nhân viên")
+    ma_nv: str | None = Field(None, description="Bỏ qua: luôn đổi mật khẩu của tài khoản đang đăng nhập")
     mat_khau_cu: str = Field(..., description="Mật khẩu hiện tại")
     mat_khau_moi: str = Field(..., min_length=6, description="Mật khẩu mới (tối thiểu 6 ký tự)")
 
@@ -45,4 +50,10 @@ class employee_without_account_response(BaseModel):
 class account_admin_update(BaseModel):
     mat_khau_moi: str | None = Field(None, description="Mật khẩu mới nếu muốn đổi (bỏ trống nếu giữ nguyên)")
     ma_vai_tro: str | None = Field(None, description="Vai trò mới (ADMIN, QUAN_LY, TRUONG_NHOM, NHAN_VIEN)")
-    trang_thai: str | None = Field(None, description="Trạng thái tài khoản (HOAT_DONG, KHOA)")
+    trang_thai: str | None = Field(None, description="Trạng thái tài khoản (HOAT_DONG, KHOA)")
+
+
+
+class first_time_password_request(BaseModel):
+    mat_khau_moi: str = Field(..., min_length=6, description="Mật khẩu mới (tối thiểu 6 ký tự)")
+    ma_nv: str | None = Field(None, description="Bỏ qua: luôn đổi mật khẩu của tài khoản đang đăng nhập")

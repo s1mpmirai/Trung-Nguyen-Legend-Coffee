@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.security import decode_access_token, oauth2_scheme
 from app.db.session import get_db
 from app.repositories import auth_repository
+from app.repositories.employee_repository import apply_due_terminations
 from app.repositories.permission_repository import get_employee_permissions
 
 # Vai trò quản lý toàn công ty: thấy và xử lý dữ liệu của mọi phòng ban.
@@ -33,9 +34,12 @@ def get_current_account(
         raise unauthorized
 
     ma_nv = normalize_ma_nv(str(payload["sub"]))
+    # Thôi việc đến ngày hiệu lực: khóa tài khoản ngay cả khi token cũ vẫn còn hạn
+    apply_due_terminations(db, ma_nv)
     account = auth_repository.get_by_ma_nv(db, ma_nv)
     if account is None:
         raise unauthorized
+    db.refresh(account)
     if account.trang_thai != "HOAT_DONG":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tài khoản đã bị khóa")
 

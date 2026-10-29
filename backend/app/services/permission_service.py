@@ -6,6 +6,7 @@ from app.repositories.employee_repository import get_by_ma_nv
 from app.schemas.permission_schemas import (
     AssignRoleRequest,
     CustomPermissionBatchRequest,
+    RolePermissionsUpdate,
 )
 
 
@@ -39,7 +40,7 @@ def get_employee_permissions(db: Session, ma_nv: str) -> dict[str, Any]:
 
 # Người không phải ADMIN chỉ được cấp các vai trò / quyền nghiệp vụ, không được cấp quyền quản trị
 ROLES_ASSIGNABLE_BY_MANAGER = {"NHAN_VIEN", "TRUONG_NHOM"}
-ADMIN_ONLY_PERMISSIONS = {"ACCOUNT_MANAGE", "PERMISSION_ASSIGN"}
+ADMIN_ONLY_PERMISSIONS = {"ACCOUNT_MANAGE", "PERMISSION_ASSIGN", "ORG_MANAGE", "CONTRACT_MANAGE"}
 
 
 def _check_can_change(db: Session, actor: dict[str, Any], clean_id: str) -> dict[str, Any]:
@@ -77,3 +78,33 @@ def update_custom_permissions(
     if actor["ma_vai_tro"] != "ADMIN" and any(p["ma_quyen"] in ADMIN_ONLY_PERMISSIONS for p in items):
         raise PermissionError("Chỉ Admin mới được cấp / thu hồi quyền quản trị tài khoản và phân quyền.")
     return permission_repository.update_employee_custom_permissions(db=db, ma_nv=clean_id, permissions=items)
+
+
+def update_role_permissions(
+    db: Session, ma_vai_tro: str, data: RolePermissionsUpdate, actor: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    [Chỉ Admin] Chỉnh ma trận vai trò x quyền: thay toàn bộ quyền mặc định của một vai trò.
+    Vai trò ADMIN luôn có toàn quyền nên không chỉnh được.
+    """
+    if actor["ma_vai_tro"] != "ADMIN":
+        raise PermissionError("Chỉ Admin mới được chỉnh ma trận phân quyền theo vai trò.")
+    ma_vai_tro = ma_vai_tro.strip().upper()
+    if ma_vai_tro == "ADMIN":
+        raise ValueError("Vai trò ADMIN luôn có toàn bộ quyền, không thể chỉnh.")
+    roles = {r["ma_vai_tro"] for r in permission_repository.get_all_roles_with_permissions(db)}
+    if ma_vai_tro not in roles:
+        raise ValueError(f"Vai trò không tồn tại: {ma_vai_tro}")
+    valid = {p["ma_quyen"] for p in permission_repository.get_all_permissions(db)}
+    requested = sorted(set(data.ma_quyen))
+    invalid = [q for q in requested if q not in valid]
+    if invalid:
+        raise ValueError(f"Mã quyền không hợp lệ: {', '.join(invalid)}")
+
+    try:
+        permission_repository.set_role_permissions(db, ma_vai_tro, requested)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return permission_repository.get_role_matrix(db)
