@@ -6,12 +6,9 @@ import {
   XCircle,
   Search,
   Calendar,
-  Building2,
   Download,
   RefreshCw,
   Edit3,
-  MapPin,
-  Fingerprint,
   X,
   ShieldCheck,
   Check,
@@ -21,11 +18,9 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
   Award,
   Lock,
   Unlock,
-  Layers,
   Eye,
   Save,
 } from "lucide-react";
@@ -38,18 +33,47 @@ import {
   toggleAttendanceLock,
   getAttendanceHistory,
 } from "../../services/attendanceService";
+import { getDepartments } from "../../services/adminService";
+import ConfirmDialog, { useEscapeKey } from "./components/ConfirmDialog";
+import { getApiErrorMessage, getManagerAccess } from "./managerUtils";
 
-const DEPARTMENTS = [
-  { id: "all", label: "Tất cả phòng ban" },
-  { id: "PB01", label: "Ban Giám đốc" },
-  { id: "PB02", label: "Phòng Nhân sự" },
-  { id: "PB03", label: "Phòng Kế toán – Tài chính" },
-  { id: "PB04", label: "Phòng Marketing" },
-  { id: "PB05", label: "Phòng Kinh doanh" },
-  { id: "PB06", label: "Phòng IT" },
-  { id: "PB07", label: "Xưởng Sản xuất" },
-  { id: "PB08", label: "Phòng Kinh doanh Hà Nội" },
-];
+const ALL_DEPARTMENTS_OPTION = { id: "all", label: "Tất cả phòng ban" };
+
+// Nhãn & màu hiển thị cho từng loại công (VE_SOM tách riêng khỏi đi trễ)
+const WORK_TYPE_BADGE = {
+  CONG_DU: { cls: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
+  DI_TRE: { cls: "bg-amber-50 text-amber-700", dot: "bg-amber-500" },
+  VE_SOM: { cls: "bg-orange-50 text-orange-700 border border-orange-200", dot: "bg-orange-500" },
+  NUA_CONG: { cls: "bg-blue-50 text-blue-700", dot: "bg-blue-500" },
+  NGHI_PHEP: { cls: "bg-sky-50 text-sky-700", dot: "bg-sky-500" },
+  NGHI_KHONG_PHEP: { cls: "bg-rose-50 text-rose-700 border border-rose-200", dot: "bg-rose-500" },
+};
+const WORK_TYPE_LABEL = {
+  CONG_DU: "Đúng giờ",
+  DI_TRE: "Đi muộn",
+  VE_SOM: "Về sớm",
+  NUA_CONG: "Nửa công",
+  NGHI_PHEP: "Nghỉ phép",
+  NGHI_KHONG_PHEP: "Nghỉ không phép",
+  CHUA_CHAM: "Chưa chấm",
+};
+
+// Số giờ làm thực tế từ giờ vào / ra (ca hành chính trừ 1h nghỉ trưa khi làm từ 5h)
+const computeWorkedHours = (shiftCode, inTime, outTime) => {
+  if (!inTime || !outTime || inTime === "--:--" || outTime === "--:--") return null;
+  const [ih, im] = inTime.split(":").map(Number);
+  const [oh, om] = outTime.split(":").map(Number);
+  if ([ih, im, oh, om].some((v) => Number.isNaN(v))) return null;
+  let inMins = ih * 60 + im;
+  let outMins = oh * 60 + om;
+  if (outMins < inMins) outMins += 24 * 60;
+  let dur = (outMins - inMins) / 60;
+  if (shiftCode === "CA01" && dur >= 5) dur -= 1;
+  return Math.max(0, dur);
+};
+
+// Quy tắc công theo số giờ làm: ≥ 7h = 1 công, 4–7h = 0,5 công, < 4h = 0 công
+const workdayFromHours = (hours) => (hours == null ? 0 : hours >= 7 ? 1.0 : hours >= 4 ? 0.5 : 0.0);
 
 const getInitials = (name) => {
   if (!name) return "NV";
@@ -75,8 +99,13 @@ const getTodayDateString = () => {
   return `${y}-${m}-${d}`;
 };
 
-export default function AttendanceManagement() {
-  const [viewMode, setViewMode] = useState("daily"); // "daily" | "monthly"
+export default function AttendanceManagement({ userSession, initialPeriod }) {
+  const access = getManagerAccess(userSession);
+  // Chốt / mở khóa công cần quyền ATTENDANCE_LOCK (Trưởng nhóm không có)
+  const canLock = access.can("ATTENDANCE_LOCK");
+
+  // initialPeriod ({thang, nam}): mở thẳng bảng tổng hợp công của tháng đó (vd: từ trang Bảng lương để chốt công)
+  const [viewMode, setViewMode] = useState(initialPeriod ? "monthly" : "daily"); // "daily" | "monthly"
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -94,12 +123,21 @@ export default function AttendanceManagement() {
   const [selectedDept, setSelectedDept] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedDate, setSelectedDate] = useState(() => getTodayDateString());
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(() => initialPeriod?.thang || new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(() => initialPeriod?.nam || new Date().getFullYear());
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncToast, setSyncToast] = useState("");
+  const [syncToastType, setSyncToastType] = useState("success");
+  const [departments, setDepartments] = useState([ALL_DEPARTMENTS_OPTION]);
+
+  // Thông báo nhanh: thành công (xanh) / lỗi (đỏ) / cảnh báo (vàng)
+  const notify = (message, type = "success", duration) => {
+    setSyncToast(message);
+    setSyncToastType(type);
+    setTimeout(() => setSyncToast(""), duration || (type === "error" ? 6000 : 4000));
+  };
 
   // Dữ liệu API thực tế
   const [dailyAttendance, setDailyAttendance] = useState([]);
@@ -115,6 +153,13 @@ export default function AttendanceManagement() {
   const [isMonthLocked, setIsMonthLocked] = useState(false);
   const [lockInfo, setLockInfo] = useState({ nguoi_chot: "", ngay_chot: "", ghi_chu: "" });
   const [isLocking, setIsLocking] = useState(false);
+  const [lockConfirmOpen, setLockConfirmOpen] = useState(false);
+  const [lockError, setLockError] = useState("");
+
+  // Tháng đang xét chốt công: theo ngày đang xem (bảng ngày) hoặc tháng đang chọn (bảng tháng)
+  const [dailyYear, dailyMonth] = selectedDate.split("-").map(Number);
+  const lockThang = viewMode === "daily" ? dailyMonth : selectedMonth;
+  const lockNam = viewMode === "daily" ? dailyYear : selectedYear;
 
   // Modal điều chỉnh giờ / duyệt giải trình
   const [adjustModalData, setAdjustModalData] = useState(null);
@@ -144,6 +189,11 @@ export default function AttendanceManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
+  // Đóng các hộp thoại bằng phím Esc (không đóng khi đang gửi dữ liệu)
+  useEscapeKey(Boolean(adjustModalData), () => setAdjustModalData(null), isAdjusting);
+  useEscapeKey(Boolean(rejectModalData), () => setRejectModalData(null), isRejecting);
+  useEscapeKey(Boolean(selectedEmployeeDetail), () => setSelectedEmployeeDetail(null));
+
   // Tải dữ liệu chấm công theo ngày
   const loadDailyData = async (date = selectedDate, dept = selectedDept) => {
     setIsLoading(true);
@@ -152,7 +202,7 @@ export default function AttendanceManagement() {
       const data = await getDailyAttendanceForManager(date, dept);
       setDailyAttendance(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Lỗi khi tải bảng chấm công ngày:", err);
+      notify(`Không tải được bảng chấm công ngày: ${getApiErrorMessage(err)}`, "error");
     } finally {
       setIsLoading(false);
     }
@@ -165,7 +215,7 @@ export default function AttendanceManagement() {
       const data = await getMonthlyAttendanceSummaryForManager(m, y, dept);
       setMonthlyAttendance(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Lỗi khi tải bảng tổng hợp công tháng:", err);
+      notify(`Không tải được bảng tổng hợp công tháng: ${getApiErrorMessage(err)}`, "error");
     } finally {
       setIsLoading(false);
     }
@@ -178,28 +228,44 @@ export default function AttendanceManagement() {
       if (Array.isArray(data) && data.length > 0) {
         setAvailableShifts(data);
       }
-    } catch (e) {
-      console.error("Lỗi tải danh mục ca:", e);
+    } catch {
+      // Giữ danh mục ca mặc định khi không tải được
     }
   };
 
-  const checkMonthLock = async (m = selectedMonth, y = selectedYear) => {
+  // Danh mục phòng ban thật từ CSDL (GET /departments, mọi tài khoản đăng nhập đều xem được)
+  const loadDepartments = async () => {
+    try {
+      const list = await getDepartments({ trang_thai: 1 });
+      if (Array.isArray(list)) {
+        setDepartments([
+          ALL_DEPARTMENTS_OPTION,
+          ...list.map((pb) => ({ id: pb.ma_pb, label: pb.ten_pb || pb.ma_pb })),
+        ]);
+      }
+    } catch {
+      // Không tải được danh mục: chỉ còn lựa chọn "Tất cả phòng ban"
+    }
+  };
+
+  const checkMonthLock = async (m = lockThang, y = lockNam) => {
     try {
       const status = await getAttendanceLockStatus(m, y);
       setIsMonthLocked(Boolean(status?.is_locked));
       setLockInfo(status || {});
-    } catch (e) {
-      console.error("Lỗi kiểm tra khóa công:", e);
+    } catch {
+      setIsMonthLocked(false);
     }
   };
 
   useEffect(() => {
     loadShifts();
+    loadDepartments();
   }, []);
 
   useEffect(() => {
-    checkMonthLock(selectedMonth, selectedYear);
-  }, [selectedMonth, selectedYear]);
+    checkMonthLock(lockThang, lockNam);
+  }, [lockThang, lockNam]);
 
   useEffect(() => {
     if (viewMode === "daily") {
@@ -209,31 +275,45 @@ export default function AttendanceManagement() {
     }
   }, [viewMode, selectedDate, selectedDept, selectedMonth, selectedYear]);
 
-  // Chốt hoặc mở khóa bảng công tháng
-  const handleToggleLockMonth = async () => {
+  // Mở hộp thoại xác nhận chốt / mở khóa bảng công tháng
+  const handleToggleLockMonth = () => {
+    if (!canLock) return;
+    setLockError("");
+    setLockConfirmOpen(true);
+  };
+
+  // Chốt hoặc mở khóa bảng công tháng (POST /attendance/toggle-lock, quyền ATTENDANCE_LOCK)
+  const handleConfirmToggleLock = async () => {
+    if (isLocking) return;
     setIsLocking(true);
+    setLockError("");
+    const willLock = !isMonthLocked;
     try {
-      const willLock = !isMonthLocked;
       const res = await toggleAttendanceLock({
-        thang: selectedMonth,
-        nam: selectedYear,
+        thang: lockThang,
+        nam: lockNam,
         khoa: willLock,
-        nguoi_chot: "Quản lý nhân sự",
         ghi_chu: willLock
-          ? `Đã chốt công tháng ${selectedMonth}/${selectedYear} để đối soát và tính lương`
-          : `Mở khóa điều chỉnh bổ sung công tháng ${selectedMonth}/${selectedYear}`,
+          ? `Đã chốt công tháng ${lockThang}/${lockNam} để đối soát và tính lương`
+          : `Mở khóa điều chỉnh bổ sung công tháng ${lockThang}/${lockNam}`,
       });
       setIsMonthLocked(Boolean(res?.is_locked));
       setLockInfo(res || {});
-      setSyncToast(
+      setLockConfirmOpen(false);
+      notify(
         willLock
-          ? `Đã chốt và khóa thành công bảng công Tháng ${selectedMonth}/${selectedYear}!`
-          : `Đã mở khóa bảng công Tháng ${selectedMonth}/${selectedYear}!`
+          ? `Đã chốt và khóa bảng công tháng ${lockThang}/${lockNam}. Các bản ghi đang chờ duyệt đã được tự động duyệt.`
+          : `Đã mở khóa bảng công tháng ${lockThang}/${lockNam}.`
       );
-      setTimeout(() => setSyncToast(""), 4000);
+      // Chốt công tự duyệt các bản ghi chờ duyệt -> tải lại để thấy trạng thái mới
+      if (viewMode === "daily") {
+        loadDailyData(selectedDate, selectedDept);
+      } else {
+        loadMonthlyData(selectedMonth, selectedYear, selectedDept);
+      }
     } catch (err) {
-      setSyncToast(`Lỗi: ${err.message}`);
-      setTimeout(() => setSyncToast(""), 4500);
+      // 400: không thể mở khóa khi bảng lương tháng đã duyệt / đã chi trả; 403: thiếu quyền ATTENDANCE_LOCK
+      setLockError(getApiErrorMessage(err, "Không thể cập nhật trạng thái chốt công."));
     } finally {
       setIsLocking(false);
     }
@@ -249,11 +329,10 @@ export default function AttendanceManagement() {
       } else {
         await loadMonthlyData(selectedMonth, selectedYear, selectedDept);
       }
-      setSyncToast("Đã đồng bộ dữ liệu thời gian thực thành công!");
-      setTimeout(() => setSyncToast(""), 3500);
-    } catch (_) {
-      setSyncToast("Lỗi khi đồng bộ dữ liệu!");
-      setTimeout(() => setSyncToast(""), 3500);
+      await checkMonthLock(lockThang, lockNam);
+      notify("Đã đồng bộ dữ liệu chấm công mới nhất!", "success", 3500);
+    } catch (err) {
+      notify(`Lỗi khi đồng bộ dữ liệu: ${getApiErrorMessage(err)}`, "error");
     } finally {
       setIsSyncing(false);
     }
@@ -286,12 +365,14 @@ export default function AttendanceManagement() {
   };
 
   // Phê duyệt xác nhận công cho bản ghi (giữ đúng tình trạng Đi trễ nếu nhân viên đi trễ)
+  const [approvingId, setApprovingId] = useState(null);
   const handleApprove = async (row) => {
     if (!row.ma_cc) {
-      setSyncToast(`Nhân viên ${row.ho_ten} chưa có bản ghi chấm công ngày này để chốt.`);
-      setTimeout(() => setSyncToast(""), 3500);
+      notify(`Nhân viên ${row.ho_ten} chưa có bản ghi chấm công ngày này để chốt.`, "warning");
       return;
     }
+    if (approvingId) return;
+    setApprovingId(row.ma_cc);
     try {
       const isLateRecord = row.loai_cong === "DI_TRE";
       const targetLoaiCong = row.loai_cong || "CONG_DU";
@@ -306,24 +387,29 @@ export default function AttendanceManagement() {
         trang_thai_duyet: "DA_DUYET",
         ghi_chu: ghiChuText,
       });
-      setSyncToast(
+      notify(
         isLateRecord
           ? `Đã duyệt xác nhận đi trễ cho ${row.ho_ten}!`
           : `Đã phê duyệt công cho ${row.ho_ten}!`
       );
-      setTimeout(() => setSyncToast(""), 3500);
       loadDailyData(selectedDate, selectedDept);
     } catch (err) {
-      setSyncToast(`Lỗi: ${err.message}`);
-      setTimeout(() => setSyncToast(""), 4500);
+      // 403: ngoài phạm vi quản lý (Trưởng nhóm chỉ duyệt cấp dưới trực tiếp) / tự duyệt công của mình
+      notify(`Không thể duyệt công của ${row.ho_ten}: ${getApiErrorMessage(err)}`, "error");
+    } finally {
+      setApprovingId(null);
     }
   };
 
   // Mở modal điều chỉnh
   const handleOpenAdjust = (row) => {
     if (isMonthLocked) {
-      setSyncToast(`Bảng công tháng ${selectedMonth}/${selectedYear} đã được Chốt và Khóa. Vui lòng mở khóa trước khi điều chỉnh!`);
-      setTimeout(() => setSyncToast(""), 4000);
+      notify(
+        `Bảng công tháng ${lockThang}/${lockNam} đã được chốt và khóa. ${
+          canLock ? "Vui lòng mở khóa trước khi điều chỉnh." : "Liên hệ Quản lý để mở khóa nếu cần điều chỉnh."
+        }`,
+        "warning"
+      );
       return;
     }
     const initIn = row.gio_vao && row.gio_vao !== "--:--" ? row.gio_vao : "08:00";
@@ -355,7 +441,7 @@ export default function AttendanceManagement() {
 
   // Lưu điều chỉnh từ modal (có thể chọn chỉ lưu hoặc lưu & xác nhận duyệt luôn)
   const handleSaveAdjust = async (shouldApprove = false) => {
-    if (!adjustModalData) return;
+    if (!adjustModalData || isAdjusting) return;
     if (!adjustModalData.ma_cc) {
       setAdjustError("Nhân viên này chưa có bản ghi chấm công để điều chỉnh.");
       return;
@@ -377,7 +463,9 @@ export default function AttendanceManagement() {
           ? (adjustModalData.so_cong != null && adjustModalData.so_cong > 0 ? adjustModalData.so_cong : 1.0)
           : adjustedWorkType === "NUA_CONG"
           ? 0.5
-          : adjustedWorkType === "NGHI_KHONG_PHEP" || adjustedWorkType === "VE_SOM"
+          : adjustedWorkType === "VE_SOM"
+          ? workdayFromHours(computeWorkedHours(adjustedShift, adjustedTime, adjustedCheckOutTime))
+          : adjustedWorkType === "NGHI_KHONG_PHEP"
           ? 0.0
           : 1.0;
 
@@ -399,17 +487,17 @@ export default function AttendanceManagement() {
         ghi_chu: adjustReason || defaultNote,
       });
       setAdjustModalData(null);
-      setSyncToast(
+      notify(
         shouldApprove
           ? (adjustedWorkType === "DI_TRE"
               ? `Đã duyệt xác nhận đi trễ cho ${adjustModalData.ho_ten}!`
               : `Đã phê duyệt công cho ${adjustModalData.ho_ten}!`)
           : `Đã lưu điều chỉnh giờ chấm công cho ${adjustModalData.ho_ten}!`
       );
-      setTimeout(() => setSyncToast(""), 3500);
       loadDailyData(selectedDate, selectedDept);
     } catch (err) {
-      setAdjustError(err.message || "Lỗi khi lưu điều chỉnh.");
+      // 403: nhân sự ngoài nhóm của Trưởng nhóm / công của chính mình; 400: tháng đã khóa, quá 3 lần sửa giờ...
+      setAdjustError(getApiErrorMessage(err, "Lỗi khi lưu điều chỉnh."));
     } finally {
       setIsAdjusting(false);
     }
@@ -418,8 +506,7 @@ export default function AttendanceManagement() {
   // Mở Popup Từ chối duyệt công riêng biệt (Icon X)
   const handleOpenReject = (row) => {
     if (isMonthLocked) {
-      setSyncToast(`Bảng công tháng ${selectedMonth}/${selectedYear} đã được Chốt và Khóa! Vui lòng mở khóa trước.`);
-      setTimeout(() => setSyncToast(""), 4000);
+      notify(`Bảng công tháng ${lockThang}/${lockNam} đã được chốt và khóa, không thể thay đổi.`, "warning");
       return;
     }
     setAdjustModalData(null);
@@ -430,7 +517,7 @@ export default function AttendanceManagement() {
 
   // Xác nhận từ chối duyệt công từ Popup X (0 công, chuyển thành nghỉ không phép / vi phạm)
   const handleConfirmReject = async () => {
-    if (!rejectModalData) return;
+    if (!rejectModalData || isRejecting) return;
     if (!rejectionReason.trim()) {
       setRejectError("Vui lòng nhập lý do từ chối công trước khi xác nhận.");
       return;
@@ -451,11 +538,10 @@ export default function AttendanceManagement() {
       });
       const name = rejectModalData.ho_ten;
       setRejectModalData(null);
-      setSyncToast(`Đã TỪ CHỐI duyệt công cho ${name} (0 công)!`);
-      setTimeout(() => setSyncToast(""), 3500);
+      notify(`Đã từ chối công ngày này của ${name}: bản ghi không được tính công.`);
       loadDailyData(selectedDate, selectedDept);
     } catch (err) {
-      setRejectError(err.message || "Lỗi khi từ chối duyệt công.");
+      setRejectError(getApiErrorMessage(err, "Lỗi khi từ chối duyệt công."));
     } finally {
       setIsRejecting(false);
     }
@@ -469,8 +555,8 @@ export default function AttendanceManagement() {
     try {
       const res = await getAttendanceHistory(row.ma_nv, selectedMonth, selectedYear);
       setEmployeeDetailHistory(res);
-    } catch (e) {
-      console.error("Lỗi tải chi tiết chấm công nhân viên:", e);
+    } catch (err) {
+      notify(`Không tải được chi tiết chấm công của ${row.ho_ten}: ${getApiErrorMessage(err)}`, "error");
     } finally {
       setIsLoadingDetail(false);
     }
@@ -480,9 +566,17 @@ export default function AttendanceManagement() {
   const handleExportExcel = () => {
     let csvContent = "\uFEFF"; // UTF-8 BOM
     if (viewMode === "daily") {
-      csvContent += "Mã NV,Họ tên,Phòng ban,Chức vụ,Ca làm việc,Giờ vào,Giờ ra,Số giờ làm,Loại công,Trạng thái,Ghi chú\n";
+      csvContent += "Mã NV,Họ tên,Phòng ban,Chức vụ,Ca làm việc,Giờ vào,Giờ ra,Số giờ làm,Số công,Loại công,Trạng thái,Phê duyệt,Ghi chú\n";
+      const approvalLabel = (r) =>
+        r.trang_thai_duyet === "DA_DUYET"
+          ? "Đã duyệt"
+          : r.trang_thai_duyet === "TU_CHOI"
+          ? "Từ chối (không tính công)"
+          : r.ma_cc
+          ? "Chờ duyệt"
+          : "";
       filteredDaily.forEach((r) => {
-        csvContent += `"${r.ma_nv}","${r.ho_ten}","${r.ten_pb || ''}","${r.ten_cv || ''}","${r.ca_lam_viec || 'Hành chính'}","${r.gio_vao || ''}","${r.gio_ra || ''}","${r.so_gio_lam || 0}","${r.loai_cong || ''}","${r.trang_thai || ''}","${(r.ghi_chu || '').replace(/"/g, '""')}"\n`;
+        csvContent += `"${r.ma_nv}","${r.ho_ten}","${r.ten_pb || ''}","${r.ten_cv || ''}","${r.ca_lam_viec || 'Hành chính'}","${r.gio_vao || ''}","${r.gio_ra || ''}","${r.so_gio_lam || 0}","${r.ma_cc ? r.so_cong ?? '' : ''}","${WORK_TYPE_LABEL[r.loai_cong] || r.loai_cong || ''}","${r.trang_thai || ''}","${approvalLabel(r)}","${(r.ghi_chu || '').replace(/"/g, '""')}"\n`;
       });
     } else {
       csvContent += "Mã NV,Họ tên,Phòng ban,Chức vụ,Tháng,Năm,Tổng ngày công,Số lần đi trễ,Số ngày phép\n";
@@ -501,15 +595,15 @@ export default function AttendanceManagement() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    setSyncToast("Đã xuất file bảng chấm công thành công!");
-    setTimeout(() => setSyncToast(""), 3500);
+    notify("Đã xuất file bảng chấm công!", "success", 3500);
   };
 
   // KPI Calculations cho Bảng ngày
   const totalEmployees = dailyAttendance.length;
   const checkedInCount = dailyAttendance.filter((r) => r.gio_vao && r.gio_vao !== "--:--" && r.gio_vao !== "-").length;
   const onTimeCount = dailyAttendance.filter((r) => r.loai_cong === "CONG_DU" && r.gio_vao && r.gio_vao !== "--:--").length;
-  const lateCount = dailyAttendance.filter((r) => r.loai_cong === "DI_TRE" || r.loai_cong === "VE_SOM").length;
+  const lateCount = dailyAttendance.filter((r) => r.loai_cong === "DI_TRE").length;
+  const earlyLeaveCount = dailyAttendance.filter((r) => r.loai_cong === "VE_SOM").length;
   const absentCount = dailyAttendance.filter((r) => !r.gio_vao || r.gio_vao === "--:--" || r.gio_vao === "-").length;
   const leaveCount = dailyAttendance.filter((r) => r.loai_cong === "NGHI_PHEP").length;
   const unauthorizedCount = Math.max(0, absentCount - leaveCount);
@@ -518,7 +612,6 @@ export default function AttendanceManagement() {
 
   // KPI Calculations cho Bảng tháng
   const totalWorkDays = monthlyAttendance.reduce((acc, r) => acc + (Number(r.tong_ngay_cong) || 0), 0);
-  const totalOTHours = monthlyAttendance.reduce((acc, r) => acc + (Number(r.tong_gio_ot) || 0), 0);
   const totalLateTimes = monthlyAttendance.reduce((acc, r) => acc + (Number(r.so_lan_di_tre) || 0), 0);
   const totalLeaveDays = monthlyAttendance.reduce((acc, r) => acc + (Number(r.so_ngay_phep) || 0), 0);
 
@@ -530,6 +623,8 @@ export default function AttendanceManagement() {
       (item.ten_pb || "").toLowerCase().includes(searchQuery.toLowerCase());
 
     const isLate = item.loai_cong === "DI_TRE";
+    const isEarlyLeave = item.loai_cong === "VE_SOM";
+    const isRejectedRecord = item.trang_thai_duyet === "TU_CHOI" && Boolean(item.ma_cc);
     const isOntime = item.loai_cong === "CONG_DU" && item.gio_vao && item.gio_vao !== "--:--";
     const isWorking = item.gio_vao && item.gio_vao !== "--:--" && (item.gio_ra === "--:--" || !item.gio_ra);
     const isAbsent = !item.gio_vao || item.gio_vao === "--:--" || item.gio_vao === "-";
@@ -543,6 +638,8 @@ export default function AttendanceManagement() {
       (selectedStatus === "pending" && isPending) ||
       (selectedStatus === "ontime" && isOntime) ||
       (selectedStatus === "late" && isLate) ||
+      (selectedStatus === "early" && isEarlyLeave) ||
+      (selectedStatus === "rejected" && isRejectedRecord) ||
       (selectedStatus === "working" && isWorking) ||
       (selectedStatus === "absent" && isAbsent);
 
@@ -668,25 +765,27 @@ export default function AttendanceManagement() {
   // Phê duyệt phụ thuộc vào số lượng người dùng tick vào (duyệt đúng theo tình trạng: đi trễ duyệt theo đi trễ, đúng giờ duyệt theo công đủ)
   const handleBulkApprove = async () => {
     if (isMonthLocked) {
-      setSyncToast(`Bảng công tháng ${selectedMonth}/${selectedYear} đã được Chốt và Khóa! Vui lòng mở khóa trước.`);
-      setTimeout(() => setSyncToast(""), 4000);
+      notify(`Bảng công tháng ${lockThang}/${lockNam} đã được chốt và khóa, không thể thay đổi.`, "warning");
       return;
     }
 
+    if (isBulkApproving) return;
+
     if (selectedEligibleDailyRows.length === 0) {
-      if (selectedRowIds.length > 0) {
-        setSyncToast("Các nhân sự bạn đã tick chọn đều đã được duyệt hoặc đang bị từ chối.");
-      } else {
-        setSyncToast("Vui lòng tick chọn ít nhất 1 nhân sự hợp lệ để phê duyệt.");
-      }
-      setTimeout(() => setSyncToast(""), 4000);
+      notify(
+        selectedRowIds.length > 0
+          ? "Các nhân sự bạn đã tick chọn đều đã được duyệt hoặc đang bị từ chối."
+          : "Vui lòng tick chọn ít nhất 1 nhân sự hợp lệ để phê duyệt.",
+        "warning"
+      );
       return;
     }
 
     setIsBulkApproving(true);
     try {
       let lateCount = 0;
-      await Promise.all(
+      // allSettled: một bản ghi bị từ chối (vd 403 ngoài nhóm) không chặn các bản ghi còn lại
+      const results = await Promise.allSettled(
         selectedEligibleDailyRows.map((r) => {
           const isLate = r.loai_cong === "DI_TRE";
           if (isLate) lateCount += 1;
@@ -705,22 +804,30 @@ export default function AttendanceManagement() {
         })
       );
 
+      const failed = results
+        .map((res, idx) => ({ res, row: selectedEligibleDailyRows[idx] }))
+        .filter(({ res }) => res.status === "rejected");
+      const okCount = results.length - failed.length;
       const skippedCount = selectedRowIds.length - selectedEligibleDailyRows.length;
-      let toastMsg = `Đã phê duyệt thành công cho ${selectedEligibleDailyRows.length} nhân sự`;
-      if (lateCount > 0) {
-        toastMsg += ` (bao gồm ${lateCount} nhân sự xác nhận đi trễ)`;
+      let toastMsg = `Đã phê duyệt thành công cho ${okCount} nhân sự`;
+      if (lateCount > 0 && okCount > 0) {
+        toastMsg += ` (có nhân sự được xác nhận đi trễ)`;
       }
       if (skippedCount > 0) {
         toastMsg += ` (đã bỏ qua ${skippedCount} người đã duyệt hoặc bị từ chối)`;
       }
-      setSyncToast(`${toastMsg}!`);
+      if (failed.length > 0) {
+        const first = failed[0];
+        toastMsg += `. ${failed.length} bản ghi không duyệt được — ${first.row.ho_ten}: ${getApiErrorMessage(first.res.reason)}`;
+        notify(toastMsg, okCount > 0 ? "warning" : "error", 7000);
+      } else {
+        notify(`${toastMsg}!`);
+      }
 
       setSelectedRowIds([]);
-      setTimeout(() => setSyncToast(""), 4000);
       await loadDailyData(selectedDate, selectedDept);
     } catch (err) {
-      setSyncToast(`Lỗi khi phê duyệt hàng loạt: ${err.message}`);
-      setTimeout(() => setSyncToast(""), 4500);
+      notify(`Lỗi khi phê duyệt hàng loạt: ${getApiErrorMessage(err)}`, "error");
     } finally {
       setIsBulkApproving(false);
     }
@@ -753,37 +860,54 @@ export default function AttendanceManagement() {
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Dữ liệu kết nối trực tiếp từ hệ thống chấm công, máy vân tay và API Quản lý vận hành.
+            Dữ liệu chấm công trên web của nhân sự, cập nhật trực tiếp từ hệ thống.
           </p>
         </div>
 
         {/* Action Group */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={handleToggleLockMonth}
-            disabled={isLocking}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all active:scale-95 ${
-              isMonthLocked
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100"
-                : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-amber-500/20"
-            }`}
-            title={isMonthLocked ? "Mở khóa bảng chấm công tháng" : "Chốt và khóa bảng công tháng để tính lương"}
-          >
-            {isLocking ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : isMonthLocked ? (
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            ) : (
+          {canLock ? (
+            <button
+              type="button"
+              onClick={handleToggleLockMonth}
+              disabled={isLocking}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-all active:scale-95 disabled:opacity-60 ${
+                isMonthLocked
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100"
+                  : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-amber-500/20"
+              }`}
+              title={isMonthLocked ? "Mở khóa bảng chấm công tháng" : "Chốt và khóa bảng công tháng để tính lương"}
+            >
+              {isLocking ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isMonthLocked ? (
+                <Unlock className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <Lock className="w-3.5 h-3.5" />
+              )}
+              <span>
+                {isLocking
+                  ? "Đang xử lý..."
+                  : isMonthLocked
+                  ? `Đã chốt công T${lockThang}/${lockNam} (Mở khóa)`
+                  : `Chốt công T${lockThang}/${lockNam}`}
+              </span>
+            </button>
+          ) : (
+            <span
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border cursor-not-allowed ${
+                isMonthLocked
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-slate-50 text-slate-500 border-slate-200"
+              }`}
+              title="Chỉ tài khoản có quyền Chốt / mở khóa công (ATTENDANCE_LOCK) mới thực hiện được"
+            >
               <Lock className="w-3.5 h-3.5" />
-            )}
-            <span>
-              {isLocking
-                ? "Đang xử lý..."
-                : isMonthLocked
-                ? `Đã chốt công Th.${selectedMonth} (Mở khóa)`
-                : `Chốt công Th.${selectedMonth}`}
+              <span>
+                {isMonthLocked ? `Đã chốt công T${lockThang}/${lockNam}` : `Chưa chốt công T${lockThang}/${lockNam}`}
+              </span>
             </span>
-          </button>
+          )}
 
           <button
             onClick={handleSync}
@@ -803,6 +927,16 @@ export default function AttendanceManagement() {
         </div>
       </div>
 
+      {!canLock && (
+        <div className="p-3 bg-slate-50 border border-slate-200 text-slate-600 text-xs rounded-2xl flex items-start gap-2">
+          <Lock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+          <span>
+            Bạn có thể xem, điều chỉnh và duyệt công của nhân sự trong phạm vi quản lý, nhưng không có quyền{" "}
+            <strong>chốt / mở khóa bảng công tháng</strong> (ATTENDANCE_LOCK). Việc chốt công do Quản lý thực hiện.
+          </span>
+        </div>
+      )}
+
       {/* Banner thông báo trạng thái Chốt công tháng */}
       {isMonthLocked && (
         <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 text-emerald-900 text-xs rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
@@ -812,10 +946,11 @@ export default function AttendanceManagement() {
             </div>
             <div>
               <span className="font-bold text-emerald-800 text-xs block">
-                Bảng chấm công Tháng {selectedMonth}/{selectedYear} đã được Chốt & Khóa an toàn!
+                Bảng chấm công tháng {lockThang}/{lockNam} đã được chốt & khóa
               </span>
               <p className="text-[11px] text-emerald-700 mt-0.5">
-                Dữ liệu ngày công đã cố định cho phòng Kế toán tính lương. Bảng công đã được khóa chống chỉnh sửa.
+                Dữ liệu ngày công đã cố định để tính lương; các bản ghi bị từ chối không được tính công. Không thể điều
+                chỉnh cho đến khi mở khóa.
               </p>
             </div>
           </div>
@@ -828,8 +963,23 @@ export default function AttendanceManagement() {
 
       {/* Sync Toast Notice */}
       {syncToast && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div
+          role={syncToastType === "error" ? "alert" : "status"}
+          className={`p-3 border text-xs rounded-xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 ${
+            syncToastType === "error"
+              ? "bg-rose-50 border-rose-200 text-rose-800"
+              : syncToastType === "warning"
+              ? "bg-amber-50 border-amber-200 text-amber-900"
+              : "bg-emerald-50 border-emerald-200 text-emerald-800"
+          }`}
+        >
+          {syncToastType === "error" ? (
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          ) : syncToastType === "warning" ? (
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          )}
           <span>{syncToast}</span>
         </div>
       )}
@@ -896,7 +1046,7 @@ export default function AttendanceManagement() {
           {/* Card 3: Đi muộn */}
           <div className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex flex-col justify-between relative overflow-hidden group hover:border-amber-300 transition-all">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Đi muộn / Vi phạm</span>
+              <span className="text-xs font-medium text-slate-500">Đi muộn / Về sớm</span>
               <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
                 <AlertTriangle className="w-4 h-4" />
               </div>
@@ -906,17 +1056,25 @@ export default function AttendanceManagement() {
                 <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-amber-600">
                   {lateCount}
                 </span>
-                <span className="text-xs text-slate-400">trường hợp</span>
+                <span className="text-xs text-slate-400">đi muộn</span>
+                <span className="font-['Plus_Jakarta_Sans',sans-serif] text-2xl font-bold text-orange-600 ml-2">
+                  {earlyLeaveCount}
+                </span>
+                <span className="text-xs text-slate-400">về sớm</span>
               </div>
-              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1 flex">
                 <div
-                  className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                  className="bg-amber-500 h-full transition-all duration-500"
                   style={{ width: `${totalEmployees > 0 ? (lateCount / totalEmployees) * 100 : 0}%` }}
+                ></div>
+                <div
+                  className="bg-orange-500 h-full transition-all duration-500"
+                  style={{ width: `${totalEmployees > 0 ? (earlyLeaveCount / totalEmployees) * 100 : 0}%` }}
                 ></div>
               </div>
               <div className="flex justify-between items-center text-[11px] text-slate-500 mt-1">
-                <span>Quản lý có thể sửa ≤ 3 lần</span>
-                <span className="text-amber-600 font-semibold">Theo quy định</span>
+                <span>Vào trễ / ra sớm quá 15 phút</span>
+                <span className="text-amber-600 font-semibold">Sửa giờ vào ≤ 3 lần/tháng</span>
               </div>
             </div>
           </div>
@@ -1054,8 +1212,12 @@ export default function AttendanceManagement() {
               Grace: 15 phút (trước 08:15)
             </span>
             <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+              Về sớm: ra ca sớm quá 15 phút
+            </span>
+            <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-              Sau 8h15: Giới hạn sửa ≤ 3 lần/tháng
+              Từ chối: không tính công
             </span>
           </div>
         </div>
@@ -1134,7 +1296,7 @@ export default function AttendanceManagement() {
               onChange={(e) => setSelectedDept(e.target.value)}
               className="px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
             >
-              {DEPARTMENTS.map((dept) => (
+              {departments.map((dept) => (
                 <option key={dept.id} value={dept.id}>
                   {dept.label}
                 </option>
@@ -1153,6 +1315,8 @@ export default function AttendanceManagement() {
                 <option value="pending">Chờ duyệt công</option>
                 <option value="ontime">Đúng giờ</option>
                 <option value="late">Đi muộn</option>
+                <option value="early">Về sớm</option>
+                <option value="rejected">Từ chối (không tính công)</option>
                 <option value="working">Đang làm việc</option>
                 <option value="absent">Vắng mặt / Chưa chấm</option>
               </select>
@@ -1252,7 +1416,12 @@ export default function AttendanceManagement() {
                     const isCheckedIn = row.gio_vao && row.gio_vao !== "--:--" && row.gio_vao !== "-";
                     const isApproved = row.trang_thai_duyet === "DA_DUYET";
                     const isRejected = row.trang_thai_duyet === "TU_CHOI" || row.loai_cong === "NGHI_KHONG_PHEP";
-                    const hasExplanation = isLate || Boolean(row.ghi_chu && row.ghi_chu.length > 0);
+                    const isWorkingNow = isCheckedIn && (row.gio_ra === "--:--" || !row.gio_ra);
+                    const typeBadge =
+                      WORK_TYPE_BADGE[row.loai_cong] ||
+                      (isWorkingNow
+                        ? { cls: "bg-sky-50 text-sky-700", dot: "bg-sky-500 animate-pulse" }
+                        : { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400" });
 
                     return (
                       <tr key={row.ma_nv} className={`hover:bg-slate-50/80 transition-colors ${selectedRowIds.includes(row.ma_cc) ? "bg-sky-50/50" : ""}`}>
@@ -1344,13 +1513,22 @@ export default function AttendanceManagement() {
 
                         {/* Số công */}
                         <td className="py-3 px-4 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                            (row.so_cong >= 1) ? "bg-emerald-50 text-emerald-700" :
-                            (row.so_cong >= 0.5) ? "bg-blue-50 text-blue-700" :
-                            row.ma_cc ? "bg-slate-100 text-slate-500" : ""
-                          }`}>
-                            {row.so_cong != null && row.ma_cc ? Number(row.so_cong).toFixed(1) : "-"}
-                          </span>
+                          {row.ma_cc && row.trang_thai_duyet === "TU_CHOI" ? (
+                            <span
+                              className="inline-flex px-2 py-0.5 rounded-md font-bold text-[11px] bg-rose-50 text-rose-600 line-through decoration-rose-400"
+                              title="Bản ghi bị từ chối: không được tính công khi tính lương"
+                            >
+                              {row.so_cong != null ? Number(row.so_cong).toFixed(1) : "0.0"}
+                            </span>
+                          ) : (
+                            <span className={`inline-flex px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                              (row.so_cong >= 1) ? "bg-emerald-50 text-emerald-700" :
+                              (row.so_cong >= 0.5) ? "bg-blue-50 text-blue-700" :
+                              row.ma_cc ? "bg-slate-100 text-slate-500" : ""
+                            }`}>
+                              {row.so_cong != null && row.ma_cc ? Number(row.so_cong).toFixed(1) : "-"}
+                            </span>
+                          )}
                         </td>
 
                         
@@ -1358,38 +1536,10 @@ export default function AttendanceManagement() {
                         {/* Status */}
                         <td className="py-3 px-4">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${row.loai_cong === "CONG_DU"
-                                ? "bg-emerald-50 text-emerald-700"
-                                : row.loai_cong === "VE_SOM"
-                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                  : isLate
-                                    ? "bg-amber-50 text-amber-700"
-                                    : row.loai_cong === "NUA_CONG"
-                                      ? "bg-blue-50 text-blue-700"
-                                      : row.loai_cong === "NGHI_PHEP"
-                                        ? "bg-sky-50 text-sky-700"
-                                        : isCheckedIn && (row.gio_ra === "--:--" || !row.gio_ra)
-                                          ? "bg-sky-50 text-sky-700"
-                                          : "bg-slate-100 text-slate-600"
-                              }`}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${typeBadge.cls}`}
                           >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${row.loai_cong === "CONG_DU"
-                                  ? "bg-emerald-500"
-                                  : row.loai_cong === "VE_SOM"
-                                    ? "bg-rose-500"
-                                    : isLate
-                                      ? "bg-amber-500"
-                                      : row.loai_cong === "NUA_CONG"
-                                        ? "bg-blue-500"
-                                        : row.loai_cong === "NGHI_PHEP"
-                                          ? "bg-sky-500"
-                                          : isCheckedIn && (row.gio_ra === "--:--" || !row.gio_ra)
-                                            ? "bg-sky-500 animate-pulse"
-                                            : "bg-slate-400"
-                                }`}
-                            ></span>
-                            {row.trang_thai || (row.loai_cong === "CONG_DU" ? "Đúng giờ" : "Chưa chấm")}
+                            <span className={`w-1.5 h-1.5 rounded-full ${typeBadge.dot}`}></span>
+                            {row.trang_thai || WORK_TYPE_LABEL[row.loai_cong] || "Chưa chấm"}
                           </span>
                         </td>
 
@@ -1401,9 +1551,12 @@ export default function AttendanceManagement() {
                               <span>Đã duyệt</span>
                             </span>
                           ) : isRejected ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/90 shadow-2xs">
-                              <XCircle className="w-3.5 h-3.5 text-rose-600 stroke-[2.4]" />
-                              <span>Từ chối</span>
+                            <span className="inline-flex flex-col items-center gap-0.5">
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/90 shadow-2xs">
+                                <XCircle className="w-3.5 h-3.5 text-rose-600 stroke-[2.4]" />
+                                <span>Từ chối</span>
+                              </span>
+                              <span className="text-[10px] font-semibold text-rose-600">Không tính công</span>
                             </span>
                           ) : row.ma_cc ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200/80">
@@ -1485,7 +1638,8 @@ export default function AttendanceManagement() {
                                 <button
                                   type="button"
                                   onClick={() => handleApprove(row)}
-                                  className="w-8 h-8 rounded-lg text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                                  disabled={approvingId === row.ma_cc}
+                                  className="w-8 h-8 rounded-lg text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 transition-all flex items-center justify-center cursor-pointer active:scale-95 disabled:opacity-50"
                                   title={isLate ? "Phê duyệt lại (Xác nhận đi trễ)" : "Phê duyệt lại công đủ (1.0 ngày công)"}
                                 >
                                   <Check className="w-4 h-4 stroke-[2.5]" />
@@ -1517,7 +1671,8 @@ export default function AttendanceManagement() {
                                 <button
                                   type="button"
                                   onClick={() => handleApprove(row)}
-                                  className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-2xs flex items-center justify-center cursor-pointer active:scale-95"
+                                  disabled={approvingId === row.ma_cc}
+                                  className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-2xs flex items-center justify-center cursor-pointer active:scale-95 disabled:opacity-50"
                                   title={isLate ? "Xác nhận duyệt đi trễ" : "Chốt duyệt công đủ (1.0 ngày công)"}
                                 >
                                   <Check className="w-4 h-4 stroke-[2.5]" />
@@ -1799,12 +1954,15 @@ export default function AttendanceManagement() {
       {/* ──────────────── MODAL ĐIỀU CHỈNH GIỜ / DUYỆT GIẢI TRÌNH ──────────────── */}
       {adjustModalData && (
         <div
-          onClick={() => setAdjustModalData(null)}
+          onClick={() => !isAdjusting && setAdjustModalData(null)}
           className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Điều chỉnh giờ chấm công"
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 animate-in zoom-in-95 duration-200 cursor-default"
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-100 animate-in zoom-in-95 duration-200 cursor-default max-h-[92vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -1930,7 +2088,7 @@ export default function AttendanceManagement() {
                   <option value="DI_TRE">Đi trễ (Ghi nhận vi phạm)</option>
                   <option value="NUA_CONG">Nửa ngày công (0.5 công)</option>
                   <option value="NGHI_PHEP">Nghỉ phép (Hưởng chế độ phép)</option>
-                  <option value="VE_SOM">Về sớm (0.0 ngày công)</option>
+                  <option value="VE_SOM">Về sớm (công theo số giờ làm: ≥7h = 1, 4–7h = 0,5)</option>
                   <option value="NGHI_KHONG_PHEP">Từ chối duyệt (0.0 công - Nghỉ không phép / Bỏ ca)</option>
                 </select>
                 <p className="text-[11px] text-slate-400 mt-1">
@@ -1956,7 +2114,8 @@ export default function AttendanceManagement() {
               <button
                 type="button"
                 onClick={() => setAdjustModalData(null)}
-                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold text-xs transition-colors cursor-pointer"
+                disabled={isAdjusting}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold text-xs transition-colors cursor-pointer disabled:opacity-50"
               >
                 Hủy bỏ
               </button>
@@ -1986,10 +2145,13 @@ export default function AttendanceManagement() {
       {/* ──────────────── POPUP TỪ CHỐI DUYỆT CÔNG (NÚT X) ──────────────── */}
       {rejectModalData && (
         <div
-          onClick={() => setRejectModalData(null)}
+          onClick={() => !isRejecting && setRejectModalData(null)}
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150 cursor-pointer"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Từ chối duyệt công"
             onClick={(e) => e.stopPropagation()}
             className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-150 cursor-default"
           >
@@ -2001,7 +2163,7 @@ export default function AttendanceManagement() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-800">Từ chối duyệt công</h3>
-                  <p className="text-[11px] text-slate-500">Chuyển thành 0 ngày công (Nghỉ không phép / Vi phạm)</p>
+                  <p className="text-[11px] text-slate-500">Bản ghi bị từ chối sẽ không được tính công khi tính lương</p>
                 </div>
               </div>
               <button
@@ -2113,6 +2275,9 @@ export default function AttendanceManagement() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto cursor-pointer"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Chi tiết chấm công của ${selectedEmployeeDetail.ho_ten}`}
             onClick={(e) => e.stopPropagation()}
             className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl p-6 text-sm relative animate-in fade-in zoom-in-95 duration-150 my-8 cursor-default"
           >
@@ -2218,15 +2383,9 @@ export default function AttendanceManagement() {
                         </td>
                         <td className="py-2.5 px-3 text-center">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                            rec.loai_cong === "CONG_DU"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : rec.loai_cong === "DI_TRE"
-                              ? "bg-amber-50 text-amber-700"
-                              : rec.loai_cong === "NUA_CONG"
-                              ? "bg-blue-50 text-blue-700"
-                              : "bg-slate-100 text-slate-600"
+                            (WORK_TYPE_BADGE[rec.loai_cong] || { cls: "bg-slate-100 text-slate-600" }).cls
                           }`}>
-                            {rec.trang_thai || (rec.loai_cong === "CONG_DU" ? "Đúng giờ" : rec.loai_cong)}
+                            {rec.trang_thai || WORK_TYPE_LABEL[rec.loai_cong] || rec.loai_cong}
                           </span>
                         </td>
                         {/* Phê duyệt */}
@@ -2237,9 +2396,12 @@ export default function AttendanceManagement() {
                               Đã duyệt
                             </span>
                           ) : rec.trang_thai_duyet === "TU_CHOI" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              <XCircle className="w-3 h-3" />
-                              Từ chối
+                            <span className="inline-flex flex-col items-center gap-0.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <XCircle className="w-3 h-3" />
+                                Từ chối
+                              </span>
+                              <span className="text-[10px] font-semibold text-rose-600">Không tính công</span>
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
@@ -2271,6 +2433,43 @@ export default function AttendanceManagement() {
           </div>
         </div>
       )}
+
+      {/* ──────────────── XÁC NHẬN CHỐT / MỞ KHÓA BẢNG CÔNG THÁNG ──────────────── */}
+      <ConfirmDialog
+        open={lockConfirmOpen}
+        tone={isMonthLocked ? "warning" : "primary"}
+        icon={isMonthLocked ? Unlock : Lock}
+        title={
+          isMonthLocked
+            ? `Mở khóa bảng công tháng ${lockThang}/${lockNam}?`
+            : `Chốt và khóa bảng công tháng ${lockThang}/${lockNam}?`
+        }
+        description={
+          isMonthLocked ? (
+            <ul className="list-disc pl-4 space-y-1">
+              <li>Bảng công sẽ cho phép điều chỉnh / duyệt lại.</li>
+              <li>
+                Không thể mở khóa nếu bảng lương tháng {lockThang}/{lockNam} đã được <strong>duyệt</strong> hoặc{" "}
+                <strong>đã chi trả</strong> — cần mở lại bảng lương về Nháp trước.
+              </li>
+            </ul>
+          ) : (
+            <ul className="list-disc pl-4 space-y-1">
+              <li>
+                Tất cả bản ghi chấm công đang <strong>Chờ duyệt</strong> của tháng sẽ được{" "}
+                <strong>tự động duyệt</strong>.
+              </li>
+              <li>Bản ghi đã bị Từ chối giữ nguyên và không được tính công.</li>
+              <li>Sau khi chốt, không thể điều chỉnh công; bảng lương tháng mới được phép tính.</li>
+            </ul>
+          )
+        }
+        confirmLabel={isMonthLocked ? "Mở khóa bảng công" : "Chốt công & khóa"}
+        busy={isLocking}
+        error={lockError}
+        onCancel={() => !isLocking && setLockConfirmOpen(false)}
+        onConfirm={handleConfirmToggleLock}
+      />
     </div>
   );
 }

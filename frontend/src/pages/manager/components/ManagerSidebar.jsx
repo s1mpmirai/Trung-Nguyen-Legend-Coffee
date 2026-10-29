@@ -8,12 +8,13 @@ import {
   Shield,
   ShieldCheck,
   ArrowLeftRight,
-  FileBarChart2,
+  FilePen,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import logoImg from "../../../assets/logo/Logo Trung Nguyên_black.png";
 import { navigateClean } from "../../../utils/navigation";
+import { getManagerAccess } from "../managerUtils";
 
 export default function ManagerSidebar({
   activeTab = "dashboard",
@@ -24,6 +25,7 @@ export default function ManagerSidebar({
   onToggleCollapse,
   onClose,
   userSession,
+  pendingProfileCount = 0,
 }) {
   const sidebarRef = useRef(null);
 
@@ -47,10 +49,8 @@ export default function ManagerSidebar({
     };
   }, [collapsed, onToggleCollapse, onClose]);
 
-  const userRole = String(userSession?.role || localStorage.getItem("user_role") || "").toUpperCase();
-  const userPerms = userSession?.permissions || JSON.parse(localStorage.getItem("user_permissions") || "[]");
   // Menu hiển thị theo quyền thực tế của tài khoản (khớp với kiểm tra quyền ở backend)
-  const can = (perm) => userRole === "ADMIN" || userPerms.includes(perm);
+  const { can } = getManagerAccess(userSession);
 
   const allNavItems = [
     { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
@@ -59,6 +59,13 @@ export default function ManagerSidebar({
       label: "Quản lý nhân sự",
       icon: Users,
       allowed: can("EMPLOYEE_VIEW"),
+    },
+    {
+      id: "profile-requests",
+      label: "Duyệt sửa hồ sơ",
+      icon: FilePen,
+      allowed: can("EMPLOYEE_UPDATE"),
+      badge: pendingProfileCount,
     },
     {
       id: "leaves",
@@ -174,8 +181,21 @@ export default function ManagerSidebar({
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-sky-600" : "text-slate-400"}`} />
-                {!collapsed && <span className="truncate">{item.label}</span>}
+                <span className="relative shrink-0">
+                  <Icon className={`w-4 h-4 ${isActive ? "text-sky-600" : "text-slate-400"}`} />
+                  {collapsed && item.badge > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full bg-amber-500" />
+                  )}
+                </span>
+                {!collapsed && <span className="truncate flex-1">{item.label}</span>}
+                {!collapsed && item.badge > 0 && (
+                  <span
+                    className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold flex items-center justify-center"
+                    aria-label={`${item.badge} yêu cầu chờ duyệt`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -197,7 +217,7 @@ export default function ManagerSidebar({
             title="Chuyển sang Cổng Quản Trị Viên (Admin)"
           >
             <Shield className="w-3.5 h-3.5 text-amber-600" />
-            {!collapsed && <span>Cổng Admin Tối Cao</span>}
+            {!collapsed && <span>Cổng Quản trị</span>}
           </button>
         )}
 

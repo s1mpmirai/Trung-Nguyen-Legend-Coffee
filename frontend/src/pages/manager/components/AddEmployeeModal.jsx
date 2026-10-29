@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getDepartments, getPositions } from "../../../services/adminService";
-import { UserPlus, X, CheckCircle2, Save, ShieldCheck } from "lucide-react";
+import { UserPlus, X, CheckCircle2, Save, Loader2 } from "lucide-react";
+import { useEscapeKey } from "./ConfirmDialog";
 
 export const CONTRACT_TYPES = [
   { id: "THU_VIEC", name: "Hợp đồng Thử việc (02 tháng)" },
@@ -19,7 +20,7 @@ export const EDUCATION_LEVELS = [
   { id: "CHUNG_CHI", name: "Chứng chỉ nghề" },
 ];
 
-export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
+export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptions = [] }) {
   const todayStr = new Date().toISOString().split("T")[0];
 
   const [formData, setFormData] = useState({
@@ -37,11 +38,27 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
     salary: "",
     educationLevel: "DAI_HOC",
     major: "",
+    managerId: "",
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  useEscapeKey(isOpen, onClose, isSaving);
 
   // Chỉ cho chọn phòng ban / chức vụ đang hoạt động (đã xóa mềm thì không hiện)
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
+
+  // Danh sách Quản lý trực tiếp: ưu tiên nhân sự cùng phòng ban đang chọn lên đầu
+  const sortedManagerOptions = useMemo(() => {
+    const deptName = departments.find((d) => d.id === formData.maPb)?.name || "";
+    return [...managerOptions].sort((a, b) => {
+      const aSame = a.dept === deptName ? 0 : 1;
+      const bSame = b.dept === deptName ? 0 : 1;
+      if (aSame !== bSame) return aSame - bSame;
+      return String(a.name || "").localeCompare(String(b.name || ""), "vi");
+    });
+  }, [managerOptions, departments, formData.maPb]);
   useEffect(() => {
     if (!isOpen) return;
     Promise.all([getDepartments({ trang_thai: 1 }), getPositions({ trang_thai: 1 })])
@@ -57,13 +74,14 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
           maCv: posList.some((p) => p.id === prev.maCv) ? prev.maCv : posList[0]?.id || "",
         }));
       })
-      .catch((err) => console.error("Không tải được danh mục phòng ban / chức vụ:", err));
+      .catch((err) => setLoadError(`Không tải được danh mục phòng ban / chức vụ: ${err.message}`));
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSaving) return;
 
     // Chuẩn hóa mức lương về số nguyên phục vụ DB DECIMAL(12,0)
     const cleanSalary = Number(String(formData.salary).replace(/[^0-9]/g, ""));
@@ -88,6 +106,8 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
       loai_hd: formData.contractType,
       trinh_do: formData.educationLevel,
       chuyen_nganh: formData.major.trim() || null,
+      // Quản lý trực tiếp (tùy chọn): bỏ trống = Trưởng phòng ban
+      ma_nql: formData.managerId || null,
 
       // Thuộc tính tương thích giao diện frontend
       fullName: formData.fullName.trim(),
@@ -101,18 +121,25 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
       salary: cleanSalary,
     };
 
-    if (onSave) {
-      onSave(payload);
+    setIsSaving(true);
+    try {
+      // onSave trả về false khi máy chủ từ chối -> giữ modal để người dùng sửa lại
+      const ok = onSave ? await onSave(payload) : true;
+      if (ok !== false) onClose();
+    } finally {
+      setIsSaving(false);
     }
-    onClose();
   };
 
   return (
     <div
-      onClick={onClose}
+      onClick={() => !isSaving && onClose()}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn cursor-pointer"
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-employee-title"
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden my-6 cursor-default"
       >
@@ -123,7 +150,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
               <UserPlus className="w-5 h-5" />
             </div>
             <div className="flex flex-col">
-              <h2 className="text-base font-bold text-slate-800">
+              <h2 id="add-employee-title" className="text-base font-bold text-slate-800">
                 Thêm hồ sơ nhân sự mới
               </h2>
               <p className="text-xs text-slate-400">
@@ -133,7 +160,9 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+            disabled={isSaving}
+            aria-label="Đóng"
+            className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40"
             type="button"
           >
             <X className="w-4 h-4" />
@@ -142,6 +171,11 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-5 max-h-[80vh] overflow-y-auto">
+          {loadError && (
+            <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+              {loadError}
+            </div>
+          )}
           {/* Nhóm 1: Thông tin cá nhân & Định danh */}
           <div className="flex flex-col gap-3.5">
             <div className="flex items-center gap-2">
@@ -323,6 +357,32 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
               </div>
 
 
+              {/* Quản lý trực tiếp (tùy chọn) */}
+              <div className="flex flex-col gap-1.5 md:col-span-2">
+                <label htmlFor="add-emp-ma-nql" className="text-xs font-semibold text-slate-700">
+                  Quản lý trực tiếp
+                </label>
+                <select
+                  id="add-emp-ma-nql"
+                  value={formData.managerId}
+                  onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
+                  aria-describedby="add-emp-ma-nql-help"
+                  className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all cursor-pointer"
+                >
+                  <option value="">— Mặc định: Trưởng phòng ban —</option>
+                  {sortedManagerOptions.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {`${m.id} - ${m.name}${
+                        m.role || m.dept ? ` (${[m.role, m.dept].filter(Boolean).join(" • ")})` : ""
+                      }`}
+                    </option>
+                  ))}
+                </select>
+                <p id="add-emp-ma-nql-help" className="text-[11px] text-slate-400">
+                  Bỏ trống = Trưởng phòng ban. Người được chọn sẽ duyệt đơn từ và chấm công của nhân sự này.
+                </p>
+              </div>
+
               {/* Loại hợp đồng (Khớp bảng hop_dong_lao_dong) */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
@@ -395,16 +455,18 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              disabled={isSaving}
+              className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              disabled={isSaving}
+              className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Save className="w-4 h-4" />
-              <span>Lưu hồ sơ </span>
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{isSaving ? "Đang lưu..." : "Lưu hồ sơ"}</span>
             </button>
           </div>
         </form>

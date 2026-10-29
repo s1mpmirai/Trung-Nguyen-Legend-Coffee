@@ -1,8 +1,9 @@
 import React from "react";
+import CardErrorNotice from "./CardErrorNotice";
 
 const CIRCUMFERENCE = 2 * Math.PI * 38; // r = 38
 
-export default function EducationChartCard({ educationData }) {
+export default function EducationChartCard({ educationData, error }) {
   const items = educationData || [];
   const totalEmployees = items.reduce((sum, item) => sum + item.count, 0);
   const topItem = items.reduce((best, item) => (!best || item.count > best.count ? item : best), null);
@@ -31,7 +32,9 @@ export default function EducationChartCard({ educationData }) {
           </span>
         </div>
 
-        {items.length === 0 ? (
+        {error ? (
+          <CardErrorNotice message={error} />
+        ) : items.length === 0 ? (
           <p className="py-10 text-center text-xs text-slate-400">Chưa có dữ liệu trình độ</p>
         ) : (
           <>

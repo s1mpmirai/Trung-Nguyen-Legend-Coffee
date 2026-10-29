@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  ClipboardCheck,
   Clock,
   CheckCircle2,
   XCircle,
@@ -9,21 +8,40 @@ import {
   X,
   AlertTriangle,
   Calendar,
-  Building2,
-  Sparkles,
+  CalendarClock,
   Paperclip,
   RotateCcw,
   Loader2,
-  FileText,
-  User,
   ShieldAlert,
   ChevronLeft,
   ChevronRight,
   Search,
 } from "lucide-react";
 import { getAllLeavesForManager, reviewLeave } from "../../services/leaveService";
+import apiClient from "../../services/apiClient";
+import ConfirmDialog, { useEscapeKey } from "./components/ConfirmDialog";
+import { formatDateVN, getApiErrorMessage, getManagerAccess } from "./managerUtils";
 
-export default function LeaveApprovals() {
+// Nhãn loại đơn theo mã loai_don của backend
+const LEAVE_TYPE_META = {
+  NGHI_PHEP: { type: "Đơn xin nghỉ phép năm", category: "annual" },
+  NGHI_OM: { type: "Đơn nghỉ ốm", category: "sick" },
+  NGHI_THAI_SAN: { type: "Đơn nghỉ thai sản", category: "sick" },
+  NGHI_KHONG_LUONG: { type: "Đơn nghỉ không lương", category: "unpaid" },
+  KHAC: { type: "Đơn nghỉ khác", category: "unpaid" },
+  NGHI_VIEC: { type: "Đơn xin thôi việc", category: "resignation" },
+};
+
+// Số ngày do máy chủ tính (ngày làm việc T2–T6 trừ ngày lễ; nửa ngày = 0,5)
+const formatLeaveDays = (value) => {
+  if (value === null || value === undefined || value === "") return "—";
+  const num = Number(value);
+  if (Number.isNaN(num)) return String(value);
+  return `${num.toLocaleString("vi-VN")} ngày`;
+};
+
+export default function LeaveApprovals({ userSession }) {
+  const access = getManagerAccess(userSession);
   const [activeFilter, setActiveFilter] = useState("all");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,8 +63,23 @@ export default function LeaveApprovals() {
   const [pageSize, setPageSize] = useState(10);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [toast, setToast] = useState("");
+  const [toastType, setToastType] = useState("success");
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Xác nhận phê duyệt đơn thôi việc (lên lịch thôi việc tại ngày kết thúc của đơn)
+  const [resignationConfirm, setResignationConfirm] = useState(null);
+  const [resignationError, setResignationError] = useState("");
+
+  // Số dư phép năm của nhân viên trong đơn đang xem (GET /leaves/balance/{ma_nv})
+  const [leaveBalance, setLeaveBalance] = useState(null);
+  const [balanceError, setBalanceError] = useState("");
+
+  const showToast = (message, type = "success") => {
+    setToast(message);
+    setToastType(type);
+    setTimeout(() => setToast(""), type === "error" ? 6500 : 4000);
+  };
 
   // Popup Modal xác nhận từ chối và nhập lý do
   const [rejectModalData, setRejectModalData] = useState(null);
@@ -58,18 +91,9 @@ export default function LeaveApprovals() {
 
   // Helper ánh xạ dữ liệu từ backend sang format bảng
   const mapBackendLeave = (item) => {
-    let type = "Đơn xin nghỉ phép";
-    let typeCategory = "annual";
-    if (item.loai_don === "NGHI_VIEC") {
-      type = "Đơn xin thôi việc";
-      typeCategory = "resignation";
-    } else if (item.loai_don === "NGHI_OM" || item.loai_don === "NGHI_THAI_SAN") {
-      type = "Đơn nghỉ ốm đau, thai sản";
-      typeCategory = "sick";
-    } else if (item.loai_don === "NGHI_KHONG_LUONG" || item.loai_don === "KHAC") {
-      type = "Đơn xin nghỉ phép";
-      typeCategory = "annual";
-    }
+    const meta = LEAVE_TYPE_META[item.loai_don] || { type: "Đơn xin nghỉ", category: "unpaid" };
+    const type = meta.type;
+    const typeCategory = meta.category;
 
     const initials = item.ho_ten
       ? item.ho_ten
@@ -136,7 +160,7 @@ export default function LeaveApprovals() {
     const createdAt = formatDisplayDate(item.ngay_tao);
     const createdDateTime = formatDisplayDateTime(item.ngay_tao);
     const isResignation = item.loai_don === "NGHI_VIEC";
-    const totalDays = isResignation ? "Thôi việc" : `${item.so_ngay || 1} ngày`;
+    const totalDays = isResignation ? "Thôi việc" : formatLeaveDays(item.so_ngay);
 
     const period =
       startDate === endDate
@@ -148,12 +172,12 @@ export default function LeaveApprovals() {
       empId: item.ma_nv,
       name: item.ho_ten || item.ma_nv,
       rawLoaiDon: item.loai_don,
-      rawDays: parseFloat(item.so_ngay) || 1,
+      rawStartDate: item.ngay_bat_dau ? String(item.ngay_bat_dau).slice(0, 10) : "",
       initials: initials,
       dept: item.ten_pb || "Phòng ban nội bộ",
       type: type,
       typeCategory: typeCategory,
-      priority: item.loai_don === "NGHI_VIEC" || item.so_ngay >= 3 ? "Ưu tiên cao" : null,
+      priority: item.loai_don === "NGHI_VIEC" || Number(item.so_ngay) >= 3 ? "Ưu tiên cao" : null,
       createdAt: createdAt,
       createdDateTime: createdDateTime,
       startDate: startDate,
@@ -184,37 +208,54 @@ export default function LeaveApprovals() {
         setRequests([]);
       }
     } catch (err) {
-      console.warn("Lỗi khi tải đơn từ từ API:", err);
       setRequests([]);
-      setToast(`Không tải được danh sách đơn: ${err.message}`);
-      setTimeout(() => setToast(""), 4000);
+      showToast(`Không tải được danh sách đơn: ${getApiErrorMessage(err)}`, "error");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Tính số ngày phép năm còn lại của nhân viên
-  const calculateEmployeeLeaveBalance = (empId) => {
-    const tongPhep = 12.0;
-    const daDung = requests
-      .filter(
-        (r) =>
-          r.empId === empId &&
-          (r.rawLoaiDon === "NGHI_PHEP" || r.typeCategory === "annual" || r.type === "Đơn xin nghỉ phép") &&
-          r.status === "approved"
-      )
-      .reduce((sum, item) => sum + (parseFloat(item.rawDays) || 1), 0);
-    const conLai = Math.max(0, tongPhep - daDung);
-    return { tongPhep, daDung, conLai };
   };
 
   useEffect(() => {
     fetchLeaves();
   }, []);
 
+  // Số dư phép năm lấy từ máy chủ (12 ngày + thâm niên, tính theo tỷ lệ năm đầu) khi xem đơn nghỉ phép năm
+  useEffect(() => {
+    setLeaveBalance(null);
+    setBalanceError("");
+    if (!selectedRequest || selectedRequest.rawLoaiDon !== "NGHI_PHEP") return undefined;
+    let cancelled = false;
+    const nam = Number(selectedRequest.rawStartDate.slice(0, 4)) || new Date().getFullYear();
+    apiClient
+      .get(`/leaves/balance/${encodeURIComponent(selectedRequest.empId)}`, { params: { nam } })
+      .then((data) => {
+        if (!cancelled) setLeaveBalance(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setBalanceError(getApiErrorMessage(err, "Không tải được số dư phép năm."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRequest?.id]);
+
+  useEscapeKey(Boolean(rejectModalData), () => setRejectModalData(null), isSubmitting);
+  useEscapeKey(Boolean(selectedRequest) && !resignationConfirm, () => setSelectedRequest(null));
+
+  // Bấm phê duyệt: đơn thôi việc cần xác nhận vì sẽ lên lịch cho thôi việc
+  const requestApprove = (req) => {
+    if (req.rawLoaiDon === "NGHI_VIEC") {
+      setResignationError("");
+      setResignationConfirm(req);
+      return;
+    }
+    handleApprove(req);
+  };
+
   // 1. Phê duyệt đơn từ (Icon Tick)
   const handleApprove = async (req) => {
     const id = req.id;
+    if (isSubmitting) return false;
 
     setIsSubmitting(true);
     try {
@@ -253,14 +294,30 @@ export default function LeaveApprovals() {
         );
       }
 
-      setToast(`Đã phê duyệt thành công đơn #${id} của ${req.name}!`);
-      setTimeout(() => setToast(""), 3500);
+      showToast(
+        req.rawLoaiDon === "NGHI_VIEC"
+          ? `Đã duyệt đơn thôi việc #${id} của ${req.name}: thôi việc có hiệu lực từ ${req.endDate}.`
+          : `Đã phê duyệt thành công đơn #${id} của ${req.name}!`
+      );
+      return true;
     } catch (err) {
-      setToast(`Lỗi khi phê duyệt: ${err.message}`);
-      setTimeout(() => setToast(""), 4000);
+      // 400: tháng đã chốt công, hết phép... ; 403: tự duyệt đơn của mình / không phải cấp dưới
+      const message = getApiErrorMessage(err, "Không thể phê duyệt đơn.");
+      if (req.rawLoaiDon === "NGHI_VIEC") {
+        setResignationError(message);
+      } else {
+        showToast(`Không thể phê duyệt đơn #${id} của ${req.name}: ${message}`, "error");
+      }
+      return false;
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleConfirmResignation = async () => {
+    if (!resignationConfirm) return;
+    const ok = await handleApprove(resignationConfirm);
+    if (ok) setResignationConfirm(null);
   };
 
   // Mở Popup xác nhận từ chối (Icon X)
@@ -273,6 +330,7 @@ export default function LeaveApprovals() {
 
   // 2. Xác nhận từ chối và nêu lý do (Popup Modal)
   const handleConfirmReject = async () => {
+    if (isSubmitting) return;
     if (!rejectionReason.trim()) {
       setRejectError("Vui lòng nhập lý do từ chối đơn từ trước khi xác nhận.");
       return;
@@ -319,14 +377,11 @@ export default function LeaveApprovals() {
         );
       }
 
-      setToast(
-        `Đã từ chối đơn #${id} của ${rejectModalData.name} kèm lý do phản hồi!`
-      );
-      setTimeout(() => setToast(""), 3500);
+      showToast(`Đã từ chối đơn #${id} của ${rejectModalData.name} kèm lý do phản hồi!`);
       setRejectModalData(null);
       setRejectionReason("");
     } catch (err) {
-      setRejectError(`Lỗi khi gửi từ chối: ${err.message}`);
+      setRejectError(`Không thể từ chối đơn: ${getApiErrorMessage(err)}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -388,7 +443,7 @@ export default function LeaveApprovals() {
           </button>
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 shadow-2xs">
             <Calendar className="w-3.5 h-3.5 text-sky-600" />
-            <span>Tháng 10, 2026</span>
+            <span>Hôm nay: {new Date().toLocaleDateString("vi-VN")}</span>
           </div>
         </div>
       </div>
@@ -446,8 +501,19 @@ export default function LeaveApprovals() {
 
       {/* Toast Notice */}
       {toast && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div
+          role={toastType === "error" ? "alert" : "status"}
+          className={`p-3 border rounded-xl text-xs font-semibold flex items-center gap-2 animate-fadeIn ${
+            toastType === "error"
+              ? "bg-rose-50 border-rose-200 text-rose-800"
+              : "bg-emerald-50 border-emerald-200 text-emerald-800"
+          }`}
+        >
+          {toastType === "error" ? (
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          )}
           <span>{toast}</span>
         </div>
       )}
@@ -597,14 +663,19 @@ export default function LeaveApprovals() {
                     </td>
                     {/* Cột 6: Thời gian kết thúc */}
                     <td className="py-3 px-4 whitespace-nowrap text-slate-800 font-semibold">
-                      {req.typeCategory === "resignation" ? "—" : (req.endDate || req.period)}
+                      {req.endDate || req.period}
+                      {req.typeCategory === "resignation" && (
+                        <span className="block text-[10px] font-semibold text-rose-600">Ngày hiệu lực thôi việc</span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <p className="text-slate-700 line-clamp-1">{req.reason}</p>
-                      <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                        <Paperclip className="w-3 h-3 text-sky-500" />
-                        {req.handover}
-                      </span>
+                      {req.handover && (
+                        <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          <Paperclip className="w-3 h-3 text-sky-500" />
+                          {req.handover}
+                        </span>
+                      )}
                     </td>
                     {/* Cột 8: Số ngày nghỉ - hiển thị chữ đen đơn giản, không khung */}
                     <td className="py-3 px-4 text-center whitespace-nowrap text-slate-800 font-medium">
@@ -637,7 +708,12 @@ export default function LeaveApprovals() {
                         </button>
 
                         {/* Các nút thao tác chuyển hết thành Icon Tick và Icon X */}
-                        {req.status === "pending" && (
+                        {req.status === "pending" && access.maNv && req.empId === access.maNv && (
+                          <span className="text-[11px] italic text-slate-400 px-1" title="Đơn của bạn do cấp trên duyệt">
+                            Cấp trên duyệt
+                          </span>
+                        )}
+                        {req.status === "pending" && !(access.maNv && req.empId === access.maNv) && (
                           <>
                             {/* Icon X: Từ chối (Mở popup xác nhận & nhập lý do) */}
                             <button
@@ -653,10 +729,14 @@ export default function LeaveApprovals() {
                             {/* Icon Tick: Phê duyệt trực tiếp */}
                             <button
                               type="button"
-                              onClick={() => handleApprove(req)}
+                              onClick={() => requestApprove(req)}
                               disabled={isSubmitting}
                               className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-2xs flex items-center justify-center cursor-pointer active:scale-95 disabled:opacity-50"
-                              title="Phê duyệt đơn"
+                              title={
+                                req.typeCategory === "resignation"
+                                  ? `Phê duyệt đơn thôi việc (có hiệu lực từ ${req.endDate})`
+                                  : "Phê duyệt đơn"
+                              }
                             >
                               <Check className="w-4 h-4 stroke-[2.5]" />
                             </button>
@@ -764,10 +844,13 @@ export default function LeaveApprovals() {
       {/* ──────────────── POPUP XÁC NHẬN TỪ CHỐI & NÊU LÝ DO ──────────────── */}
       {rejectModalData && (
         <div
-          onClick={() => setRejectModalData(null)}
+          onClick={() => !isSubmitting && setRejectModalData(null)}
           className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn cursor-pointer"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="leave-reject-title"
             onClick={(e) => e.stopPropagation()}
             className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200 cursor-default"
           >
@@ -778,7 +861,7 @@ export default function LeaveApprovals() {
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-sm">
+                  <h3 id="leave-reject-title" className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-slate-900 text-sm">
                     Xác nhận từ chối đơn từ
                   </h3>
                   <span className="text-[11px] text-slate-400">
@@ -789,7 +872,9 @@ export default function LeaveApprovals() {
               <button
                 type="button"
                 onClick={() => setRejectModalData(null)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
+                disabled={isSubmitting}
+                aria-label="Đóng"
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors disabled:opacity-40"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -813,7 +898,7 @@ export default function LeaveApprovals() {
                 </span>
                 <span className="text-slate-700 font-medium">
                   {rejectModalData.typeCategory === "resignation"
-                    ? `Từ ${rejectModalData.startDate}`
+                    ? `Hiệu lực từ ${rejectModalData.endDate}`
                     : `${rejectModalData.period} (${rejectModalData.subPeriod})`}
                 </span>
               </div>
@@ -906,8 +991,11 @@ export default function LeaveApprovals() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn cursor-pointer"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Chi tiết đơn #${selectedRequest.id}`}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200 cursor-default"
+            className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-100 flex flex-col gap-4 animate-in zoom-in-95 duration-200 cursor-default max-h-[92vh] overflow-y-auto"
           >
             {/* Header Popup: Hiển thị Mã đơn, Loại đơn và Thời gian gửi chi tiết (kèm giờ phút) trên đầu, không bỏ vào khung */}
             <div className="flex items-start justify-between pb-3 border-b border-slate-100">
@@ -931,6 +1019,7 @@ export default function LeaveApprovals() {
               <button
                 type="button"
                 onClick={() => setSelectedRequest(null)}
+                aria-label="Đóng"
                 className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -950,18 +1039,27 @@ export default function LeaveApprovals() {
                 <span className="text-slate-400">Phòng ban:</span>
                 <span className="font-semibold text-slate-800">{selectedRequest.dept}</span>
               </div>
-              {selectedRequest.typeCategory === "resignation" || selectedRequest.type === "Đơn xin thôi việc" ? (
+              {selectedRequest.typeCategory === "resignation" ? (
                 <>
                   <div className="flex justify-between p-2.5 rounded-xl bg-slate-50">
-                    <span className="text-slate-400">Ngày bắt đầu thôi việc:</span>
+                    <span className="text-slate-400">Ngày nộp / bắt đầu bàn giao:</span>
                     <span className="font-semibold text-slate-800">
                       {selectedRequest.startDate || selectedRequest.period}
                     </span>
                   </div>
                   <div className="flex justify-between p-2.5 rounded-xl bg-rose-50/70 border border-rose-100">
-                    <span className="text-rose-600 font-semibold">Hình thức đơn từ:</span>
-                    <span className="font-bold text-rose-700">Chấm dứt hợp đồng lao động</span>
+                    <span className="text-rose-600 font-semibold">Ngày hiệu lực thôi việc:</span>
+                    <span className="font-bold text-rose-700">{selectedRequest.endDate}</span>
                   </div>
+                  {selectedRequest.status === "pending" && (
+                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-1.5">
+                      <CalendarClock className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-px" />
+                      <span>
+                        Phê duyệt đơn sẽ <strong>lên lịch thôi việc</strong> có hiệu lực từ {selectedRequest.endDate}: đến
+                        ngày đó tài khoản bị khóa và hợp đồng được thanh lý tự động.
+                      </span>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -983,19 +1081,32 @@ export default function LeaveApprovals() {
                       {selectedRequest.totalDays || selectedRequest.subPeriod || "1 ngày"}
                     </span>
                   </div>
-                  {/* Hiển thị rõ số phép năm còn lại đối với đơn xin nghỉ phép */}
-                  {(selectedRequest.typeCategory === "annual" || selectedRequest.rawLoaiDon === "NGHI_PHEP" || selectedRequest.type === "Đơn xin nghỉ phép") && (
-                    <div className="flex justify-between p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80">
-                      <span className="text-amber-800 font-semibold flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-amber-600" />
-                        Số phép năm còn lại:
-                      </span>
-                      <span className="font-bold text-amber-900">
-                        {calculateEmployeeLeaveBalance(selectedRequest.empId).conLai} / 12 ngày
-                        <span className="text-[11px] text-amber-600 font-normal ml-1.5">
-                          (Đã nghỉ: {calculateEmployeeLeaveBalance(selectedRequest.empId).daDung} ngày)
+                  {/* Số dư phép năm do máy chủ tính (GET /leaves/balance) */}
+                  {selectedRequest.rawLoaiDon === "NGHI_PHEP" && (
+                    <div className="flex flex-col gap-1 p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80">
+                      <div className="flex justify-between">
+                        <span className="text-amber-800 font-semibold flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-amber-600" />
+                          Phép năm {leaveBalance?.nam || ""} còn lại:
                         </span>
-                      </span>
+                        <span className="font-bold text-amber-900">
+                          {balanceError
+                            ? "—"
+                            : leaveBalance
+                            ? `${Number(leaveBalance.con_lai).toLocaleString("vi-VN")} / ${Number(
+                                leaveBalance.tong_phep_nam
+                              ).toLocaleString("vi-VN")} ngày`
+                            : "Đang tải..."}
+                        </span>
+                      </div>
+                      {leaveBalance && (
+                        <span className="text-[11px] text-amber-700">
+                          Đã dùng {Number(leaveBalance.da_su_dung).toLocaleString("vi-VN")} ngày • Đang chờ duyệt{" "}
+                          {Number(leaveBalance.dang_cho_duyet).toLocaleString("vi-VN")} ngày
+                          {leaveBalance.han_dung_phep ? ` • Hạn dùng phép: ${formatDateVN(leaveBalance.han_dung_phep)}` : ""}
+                        </span>
+                      )}
+                      {balanceError && <span className="text-[11px] text-rose-700">{balanceError}</span>}
                     </div>
                   )}
                 </>
@@ -1052,7 +1163,7 @@ export default function LeaveApprovals() {
                 Đóng
               </button>
 
-              {selectedRequest.status === "pending" && (
+              {selectedRequest.status === "pending" && !(access.maNv && selectedRequest.empId === access.maNv) && (
                 <div className="flex items-center gap-2">
                   {/* Nút Từ chối với Icon X */}
                   <button
@@ -1072,10 +1183,12 @@ export default function LeaveApprovals() {
                   <button
                     type="button"
                     onClick={() => {
-                      handleApprove(selectedRequest);
+                      const req = selectedRequest;
                       setSelectedRequest(null);
+                      requestApprove(req);
                     }}
-                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer transition-all active:scale-95"
+                    disabled={isSubmitting}
+                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
                     title="Phê duyệt đơn"
                   >
                     <Check className="w-4 h-4 stroke-[2.5]" />
@@ -1087,6 +1200,33 @@ export default function LeaveApprovals() {
           </div>
         </div>
       )}
+
+      {/* ──────────────── XÁC NHẬN DUYỆT ĐƠN THÔI VIỆC ──────────────── */}
+      <ConfirmDialog
+        open={Boolean(resignationConfirm)}
+        tone="danger"
+        icon={CalendarClock}
+        title={`Phê duyệt đơn thôi việc #${resignationConfirm?.id ?? ""}?`}
+        description={
+          resignationConfirm && (
+            <ul className="list-disc pl-4 space-y-1">
+              <li>
+                Hệ thống sẽ <strong>lên lịch thôi việc</strong> cho <strong>{resignationConfirm.name}</strong> (
+                {resignationConfirm.empId}) có hiệu lực từ ngày <strong>{resignationConfirm.endDate}</strong> (ngày kết
+                thúc của đơn).
+              </li>
+              <li>Trước ngày đó nhân sự vẫn làm việc và đăng nhập bình thường.</li>
+              <li>Đến ngày hiệu lực: chuyển "Đã nghỉ việc", khóa tài khoản và thanh lý hợp đồng tự động.</li>
+              <li>Có thể hủy lịch thôi việc tại trang Quản lý nhân sự trước ngày hiệu lực.</li>
+            </ul>
+          )
+        }
+        confirmLabel="Duyệt & lên lịch thôi việc"
+        busy={isSubmitting}
+        error={resignationError}
+        onCancel={() => !isSubmitting && setResignationConfirm(null)}
+        onConfirm={handleConfirmResignation}
+      />
     </div>
   );
 }

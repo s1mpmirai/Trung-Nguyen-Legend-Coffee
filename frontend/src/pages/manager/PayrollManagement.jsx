@@ -3,27 +3,22 @@ import {
   Wallet,
   TrendingUp,
   CheckCircle2,
-  Lock,
   Download,
   RefreshCw,
-  Send,
   Search,
-  Filter,
   FileText,
-  Mail,
   Printer,
   X,
-  Building2,
   ChevronRight,
-  Sparkles,
-  ArrowUpRight,
-  Eye,
-  SlidersHorizontal,
   RotateCcw,
   AlertTriangle,
   ShieldCheck,
   Calendar,
-  Loader2
+  Loader2,
+  Banknote,
+  BadgeCheck,
+  ArrowRight,
+  Info,
 } from "lucide-react";
 import {
   getCompanyPayroll,
@@ -31,6 +26,51 @@ import {
   updatePayrollStatus,
 } from "../../services/payrollService";
 import { getAttendanceLockStatus } from "../../services/attendanceService";
+import ConfirmDialog, { useEscapeKey } from "./components/ConfirmDialog";
+import { getApiErrorMessage } from "./managerUtils";
+
+const formatVnd = (value) => (Number(value) || 0).toLocaleString("vi-VN");
+
+const PAYROLL_STATUS_LABELS = {
+  pending: "Nháp – chờ duyệt",
+  ready: "Đã duyệt",
+  paid: "Đã chi trả",
+};
+
+// Các thao tác chuyển trạng thái bảng lương (NHAP <-> DA_DUYET -> DA_TRA)
+const STATUS_ACTIONS = {
+  approve: { from: "pending", to: "DA_DUYET", label: "Duyệt bảng lương", tone: "primary" },
+  reopen: { from: "ready", to: "NHAP", label: "Mở lại về Nháp", tone: "warning" },
+  pay: { from: "ready", to: "DA_TRA", label: "Xác nhận đã chi trả", tone: "success" },
+};
+
+// Xuất bảng lương ra CSV (mở bằng Excel) — đúng số liệu đã lưu trong CSDL, không tính lại
+const exportPayrollCsv = (rows, thang, nam) => {
+  const header = [
+    "Mã NV", "Họ tên", "Phòng ban", "Chức vụ", "Công chuẩn", "Công thực tế", "Lương hợp đồng",
+    "Lương theo công", "Phụ cấp", "Thưởng", "Lương Gross", "BHXH", "BHYT", "BHTN", "Thuế TNCN",
+    "Tổng khấu trừ", "Thực nhận (Net)", "Trạng thái", "Ghi chú",
+  ];
+  const escape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = rows.map((r) =>
+    [
+      r.id, r.name, r.deptLabel, r.role, r.standardDays, r.actualDays, r.baseSalary, r.salaryByDays,
+      r.allowance, r.kpiBonus, r.grossSalary, r.bhxh, r.bhyt, r.bhtn, r.thue_tncn, r.deductions,
+      r.netSalary, PAYROLL_STATUS_LABELS[r.status] || r.status, r.note,
+    ]
+      .map(escape)
+      .join(",")
+  );
+  const blob = new Blob(["\uFEFF" + [header.map(escape).join(","), ...lines].join("\n")], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `Bang_luong_T${thang}_${nam}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
 
 const getInitials = (name) => {
   if (!name) return "NV";
@@ -39,7 +79,7 @@ const getInitials = (name) => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
-export default function PayrollManagement() {
+export default function PayrollManagement({ onNavigateTab }) {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
   const [searchInput, setSearchInput] = useState("");
@@ -63,6 +103,12 @@ export default function PayrollManagement() {
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState("success");
+  const [calcError, setCalcError] = useState("");
+
+  // Hộp thoại xác nhận chuyển trạng thái bảng lương (approve | reopen | pay)
+  const [statusAction, setStatusAction] = useState(null);
+  const [statusActionError, setStatusActionError] = useState("");
 
   // Dữ liệu bảng lương
   const [payrollData, setPayrollData] = useState([]);
@@ -78,10 +124,13 @@ export default function PayrollManagement() {
   // Modal xem chi tiết phiếu lương (Payslip Drawer/Modal)
   const [selectedPayslip, setSelectedPayslip] = useState(null);
 
-  const showToast = (msg) => {
+  const showToast = (msg, type = "success") => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(""), 4000);
+    setToastType(type);
+    setTimeout(() => setToastMessage(""), type === "error" ? 6000 : 4500);
   };
+
+  useEscapeKey(Boolean(selectedPayslip), () => setSelectedPayslip(null));
 
   // Tải dữ liệu bảng lương và trạng thái chốt công
   const loadPayrollData = async (m = selectedMonth, y = selectedYear) => {
@@ -94,19 +143,19 @@ export default function PayrollManagement() {
       // 2. Lấy dữ liệu bảng lương tháng
       const res = await getCompanyPayroll(m, y);
       if (res && Array.isArray(res.items) && res.items.length > 0) {
+        // Số liệu hiển thị đúng như đã lưu trong CSDL (bảng_lương), không tính lại ở trình duyệt
         const mapped = res.items.map((item) => ({
           ma_bl: item.ma_bl,
           id: item.ma_nv,
           name: item.ho_ten || `Nhân viên ${item.ma_nv}`,
           initials: getInitials(item.ho_ten),
           role: item.ten_cv || "Nhân viên",
-          dept: item.ten_pb ? item.ten_pb.toLowerCase() : "hq",
-          deptLabel: item.ten_pb || "Trụ sở chính",
+          deptLabel: item.ten_pb || "Chưa phân bổ",
           standardDays: Number(item.so_cong_chuan) || 0,
           actualDays: Number(item.so_cong_thuc_te) || 0,
           baseSalary: Number(item.luong_co_ban) || 0,
+          salaryByDays: Number(item.luong_theo_cong) || 0,
           allowance: Number(item.tong_phu_cap) || 0,
-          otPay: Number(item.tien_tang_ca) || 0,
           deductions: Number(item.tong_khau_tru) || 0,
           kpiBonus: Number(item.tien_thuong) || 0,
           netSalary: Number(item.luong_net) || 0,
@@ -118,26 +167,29 @@ export default function PayrollManagement() {
           status: item.trang_thai === "DA_TRA" ? "paid" : item.trang_thai === "DA_DUYET" ? "ready" : "pending",
           statusLabel:
             item.trang_thai === "DA_TRA"
-              ? "Đã chi trả"
+              ? PAYROLL_STATUS_LABELS.paid
               : item.trang_thai === "DA_DUYET"
-              ? "Đã duyệt chi"
-              : "Chờ kiểm tra",
+              ? PAYROLL_STATUS_LABELS.ready
+              : PAYROLL_STATUS_LABELS.pending,
+          note: item.ghi_chu || "",
           bankAccount: item.tai_khoan_nhan_luong || "Chưa cập nhật",
         }));
 
         setPayrollData(mapped);
-        const totalNet = res.tong_tien_net || mapped.reduce((s, r) => s + r.netSalary, 0);
+        // Tổng quỹ lương lấy từ máy chủ (tong_tien_net), không cộng lại ở trình duyệt
+        const totalNet = Number(res.tong_tien_net) || 0;
+        const totalEmployees = Number(res.tong_nhan_vien) || mapped.length;
         setSummaryStats({
           totalNet,
-          avgIncome: mapped.length > 0 ? Math.round(totalNet / mapped.length) : 0,
-          totalEmployees: res.tong_nhan_vien || mapped.length,
+          avgIncome: totalEmployees > 0 ? Math.round(totalNet / totalEmployees) : 0,
+          totalEmployees,
         });
       } else {
         setPayrollData([]);
         setSummaryStats({ totalNet: 0, avgIncome: 0, totalEmployees: 0 });
       }
     } catch (err) {
-      console.error("Lỗi khi tải bảng lương:", err);
+      showToast(`Không tải được bảng lương: ${getApiErrorMessage(err)}`, "error");
     } finally {
       setIsLoading(false);
     }
@@ -149,77 +201,89 @@ export default function PayrollManagement() {
 
   // Tính lại lương tự động từ DB chấm công
   const handleRecalculate = async () => {
+    if (isRecalculating) return;
     setIsRecalculating(true);
+    setCalcError("");
     try {
       const res = await calculatePayroll(selectedMonth, selectedYear);
-      showToast(
-        res?.message ||
-          `Đã tính toán lại toàn bộ bảng lương tự động từ bảng chấm công Tháng ${selectedMonth}/${selectedYear}!`
-      );
+      showToast(res?.message || `Đã tính bảng lương tháng ${selectedMonth}/${selectedYear} từ bảng chấm công đã chốt.`);
       await loadPayrollData(selectedMonth, selectedYear);
     } catch (err) {
-      showToast(`Lỗi tính lương: ${err.message}`);
+      // 400 khi bảng công tháng chưa được chốt: hiển thị đúng thông báo của máy chủ kèm lối tắt sang trang Chấm công
+      setCalcError(getApiErrorMessage(err, "Không thể tính bảng lương."));
     } finally {
       setIsRecalculating(false);
     }
   };
 
-  // Khóa bảng lương & Duyệt chi
-  const handleLockPayroll = async () => {
-    if (!attendanceLock.is_locked) {
-      const confirmProceed = window.confirm(
-        `⚠️ Chú ý: Bảng chấm công Tháng ${selectedMonth}/${selectedYear} chưa được Chốt & Khóa bên trang Chấm công.\n\nBạn có chắc chắn muốn Duyệt chi lương ngay không? Khuyến nghị nên chốt công trước để tránh phát sinh sai lệch!`
-      );
-      if (!confirmProceed) return;
-    }
+  const pendingRows = payrollData.filter((r) => r.status === "pending");
+  const readyRows = payrollData.filter((r) => r.status === "ready");
+  const paidRows = payrollData.filter((r) => r.status === "paid");
 
-    if (payrollData.length === 0) {
-      showToast("Chưa có bản ghi lương nào trong tháng để duyệt. Vui lòng bấm 'Tính lại lương' trước!");
+  const openStatusAction = (action) => {
+    setStatusActionError("");
+    setStatusAction(action);
+  };
+
+  // Chuyển trạng thái hàng loạt theo quy trình NHAP <-> DA_DUYET -> DA_TRA (có xác nhận trước)
+  const handleConfirmStatusAction = async () => {
+    const action = STATUS_ACTIONS[statusAction];
+    if (!action || isLocking) return;
+    const targets = payrollData.filter((r) => r.ma_bl && r.status === action.from);
+    if (targets.length === 0) {
+      setStatusAction(null);
       return;
     }
-
     setIsLocking(true);
-    try {
-      const isCurrentlyApproved = payrollData.every((r) => r.status === "ready" || r.status === "paid");
-      const targetStatus = isCurrentlyApproved ? "NHAP" : "DA_DUYET";
-      // Chỉ chuyển các phiếu đang ở trạng thái liền trước (Chờ kiểm tra <-> Đã duyệt); phiếu đã chi trả giữ nguyên
-      const fromStatus = targetStatus === "DA_DUYET" ? "pending" : "ready";
-
-      for (const item of payrollData) {
-        if (item.ma_bl && item.status === fromStatus) {
-          await updatePayrollStatus(item.ma_bl, targetStatus);
-        }
+    setStatusActionError("");
+    let done = 0;
+    const failures = [];
+    for (const item of targets) {
+      try {
+        await updatePayrollStatus(item.ma_bl, action.to);
+        done += 1;
+      } catch (err) {
+        failures.push(`${item.name} (${item.id}): ${getApiErrorMessage(err)}`);
       }
-
-      await loadPayrollData(selectedMonth, selectedYear);
-      showToast(
-        targetStatus === "DA_DUYET"
-          ? `Đã khóa bảng lương Tháng ${selectedMonth}/${selectedYear} và duyệt chi thành công!`
-          : `Đã mở lại bảng lương để kiểm tra và điều chỉnh thêm!`
-      );
-    } catch (err) {
-      showToast(`Lỗi cập nhật bảng lương: ${err.message}`);
-    } finally {
-      setIsLocking(false);
     }
+    setIsLocking(false);
+    await loadPayrollData(selectedMonth, selectedYear);
+
+    if (failures.length > 0) {
+      setStatusActionError(
+        `Đã cập nhật ${done}/${targets.length} bảng lương. Lỗi: ${failures.slice(0, 3).join("; ")}${
+          failures.length > 3 ? ` (và ${failures.length - 3} lỗi khác)` : ""
+        }`
+      );
+      return;
+    }
+    setStatusAction(null);
+    const messages = {
+      approve: `Đã duyệt ${done} bảng lương tháng ${selectedMonth}/${selectedYear}. Nhân viên đã xem được phiếu lương.`,
+      reopen: `Đã mở lại ${done} bảng lương tháng ${selectedMonth}/${selectedYear} về trạng thái Nháp.`,
+      pay: `Đã xác nhận chi trả ${done} bảng lương tháng ${selectedMonth}/${selectedYear}.`,
+    };
+    showToast(messages[statusAction]);
   };
 
-  // Hệ thống chưa tích hợp email: nhân viên xem / in phiếu lương trực tiếp tại Cổng nhân viên
-  const handleSendEmail = (name) => {
-    showToast(`${name} có thể xem và in phiếu lương tại Cổng nhân viên (mục Bảng lương) sau khi bảng lương được duyệt.`);
-  };
+  const departmentOptions = Array.from(new Set(payrollData.map((r) => r.deptLabel))).sort((a, b) =>
+    a.localeCompare(b, "vi")
+  );
 
   const filteredData = payrollData.filter((item) => {
+    const q = searchQuery.toLowerCase();
     const matchSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.deptLabel.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchDept = selectedDept === "all" || item.dept.includes(selectedDept);
+      item.name.toLowerCase().includes(q) ||
+      item.id.toLowerCase().includes(q) ||
+      item.deptLabel.toLowerCase().includes(q);
+    const matchDept = selectedDept === "all" || item.deptLabel === selectedDept;
     const matchStatus = selectedStatus === "all" || item.status === selectedStatus;
     return matchSearch && matchDept && matchStatus;
   });
 
   const isAllLocked = payrollData.length > 0 && payrollData.every((r) => r.status === "ready" || r.status === "paid");
+  const actionMeta = statusAction ? STATUS_ACTIONS[statusAction] : null;
+  const actionCount = actionMeta ? payrollData.filter((r) => r.status === actionMeta.from).length : 0;
 
   return (
     <div className="flex flex-col gap-6 w-full animate-in fade-in duration-300">
@@ -272,8 +336,14 @@ export default function PayrollManagement() {
           </div>
 
           <button
+            type="button"
             onClick={handleRecalculate}
             disabled={isRecalculating || isLocking}
+            title={
+              attendanceLock.is_locked
+                ? "Tính / tính lại bảng lương từ bảng công đã chốt (bảng lương đã duyệt được giữ nguyên)"
+                : "Cần chốt công tháng trước khi tính lương"
+            }
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80 transition-all shadow-xs text-xs font-semibold active:scale-95 disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-sky-600 ${isRecalculating ? "animate-spin" : ""}`} />
@@ -281,50 +351,128 @@ export default function PayrollManagement() {
           </button>
 
           <button
-            onClick={() => showToast("Đã xuất tệp bảng lương chi tiết PDF / Excel thành công!")}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-sky-50 text-sky-700 hover:bg-sky-100 transition-all text-xs font-semibold active:scale-95"
+            type="button"
+            onClick={() => exportPayrollCsv(filteredData, selectedMonth, selectedYear)}
+            disabled={filteredData.length === 0}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-sky-50 text-sky-700 hover:bg-sky-100 transition-all text-xs font-semibold active:scale-95 disabled:opacity-50"
           >
-            <Send className="w-3.5 h-3.5" />
-            <span>Xuất phiếu lương</span>
+            <Download className="w-3.5 h-3.5" />
+            <span>Xuất bảng lương (CSV)</span>
           </button>
 
-          <button
-            onClick={handleLockPayroll}
-            disabled={isLocking || isRecalculating}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white text-xs font-semibold shadow-sm transition-all active:scale-95 ${
-              isAllLocked
-                ? "bg-amber-600 hover:bg-amber-700"
-                : "bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 shadow-sky-600/20"
-            }`}
-          >
-            {isLocking ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : isAllLocked ? (
-              <RotateCcw className="w-3.5 h-3.5" />
-            ) : (
-              <Lock className="w-3.5 h-3.5" />
-            )}
-            <span>{isAllLocked ? "Mở khóa bảng lương" : "Khóa bảng lương & Duyệt chi"}</span>
-          </button>
+          {pendingRows.length > 0 && (
+            <button
+              type="button"
+              onClick={() => openStatusAction("approve")}
+              disabled={isLocking || isRecalculating}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-xs font-semibold shadow-sm transition-all active:scale-95 bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-700 hover:to-sky-800 shadow-sky-600/20 disabled:opacity-50"
+            >
+              {isLocking && statusAction === "approve" ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <BadgeCheck className="w-3.5 h-3.5" />
+              )}
+              <span>Duyệt bảng lương ({pendingRows.length})</span>
+            </button>
+          )}
+          {readyRows.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => openStatusAction("reopen")}
+                disabled={isLocking || isRecalculating}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Mở lại ({readyRows.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => openStatusAction("pay")}
+                disabled={isLocking || isRecalculating}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-xs font-semibold shadow-sm transition-all active:scale-95 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50"
+              >
+                <Banknote className="w-3.5 h-3.5" />
+                <span>Đã chi trả ({readyRows.length})</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Cảnh báo nếu phân hệ Chấm công chưa chốt */}
       {!attendanceLock.is_locked && (
-        <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-2xl flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+        <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <span>
-              <strong>Lưu ý đối soát công:</strong> Bảng chấm công Tháng {selectedMonth}/{selectedYear} chưa được Chốt & Khóa bên trang Chấm công. Vui lòng kiểm tra và bấm "Chốt công" bên phân hệ Chấm công trước khi khóa bảng lương để đảm bảo an toàn số liệu.
+              <strong>Chưa chốt công tháng {selectedMonth}/{selectedYear}.</strong> Hệ thống chỉ tính lương từ bảng chấm
+              công đã chốt (chỉ các ngày công đã duyệt được tính). Hãy chốt công ở trang Chấm công trước khi bấm "Tính lại
+              lương".
             </span>
+          </div>
+          {onNavigateTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab("attendance", { period: { thang: selectedMonth, nam: selectedYear } })}
+              className="self-start sm:self-center shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-800 font-semibold hover:bg-amber-100 cursor-pointer"
+            >
+              <span>Đi tới Chấm công để chốt công</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {calcError && (
+        <div
+          role="alert"
+          className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <span>
+              <strong>Không tính được bảng lương:</strong> {calcError}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {onNavigateTab && !attendanceLock.is_locked && (
+              <button
+                type="button"
+                onClick={() => onNavigateTab("attendance", { period: { thang: selectedMonth, nam: selectedYear } })}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 font-semibold hover:bg-rose-100 cursor-pointer"
+              >
+                <span>Chốt công tháng {selectedMonth}/{selectedYear}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setCalcError("")}
+              aria-label="Đóng thông báo lỗi"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-rose-400 hover:text-rose-700 hover:bg-rose-100 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
 
       {/* Toast Notice */}
       {toastMessage && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div
+          role={toastType === "error" ? "alert" : "status"}
+          className={`p-3 border text-xs rounded-xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 ${
+            toastType === "error"
+              ? "bg-rose-50 border-rose-200 text-rose-800"
+              : "bg-emerald-50 border-emerald-200 text-emerald-800"
+          }`}
+        >
+          {toastType === "error" ? (
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          )}
           <span>{toastMessage}</span>
         </div>
       )}
@@ -352,12 +500,8 @@ export default function PayrollManagement() {
             </div>
           </div>
           <div className="mt-3 flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">
-              <TrendingUp className="w-3 h-3" />
-              Tự động đối soát
-            </span>
             <span className="text-[11px] text-slate-400">
-              {payrollData.length} nhân sự có dữ liệu lương
+              {summaryStats.totalEmployees} nhân sự có bảng lương • {paidRows.length} đã chi trả
             </span>
           </div>
         </div>
@@ -423,7 +567,11 @@ export default function PayrollManagement() {
                   : "Chờ Quản lý chốt công"}
               </span>
               <span className="text-slate-400">
-                {isAllLocked ? "Lương: Đã duyệt" : "Lương: Đang nháp"}
+                {payrollData.length === 0
+                  ? "Lương: Chưa tính"
+                  : isAllLocked
+                  ? "Lương: Đã duyệt"
+                  : `Lương: ${pendingRows.length} bảng nháp`}
               </span>
             </div>
             <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-0.5">
@@ -475,12 +623,12 @@ export default function PayrollManagement() {
             onChange={(e) => setSelectedDept(e.target.value)}
             className="w-full sm:w-48 px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
           >
-            <option value="all">Tất cả khối phòng ban</option>
-            <option value="kinh doanh">Phòng Kinh doanh</option>
-            <option value="sản xuất">Xưởng Sản xuất</option>
-            <option value="nhân sự">Phòng Nhân sự</option>
-            <option value="kế toán">Phòng Kế toán – Tài chính</option>
-            <option value="it">Phòng IT</option>
+            <option value="all">Tất cả phòng ban</option>
+            {departmentOptions.map((dept) => (
+              <option key={dept} value={dept}>
+                {dept}
+              </option>
+            ))}
           </select>
 
           {/* Status */}
@@ -489,10 +637,10 @@ export default function PayrollManagement() {
             onChange={(e) => setSelectedStatus(e.target.value)}
             className="w-full sm:w-44 px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
           >
-            <option value="all">Mọi trạng thái chi</option>
-            <option value="ready">Đã duyệt chi</option>
-            <option value="pending">Chờ kiểm tra</option>
-            <option value="paid">Đã chi trả</option>
+            <option value="all">Mọi trạng thái</option>
+            <option value="pending">{PAYROLL_STATUS_LABELS.pending}</option>
+            <option value="ready">{PAYROLL_STATUS_LABELS.ready}</option>
+            <option value="paid">{PAYROLL_STATUS_LABELS.paid}</option>
           </select>
         </div>
 
@@ -512,9 +660,12 @@ export default function PayrollManagement() {
             <RotateCcw className="w-4 h-4" />
           </button>
           <button
-            onClick={() => showToast("Đã tải tệp bảng lương chi tiết!")}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-slate-100 transition-colors"
-            title="Tải Excel bảng lương"
+            type="button"
+            onClick={() => exportPayrollCsv(filteredData, selectedMonth, selectedYear)}
+            disabled={filteredData.length === 0}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-slate-100 transition-colors disabled:opacity-40"
+            title="Tải bảng lương (CSV mở bằng Excel)"
+            aria-label="Tải bảng lương CSV"
           >
             <Download className="w-4 h-4" />
           </button>
@@ -535,12 +686,15 @@ export default function PayrollManagement() {
               Chưa có dữ liệu bảng lương Tháng {selectedMonth}/{selectedYear}
             </p>
             <p className="text-[11px] text-slate-400 max-w-sm text-center">
-              Nhấn nút <strong>"Tính lại lương"</strong> ở góc trên bên phải để hệ thống tự động tổng hợp từ Bảng chấm công và tính toán bảng lương ngay.
+              {attendanceLock.is_locked
+                ? 'Nhấn "Tính toán bảng lương ngay" để hệ thống tổng hợp từ bảng chấm công đã chốt.'
+                : `Bảng công tháng ${selectedMonth}/${selectedYear} chưa được chốt — cần chốt công trước khi tính lương.`}
             </p>
             <button
+              type="button"
               onClick={handleRecalculate}
               disabled={isRecalculating}
-              className="mt-2 flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-xs"
+              className="mt-2 flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-xs disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRecalculating ? "animate-spin" : ""}`} />
               <span>Tính toán bảng lương ngay</span>
@@ -585,6 +739,11 @@ export default function PayrollManagement() {
                             </span>
                             <span className="text-[11px] text-slate-400">• {row.role}</span>
                           </div>
+                          {row.note && (
+                            <span className="mt-0.5 text-[10px] font-medium text-amber-700" title={row.note}>
+                              {row.note}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -596,7 +755,7 @@ export default function PayrollManagement() {
                     </td>
 
                     <td className="py-3 px-4 text-right font-mono font-medium text-slate-700">
-                      {row.baseSalary.toLocaleString("vi-VN")}
+                      {formatVnd(row.baseSalary)}
                     </td>
 
                     <td className="py-3 px-3 text-right font-mono text-slate-500">
@@ -641,18 +800,13 @@ export default function PayrollManagement() {
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
+                          type="button"
                           onClick={() => setSelectedPayslip(row)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
                           title="Xem chi tiết phiếu lương cá nhân"
+                          aria-label={`Xem phiếu lương của ${row.name}`}
                         >
                           <FileText className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleSendEmail(row.name)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                          title="Gửi email phiếu lương"
-                        >
-                          <Mail className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -671,8 +825,11 @@ export default function PayrollManagement() {
           className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Phiếu lương của ${selectedPayslip.name}`}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 cursor-default"
+            className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 cursor-default max-h-[92vh] overflow-y-auto"
           >
             {/* Header Modal */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
@@ -690,7 +847,9 @@ export default function PayrollManagement() {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedPayslip(null)}
+                aria-label="Đóng"
                 className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -715,49 +874,50 @@ export default function PayrollManagement() {
               </div>
             </div>
 
-            {/* Detailed Salary Items */}
-            <div className="mt-4 flex flex-col gap-2 text-xs">
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-600">Lương cơ bản theo hợp đồng:</span>
-                <span className="font-mono font-semibold text-slate-900">
-                  {selectedPayslip.baseSalary.toLocaleString("vi-VN")} đ
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-600">Ngày công chuẩn / Thực tế:</span>
-                <span className="font-mono text-slate-800">
-                  {selectedPayslip.actualDays} / {selectedPayslip.standardDays} ngày
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-600">Phụ cấp chức vụ / làm việc:</span>
-                <span className="font-mono text-emerald-600">
-                  +{selectedPayslip.allowance.toLocaleString("vi-VN")} đ
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-600">Thưởng hiệu suất kinh doanh (KPI):</span>
-                <span className="font-mono text-emerald-600 font-semibold">
-                  +{selectedPayslip.kpiBonus.toLocaleString("vi-VN")} đ
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-600">Trích BHXH (8%), BHYT (1.5%), BHTN (1%) & Thuế TNCN:</span>
-                <span className="font-mono text-rose-600">
-                  -{selectedPayslip.deductions.toLocaleString("vi-VN")} đ
-                </span>
-              </div>
+            {/* Detailed Salary Items — đúng số liệu đã lưu trong bảng lương */}
+            <div className="mt-4 flex flex-col gap-1.5 text-xs">
+              {[
+                { label: "Lương hợp đồng:", value: `${formatVnd(selectedPayslip.baseSalary)} đ`, cls: "text-slate-900 font-semibold" },
+                {
+                  label: "Ngày công thực tế / chuẩn:",
+                  value: `${selectedPayslip.actualDays} / ${selectedPayslip.standardDays} ngày`,
+                  cls: "text-slate-800",
+                },
+                { label: "Lương theo ngày công:", value: `${formatVnd(selectedPayslip.salaryByDays)} đ`, cls: "text-slate-800" },
+                { label: "Phụ cấp chức vụ:", value: `+${formatVnd(selectedPayslip.allowance)} đ`, cls: "text-emerald-600" },
+                { label: "Thưởng:", value: `+${formatVnd(selectedPayslip.kpiBonus)} đ`, cls: "text-emerald-600" },
+                { label: "Tổng thu nhập (Gross):", value: `${formatVnd(selectedPayslip.grossSalary)} đ`, cls: "text-slate-900 font-bold" },
+                { label: "BHXH (8%):", value: `-${formatVnd(selectedPayslip.bhxh)} đ`, cls: "text-rose-600" },
+                { label: "BHYT (1,5%):", value: `-${formatVnd(selectedPayslip.bhyt)} đ`, cls: "text-rose-600" },
+                { label: "BHTN (1%):", value: `-${formatVnd(selectedPayslip.bhtn)} đ`, cls: "text-rose-600" },
+                { label: "Thuế TNCN:", value: `-${formatVnd(selectedPayslip.thue_tncn)} đ`, cls: "text-rose-600" },
+                { label: "Tổng khấu trừ:", value: `-${formatVnd(selectedPayslip.deductions)} đ`, cls: "text-rose-700 font-semibold" },
+              ].map((line) => (
+                <div key={line.label} className="flex items-center justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-600">{line.label}</span>
+                  <span className={`font-mono ${line.cls}`}>{line.value}</span>
+                </div>
+              ))}
+
+              {selectedPayslip.note && (
+                <div className="mt-1 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-px" />
+                  <span>
+                    <strong>Ghi chú:</strong> {selectedPayslip.note}
+                  </span>
+                </div>
+              )}
 
               {/* Net total */}
               <div className="flex items-center justify-between p-3.5 mt-2 rounded-xl bg-sky-50 border border-sky-100">
                 <div>
-                  <span className="text-xs font-bold text-sky-900 block">THỰC LĨNH CHUYỂN KHOẢN (NET)</span>
+                  <span className="text-xs font-bold text-sky-900 block">THỰC NHẬN (NET)</span>
                   <span className="text-[11px] text-sky-600">
-                    {attendanceLock.is_locked ? "Đã đối soát công hợp lệ" : "Chưa chốt bảng công"}
+                    {selectedPayslip.statusLabel} • {attendanceLock.is_locked ? "Bảng công đã chốt" : "Bảng công chưa chốt"}
                   </span>
                 </div>
                 <span className="font-['Plus_Jakarta_Sans',sans-serif] text-xl font-bold text-sky-700 font-mono">
-                  {selectedPayslip.netSalary.toLocaleString("vi-VN")} đ
+                  {formatVnd(selectedPayslip.netSalary)} đ
                 </span>
               </div>
             </div>
@@ -765,38 +925,66 @@ export default function PayrollManagement() {
             {/* Modal Actions */}
             <div className="mt-5 flex items-center justify-between pt-3 border-t border-slate-100">
               <button
-                onClick={() => {
-                  showToast("Đang chuẩn bị bản in phiếu lương...");
-                  window.print();
-                }}
+                type="button"
+                onClick={() => window.print()}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold"
               >
                 <Printer className="w-4 h-4" />
                 <span>In phiếu</span>
               </button>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelectedPayslip(null)}
-                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold"
-                >
-                  Đóng
-                </button>
-                <button
-                  onClick={() => {
-                    handleSendEmail(selectedPayslip.name);
-                    setSelectedPayslip(null);
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-xs"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>Gửi email phiếu lương</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPayslip(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ──────────────── XÁC NHẬN CHUYỂN TRẠNG THÁI BẢNG LƯƠNG ──────────────── */}
+      <ConfirmDialog
+        open={Boolean(actionMeta)}
+        tone={actionMeta?.tone || "primary"}
+        icon={statusAction === "pay" ? Banknote : statusAction === "reopen" ? RotateCcw : BadgeCheck}
+        title={actionMeta ? `${actionMeta.label} tháng ${selectedMonth}/${selectedYear}?` : ""}
+        description={
+          statusAction === "approve" ? (
+            <ul className="list-disc pl-4 space-y-1">
+              <li>
+                Duyệt <strong>{actionCount}</strong> bảng lương đang ở trạng thái Nháp.
+              </li>
+              <li>Sau khi duyệt, nhân viên xem được phiếu lương; "Tính lại lương" sẽ không ghi đè các bảng đã duyệt.</li>
+              <li>Bảng công của tháng không thể mở khóa khi đã có bảng lương được duyệt.</li>
+              {!attendanceLock.is_locked && (
+                <li className="text-amber-700 font-semibold">Lưu ý: bảng chấm công tháng này hiện chưa được chốt.</li>
+              )}
+            </ul>
+          ) : statusAction === "reopen" ? (
+            <ul className="list-disc pl-4 space-y-1">
+              <li>
+                Đưa <strong>{actionCount}</strong> bảng lương đã duyệt về trạng thái Nháp để kiểm tra / tính lại.
+              </li>
+              <li>Nhân viên sẽ không xem được phiếu lương cho đến khi được duyệt lại.</li>
+            </ul>
+          ) : statusAction === "pay" ? (
+            <ul className="list-disc pl-4 space-y-1">
+              <li>
+                Xác nhận đã chuyển lương cho <strong>{actionCount}</strong> nhân sự (bảng lương đã duyệt).
+              </li>
+              <li>Thao tác này không thể hoàn tác: bảng lương đã chi trả không thể mở lại hay tính lại.</li>
+            </ul>
+          ) : null
+        }
+        confirmLabel={actionMeta?.label || "Xác nhận"}
+        busy={isLocking}
+        error={statusActionError}
+        onCancel={() => !isLocking && setStatusAction(null)}
+        onConfirm={handleConfirmStatusAction}
+      />
     </div>
   );
 }

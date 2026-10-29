@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Shield,
   ShieldCheck,
@@ -7,7 +7,6 @@ import {
   Check,
   X,
   KeyRound,
-  ArrowRight,
   Loader2,
   CheckCircle2,
   AlertCircle,
@@ -18,28 +17,37 @@ import {
   Sparkles,
   RefreshCw,
   Search,
-  ChevronDown,
   Info,
-  HelpCircle,
+  Lock,
+  FileBarChart2,
+  UserX,
+  Wallet,
 } from "lucide-react";
 import apiClient from "../../services/apiClient";
 import {
   getRoleMatrix,
-  getRoles,
   getEmployeePermissions,
   assignRoleToEmployee,
   updateCustomPermissions,
 } from "../../services/adminService";
+import ConfirmDialog from "./components/ConfirmDialog";
+import {
+  ADMIN_ONLY_PERMISSIONS,
+  ROLES_ASSIGNABLE_BY_MANAGER,
+  getApiErrorMessage,
+  getManagerAccess,
+} from "./managerUtils";
 
-// Danh mục các quyền sử dụng web mà Quản lý có thể cấp cho nhân sự
-const WEB_OPERATIONAL_PERMISSIONS = [
+// Mô tả hiển thị cho các mã quyền đã biết. Danh sách & số lượng quyền luôn lấy từ máy chủ (/permissions/matrix);
+// mã quyền mới chưa có mô tả ở đây vẫn hiển thị theo tên quyền trong CSDL.
+const PERMISSION_META = [
   {
     ma_quyen: "ATTENDANCE_MANAGE",
     label: "Quản lý Chấm công & Ca làm việc",
     group: "Chấm công & Ca kíp",
     icon: Clock,
     color: "amber",
-    desc: "Theo dõi bảng công hàng ngày toàn chuỗi, sửa giờ vào/ra, phê duyệt công và chốt bảng công tháng.",
+    desc: "Theo dõi bảng công hàng ngày, sửa giờ vào/ra và phê duyệt công (chốt công tháng là quyền riêng).",
     defaultFor: ["QUAN_LY", "TRUONG_NHOM"],
   },
   {
@@ -87,7 +95,44 @@ const WEB_OPERATIONAL_PERMISSIONS = [
     desc: "Phê duyệt các yêu cầu thay đổi thông tin cá nhân và cập nhật chức danh cho nhân viên.",
     defaultFor: ["QUAN_LY"],
   },
+  {
+    ma_quyen: "EMPLOYEE_DELETE",
+    label: "Cho thôi việc nhân sự",
+    group: "Quản lý Nhân sự",
+    icon: UserX,
+    color: "rose",
+    desc: "Cho thôi việc với ngày hiệu lực (khóa tài khoản khi đến ngày), hủy lịch thôi việc.",
+  },
+  {
+    ma_quyen: "ATTENDANCE_LOCK",
+    label: "Chốt / mở khóa bảng công tháng",
+    group: "Chấm công & Ca kíp",
+    icon: Lock,
+    color: "amber",
+    desc: "Chốt công tháng (tự duyệt các bản ghi chờ duyệt) để tính lương, hoặc mở khóa khi bảng lương chưa duyệt.",
+  },
+  {
+    ma_quyen: "REPORT_VIEW",
+    label: "Xem báo cáo nhân sự",
+    group: "Báo cáo",
+    icon: FileBarChart2,
+    color: "sky",
+    desc: "Xem báo cáo biến động nhân sự theo tháng, thống kê trình độ, thâm niên và quỹ lương.",
+  },
+  {
+    ma_quyen: "PAYROLL_VIEW",
+    label: "Xem phiếu lương",
+    group: "Lương bổng & Đãi ngộ",
+    icon: Wallet,
+    color: "purple",
+    desc: "Xem phiếu lương cá nhân đã được duyệt.",
+  },
 ];
+const PERMISSION_META_MAP = Object.fromEntries(PERMISSION_META.map((p) => [p.ma_quyen, p]));
+
+// Thứ bậc vai trò để phân biệt thăng chức / hạ vai trò khi thông báo
+const ROLE_RANK = { NHAN_VIEN: 0, TRUONG_NHOM: 1, QUAN_LY: 2, ADMIN: 3 };
+const ROLE_COLUMN_ORDER = ["NHAN_VIEN", "TRUONG_NHOM", "QUAN_LY", "ADMIN"];
 
 const ROLE_LABELS = {
   ADMIN: "Quản trị viên tối cao",
@@ -97,6 +142,8 @@ const ROLE_LABELS = {
 };
 
 export default function RolePermissions({ userSession }) {
+  const access = getManagerAccess(userSession);
+  const actorIsAdmin = access.isAdmin;
   const [activeSubTab, setActiveSubTab] = useState("configure"); // 'configure' | 'matrix'
   const [employees, setEmployees] = useState([]);
   const [isLoadingList, setIsLoadingList] = useState(true);
@@ -116,7 +163,7 @@ export default function RolePermissions({ userSession }) {
   };
 
   // Nhân sự được chọn để cấu hình quyền
-  const [selectedMaNv, setSelectedMaNv] = useState("NV10"); // Mặc định chọn nhân viên NV10 hoặc người đầu tiên
+  const [selectedMaNv, setSelectedMaNv] = useState(""); // Mặc định chọn người đầu tiên trong danh sách
   const [empDetail, setEmpDetail] = useState(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
@@ -127,10 +174,13 @@ export default function RolePermissions({ userSession }) {
   // Bổ nhiệm vai trò
   const [promoteRole, setPromoteRole] = useState("TRUONG_NHOM");
   const [isPromoting, setIsPromoting] = useState(false);
+  const [roleConfirmOpen, setRoleConfirmOpen] = useState(false);
+  const [roleError, setRoleError] = useState("");
 
   // Ma trận quyền
   const [matrixData, setMatrixData] = useState(null);
   const [isLoadingMatrix, setIsLoadingMatrix] = useState(false);
+  const [matrixError, setMatrixError] = useState("");
 
   // Toast
   const [toastMessage, setToastMessage] = useState("");
@@ -152,11 +202,11 @@ export default function RolePermissions({ userSession }) {
       const items = res?.items || res?.data?.items || (Array.isArray(res) ? res : []);
       setEmployees(items);
       if (items.length > 0 && !selectedMaNv) {
-        setSelectedMaNv(items[0].ma_nv);
+        const firstOther = items.find((e) => e.ma_nv !== access.maNv) || items[0];
+        setSelectedMaNv(firstOther.ma_nv);
       }
     } catch (err) {
-      console.error("Lỗi khi tải danh sách nhân viên:", err);
-      showToast("Không thể tải danh sách nhân viên", "error");
+      showToast(`Không thể tải danh sách nhân viên: ${getApiErrorMessage(err)}`, "error");
     } finally {
       setIsLoadingList(false);
     }
@@ -171,16 +221,15 @@ export default function RolePermissions({ userSession }) {
       setEmpDetail(data);
       setPromoteRole(data.ma_vai_tro === "TRUONG_NHOM" ? "NHAN_VIEN" : "TRUONG_NHOM");
 
-      // Cập nhật trạng thái switch cho từng quyền
-      const effective = data.effective_permissions || [];
+      // Trạng thái bật / tắt của từng quyền = quyền hiệu lực hiện tại của nhân sự
       const initialPerms = {};
-      WEB_OPERATIONAL_PERMISSIONS.forEach((p) => {
-        initialPerms[p.ma_quyen] = effective.includes(p.ma_quyen);
+      (data.effective_permissions || []).forEach((code) => {
+        initialPerms[code] = true;
       });
       setPermsState(initialPerms);
     } catch (err) {
-      console.error("Lỗi khi tải quyền nhân viên:", err);
-      showToast(err.message || `Không thể tải quyền của nhân sự ${maNv}`, "error");
+      setEmpDetail(null);
+      showToast(getApiErrorMessage(err, `Không thể tải quyền của nhân sự ${maNv}`), "error");
     } finally {
       setIsLoadingDetail(false);
     }
@@ -189,11 +238,12 @@ export default function RolePermissions({ userSession }) {
   // 3. Tải ma trận phân quyền
   const loadMatrix = async () => {
     setIsLoadingMatrix(true);
+    setMatrixError("");
     try {
       const matrix = await getRoleMatrix();
       setMatrixData(matrix);
     } catch (err) {
-      console.error("Lỗi khi tải ma trận quyền:", err);
+      setMatrixError(getApiErrorMessage(err, "Không tải được danh mục quyền."));
     } finally {
       setIsLoadingMatrix(false);
     }
@@ -210,8 +260,46 @@ export default function RolePermissions({ userSession }) {
     }
   }, [selectedMaNv]);
 
+  // Danh mục quyền lấy từ máy chủ (tổng số quyền theo dữ liệu, không gán cứng)
+  const permissionCatalog = useMemo(
+    () =>
+      (matrixData?.permissions || []).map((perm) => {
+        const meta = PERMISSION_META_MAP[perm.ma_quyen] || {};
+        return {
+          ma_quyen: perm.ma_quyen,
+          label: perm.ten_quyen || meta.label || perm.ma_quyen,
+          group: perm.nhom_quyen || meta.group || "Khác",
+          desc: meta.desc || perm.mo_ta || "",
+          icon: meta.icon || KeyRound,
+          adminOnly: ADMIN_ONLY_PERMISSIONS.includes(perm.ma_quyen),
+        };
+      }),
+    [matrixData]
+  );
+
+  // Quyền chỉ ADMIN mới cấp / thu hồi được (Quản lý gửi lên sẽ bị 403)
+  const isPermLocked = (perm) => perm.adminOnly && !actorIsAdmin;
+
+  // Không được sửa quyền của chính mình; Quản lý không được sửa tài khoản Quản lý / Admin
+  const targetRole = empDetail?.ma_vai_tro;
+  const editBlockedReason = !empDetail
+    ? ""
+    : empDetail.ma_nv === access.maNv
+    ? "Bạn không thể tự thay đổi vai trò hoặc quyền của chính mình."
+    : !actorIsAdmin && (targetRole === "ADMIN" || targetRole === "QUAN_LY")
+    ? "Chỉ Admin mới được thay đổi vai trò / quyền của tài khoản Quản lý hoặc Admin."
+    : "";
+
+  const roleOptions = [
+    { value: "NHAN_VIEN", label: "NHÂN VIÊN" },
+    { value: "TRUONG_NHOM", label: "TRƯỞNG NHÓM" },
+    { value: "QUAN_LY", label: "QUẢN LÝ" },
+  ].filter((opt) => actorIsAdmin || ROLES_ASSIGNABLE_BY_MANAGER.includes(opt.value));
+
   // Toggle switch quyền
   const handleTogglePerm = (maQuyen) => {
+    const perm = permissionCatalog.find((p) => p.ma_quyen === maQuyen);
+    if (editBlockedReason || (perm && isPermLocked(perm))) return;
     setPermsState((prev) => ({
       ...prev,
       [maQuyen]: !prev[maQuyen],
@@ -220,13 +308,14 @@ export default function RolePermissions({ userSession }) {
 
   // 4. Lưu phân quyền web vào CSDL (tai_khoan_quyen)
   const handleSavePermissions = async () => {
-    if (!selectedMaNv || !empDetail) return;
+    if (!selectedMaNv || !empDetail || isSavingPerms || editBlockedReason) return;
     setIsSavingPerms(true);
     try {
       const rolePerms = empDetail.vai_tro_quyen || [];
       const batch = [];
 
-      WEB_OPERATIONAL_PERMISSIONS.forEach((p) => {
+      permissionCatalog.forEach((p) => {
+        if (isPermLocked(p)) return; // không gửi quyền chỉ Admin được cấp
         const isChecked = Boolean(permsState[p.ma_quyen]);
         const hasInRole = rolePerms.includes(p.ma_quyen);
 
@@ -254,29 +343,51 @@ export default function RolePermissions({ userSession }) {
       showToast(`Đã lưu thiết lập quyền sử dụng web cho nhân sự ${empDetail.ho_ten} (${selectedMaNv})!`);
       await loadEmployeeDetail(selectedMaNv);
     } catch (err) {
-      console.error("Lỗi khi lưu phân quyền:", err);
-      showToast(err.message || "Lưu phân quyền thất bại", "error");
+      showToast(getApiErrorMessage(err, "Lưu phân quyền thất bại"), "error");
     } finally {
       setIsSavingPerms(false);
     }
   };
 
-  // 5. Bổ nhiệm vai trò / Thăng chức Trưởng nhóm
+  // 5. Bổ nhiệm vai trò: thăng chức hoặc hạ vai trò (có xác nhận trước)
+  const currentRole = empDetail?.ma_vai_tro;
+  const isDemotion = (ROLE_RANK[promoteRole] ?? 0) < (ROLE_RANK[currentRole] ?? 0);
+
   const handleAssignRole = async () => {
-    if (!selectedMaNv) return;
+    if (!selectedMaNv || isPromoting || editBlockedReason) return;
     setIsPromoting(true);
+    setRoleError("");
+    const demoted = isDemotion;
+    const newRoleLabel = ROLE_LABELS[promoteRole] || promoteRole;
     try {
       await assignRoleToEmployee(selectedMaNv, { ma_vai_tro: promoteRole });
-      showToast(`Đã cập nhật vai trò ${ROLE_LABELS[promoteRole]} cho nhân sự ${selectedMaNv}!`);
+      setRoleConfirmOpen(false);
+      showToast(
+        demoted
+          ? `Đã chuyển ${empDetail?.ho_ten || selectedMaNv} về vai trò ${newRoleLabel}.`
+          : `Đã bổ nhiệm ${empDetail?.ho_ten || selectedMaNv} làm ${newRoleLabel}.`
+      );
       await loadEmployeeDetail(selectedMaNv);
       await loadEmployees();
     } catch (err) {
-      console.error("Lỗi khi bổ nhiệm vai trò:", err);
-      showToast(err.message || "Bổ nhiệm vai trò thất bại", "error");
+      // 403: Quản lý không được bổ nhiệm ADMIN / QUAN_LY hoặc sửa tài khoản Quản lý
+      setRoleError(getApiErrorMessage(err, "Đổi vai trò thất bại"));
     } finally {
       setIsPromoting(false);
     }
   };
+
+  // Cột vai trò của ma trận lấy theo dữ liệu máy chủ (giữ thứ tự cấp bậc quen thuộc)
+  const matrixColumns = useMemo(() => {
+    const roles = Array.isArray(matrixData?.roles) ? matrixData.roles : [];
+    const fromData = roles.length
+      ? roles.map((r) => (typeof r === "string" ? { ma_vai_tro: r } : r))
+      : Object.keys(matrixData?.matrix || {}).map((code) => ({ ma_vai_tro: code }));
+    return [...fromData].sort(
+      (a, b) =>
+        (ROLE_COLUMN_ORDER.indexOf(a.ma_vai_tro) + 1 || 99) - (ROLE_COLUMN_ORDER.indexOf(b.ma_vai_tro) + 1 || 99)
+    );
+  }, [matrixData]);
 
   // Lọc danh sách nhân viên theo từ khóa tìm kiếm
   const filteredEmployees = useMemo(() => {
@@ -456,21 +567,9 @@ export default function RolePermissions({ userSession }) {
                         </div>
                       </div>
 
-                      <div className="shrink-0 text-right">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            emp.ma_vai_tro === "QUAN_LY"
-                              ? "bg-sky-100 text-sky-800"
-                              : emp.ma_vai_tro === "TRUONG_NHOM"
-                              ? "bg-purple-100 text-purple-800"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {emp.ma_vai_tro === "TRUONG_NHOM"
-                            ? "Trưởng nhóm"
-                            : emp.ma_vai_tro === "QUAN_LY"
-                            ? "Quản lý"
-                            : "Nhân viên"}
+                      <div className="shrink-0 text-right max-w-[96px]">
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 truncate max-w-full">
+                          {emp.ten_cv || "—"}
                         </span>
                       </div>
                     </button>
@@ -521,28 +620,50 @@ export default function RolePermissions({ userSession }) {
                     </div>
                   </div>
 
-                  {/* Nút Bổ nhiệm vai trò / Thăng chức */}
+                  {/* Nút Bổ nhiệm vai trò (Quản lý chỉ bổ nhiệm Nhân viên / Trưởng nhóm) */}
                   <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200/80 shrink-0">
                     <select
                       value={promoteRole}
                       onChange={(e) => setPromoteRole(e.target.value)}
-                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+                      disabled={Boolean(editBlockedReason)}
+                      aria-label="Vai trò mới"
+                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <option value="TRUONG_NHOM">Bổ nhiệm: TRƯỞNG NHÓM</option>
-                      <option value="NHAN_VIEN">Hạ về: NHÂN VIÊN</option>
-                      <option value="QUAN_LY">Thăng chức: QUẢN LÝ</option>
+                      {roleOptions.map((opt) => {
+                        const rank = ROLE_RANK[opt.value] ?? 0;
+                        const curRank = ROLE_RANK[currentRole] ?? 0;
+                        const prefix = rank > curRank ? "Thăng lên" : rank < curRank ? "Hạ về" : "Giữ nguyên";
+                        return (
+                          <option key={opt.value} value={opt.value}>
+                            {prefix}: {opt.label}
+                          </option>
+                        );
+                      })}
                     </select>
                     <button
                       type="button"
-                      onClick={handleAssignRole}
-                      disabled={isPromoting || promoteRole === empDetail.ma_vai_tro}
-                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                      onClick={() => {
+                        setRoleError("");
+                        setRoleConfirmOpen(true);
+                      }}
+                      disabled={isPromoting || promoteRole === empDetail.ma_vai_tro || Boolean(editBlockedReason)}
+                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
                     >
                       {isPromoting ? <Loader2 size={13} className="animate-spin" /> : <Award size={13} />}
                       <span>Đổi vai trò</span>
                     </button>
                   </div>
                 </div>
+
+                {editBlockedReason && (
+                  <div
+                    role="note"
+                    className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-xs flex items-start gap-2"
+                  >
+                    <Lock size={15} className="text-slate-400 shrink-0 mt-0.5" />
+                    <span>{editBlockedReason}</span>
+                  </div>
+                )}
 
                 {/* 2. KHỐI THIẾT LẬP CÁC QUYỀN SỬ DỤNG WEB (CHẤM CÔNG, DUYỆT LƯƠNG, DUYỆT ĐƠN...) */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-5">
@@ -552,14 +673,18 @@ export default function RolePermissions({ userSession }) {
                         Thiết lập Quyền Vận Hành Web
                       </h3>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Bật hoặc tắt các quyền cho nhân sự sử dụng các tính năng trên website Quản lý
+                        Bật hoặc tắt các quyền cho nhân sự •{" "}
+                        <strong className="text-slate-600">
+                          {permissionCatalog.filter((p) => permsState[p.ma_quyen]).length}/{permissionCatalog.length}
+                        </strong>{" "}
+                        quyền đang có hiệu lực
                       </p>
                     </div>
 
                     <button
                       type="button"
                       onClick={handleSavePermissions}
-                      disabled={isSavingPerms}
+                      disabled={isSavingPerms || Boolean(editBlockedReason) || permissionCatalog.length === 0}
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-xs"
                     >
                       {isSavingPerms ? (
@@ -576,11 +701,24 @@ export default function RolePermissions({ userSession }) {
                     </button>
                   </div>
 
-                  {/* Danh sách 6 quyền sử dụng web */}
+                  {matrixError && (
+                    <div role="alert" className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+                      {matrixError}
+                    </div>
+                  )}
+                  {isLoadingMatrix && permissionCatalog.length === 0 && (
+                    <div className="py-6 flex items-center justify-center gap-2 text-slate-400 text-xs">
+                      <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
+                      <span>Đang tải danh mục quyền...</span>
+                    </div>
+                  )}
+
+                  {/* Danh sách quyền (lấy từ máy chủ) */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {WEB_OPERATIONAL_PERMISSIONS.map((perm) => {
+                    {permissionCatalog.map((perm) => {
                       const Icon = perm.icon;
                       const isChecked = Boolean(permsState[perm.ma_quyen]);
+                      const locked = isPermLocked(perm) || Boolean(editBlockedReason);
                       const isDefaultInRole = (empDetail.vai_tro_quyen || []).includes(perm.ma_quyen);
                       const isCustomGranted = (empDetail.custom_quyen_cap || []).includes(perm.ma_quyen);
                       const isCustomRevoked = (empDetail.custom_quyen_thu_hoi || []).includes(perm.ma_quyen);
@@ -588,8 +726,25 @@ export default function RolePermissions({ userSession }) {
                       return (
                         <div
                           key={perm.ma_quyen}
+                          role="switch"
+                          aria-checked={isChecked}
+                          aria-disabled={locked}
+                          tabIndex={locked ? -1 : 0}
                           onClick={() => handleTogglePerm(perm.ma_quyen)}
-                          className={`p-4 rounded-xl border transition-all cursor-pointer select-none flex flex-col justify-between gap-3 ${
+                          onKeyDown={(e) => {
+                            if (e.key === " " || e.key === "Enter") {
+                              e.preventDefault();
+                              handleTogglePerm(perm.ma_quyen);
+                            }
+                          }}
+                          title={
+                            isPermLocked(perm)
+                              ? "Chỉ Admin mới được cấp / thu hồi quyền này"
+                              : editBlockedReason || undefined
+                          }
+                          className={`p-4 rounded-xl border transition-all select-none flex flex-col justify-between gap-3 ${
+                            locked ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                          } ${
                             isChecked
                               ? "bg-slate-50/80 border-sky-300 shadow-2xs"
                               : "bg-white border-slate-200 hover:border-slate-300"
@@ -621,7 +776,9 @@ export default function RolePermissions({ userSession }) {
                               <input
                                 type="checkbox"
                                 checked={isChecked}
-                                onChange={() => {}} // Đã xử lý ở onClick của thẻ cha
+                                readOnly
+                                tabIndex={-1}
+                                aria-hidden="true"
                                 className="sr-only peer"
                               />
                               <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-600"></div>
@@ -634,7 +791,12 @@ export default function RolePermissions({ userSession }) {
 
                           {/* Status Badge */}
                           <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[10px]">
-                            {isCustomGranted ? (
+                            {isPermLocked(perm) ? (
+                              <span className="text-slate-500 font-bold flex items-center gap-1">
+                                <Lock size={11} />
+                                Chỉ Admin được cấp
+                              </span>
+                            ) : isCustomGranted ? (
                               <span className="text-purple-600 font-bold flex items-center gap-1">
                                 <Sparkles size={11} />
                                 Quyền riêng được cấp thêm
@@ -664,10 +826,16 @@ export default function RolePermissions({ userSession }) {
                   <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 text-amber-800 text-[11px] flex items-start gap-2.5">
                     <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
                     <div>
-                      <strong>Cơ chế hiệu lực quyền:</strong> Khi Quản lý bật hoặc tắt quyền và bấm{" "}
-                      <strong>"LƯU PHÂN QUYỀN WEB"</strong>, hệ thống tự động ghi nhận vào CSDL bảng{" "}
-                      <code>tai_khoan_quyen</code>. Nhân sự đó khi đăng nhập vào website sẽ có quyền sử dụng các
-                      tab chức năng tương ứng ngay tức thì.
+                      <strong>Cơ chế hiệu lực quyền:</strong> Khi bật hoặc tắt quyền và bấm{" "}
+                      <strong>"LƯU PHÂN QUYỀN WEB"</strong>, hệ thống ghi nhận vào CSDL bảng <code>tai_khoan_quyen</code>;
+                      nhân sự nhận quyền mới ở lần đăng nhập tiếp theo.
+                      {!actorIsAdmin && (
+                        <>
+                          {" "}
+                          Các quyền quản trị (tài khoản, phân quyền, tổ chức, hợp đồng) và vai trò Quản lý / Admin chỉ Admin
+                          mới cấp được.
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -686,7 +854,8 @@ export default function RolePermissions({ userSession }) {
                 Ma Trận Phân Quyền Vai Trò Hệ Thống (RBAC Matrix)
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Bảng đối chiếu quyền mặc định giữa 4 cấp bậc vai trò trong doanh nghiệp
+                Bảng đối chiếu quyền mặc định giữa {matrixColumns.length} vai trò •{" "}
+                {(matrixData?.permissions || []).length} quyền trong hệ thống
               </p>
             </div>
             <button
@@ -711,19 +880,26 @@ export default function RolePermissions({ userSession }) {
                   <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
                     <th className="py-3 px-4">Quyền chức năng</th>
                     <th className="py-3 px-4">Nhóm quyền</th>
-                    <th className="py-3 px-4 text-center">Nhân viên</th>
-                    <th className="py-3 px-4 text-center">Trưởng nhóm</th>
-                    <th className="py-3 px-4 text-center">Quản lý</th>
-                    <th className="py-3 px-4 text-center">Admin</th>
+                    {matrixColumns.map((role) => (
+                      <th key={role.ma_vai_tro} className="py-3 px-4 text-center">
+                        {role.ten_vai_tro || ROLE_LABELS[role.ma_vai_tro] || role.ma_vai_tro}
+                        <span className="block text-[10px] font-semibold text-slate-400">
+                          {(matrixData?.matrix?.[role.ma_vai_tro] || []).length} quyền
+                        </span>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-800">
+                  {matrixError && (
+                    <tr>
+                      <td colSpan={2 + matrixColumns.length} className="py-6 text-center text-rose-700">
+                        {matrixError}
+                      </td>
+                    </tr>
+                  )}
                   {(matrixData?.permissions || []).map((perm) => {
                     const matrixMap = matrixData?.matrix || {};
-                    const hasStaff = (matrixMap["NHAN_VIEN"] || []).includes(perm.ma_quyen);
-                    const hasLead = (matrixMap["TRUONG_NHOM"] || []).includes(perm.ma_quyen);
-                    const hasMgr = (matrixMap["QUAN_LY"] || []).includes(perm.ma_quyen);
-                    const hasAdmin = (matrixMap["ADMIN"] || []).includes(perm.ma_quyen);
 
                     return (
                       <tr key={perm.ma_quyen} className="hover:bg-slate-50/70 transition-colors">
@@ -734,34 +910,15 @@ export default function RolePermissions({ userSession }) {
                         <td className="py-3 px-4 text-[11px] text-slate-500 font-semibold">
                           {perm.nhom_quyen}
                         </td>
-                        <td className="py-3 px-4 text-center">
-                          {hasStaff ? (
-                            <CheckCircle2 size={16} className="text-emerald-600 inline" />
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {hasLead ? (
-                            <CheckCircle2 size={16} className="text-emerald-600 inline" />
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {hasMgr ? (
-                            <CheckCircle2 size={16} className="text-emerald-600 inline" />
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {hasAdmin ? (
-                            <CheckCircle2 size={16} className="text-emerald-600 inline" />
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
-                        </td>
+                        {matrixColumns.map((role) => (
+                          <td key={role.ma_vai_tro} className="py-3 px-4 text-center">
+                            {(matrixMap[role.ma_vai_tro] || []).includes(perm.ma_quyen) ? (
+                              <CheckCircle2 size={16} className="text-emerald-600 inline" aria-label="Có quyền" />
+                            ) : (
+                              <span className="text-slate-300" aria-label="Không có quyền">—</span>
+                            )}
+                          </td>
+                        ))}
                       </tr>
                     );
                   })}
@@ -771,6 +928,29 @@ export default function RolePermissions({ userSession }) {
           )}
         </div>
       )}
+
+      {/* Xác nhận đổi vai trò (thăng chức / hạ vai trò) */}
+      <ConfirmDialog
+        open={roleConfirmOpen && Boolean(empDetail)}
+        tone={isDemotion ? "warning" : "primary"}
+        icon={Award}
+        title={isDemotion ? "Xác nhận hạ vai trò" : "Xác nhận bổ nhiệm vai trò"}
+        description={
+          empDetail && (
+            <>
+              {isDemotion ? "Chuyển" : "Bổ nhiệm"} <strong>{empDetail.ho_ten}</strong> ({empDetail.ma_nv}) từ vai trò{" "}
+              <strong>{ROLE_LABELS[currentRole] || currentRole}</strong> {isDemotion ? "về" : "lên"}{" "}
+              <strong>{ROLE_LABELS[promoteRole] || promoteRole}</strong>? Quyền mặc định của nhân sự sẽ thay đổi theo vai
+              trò mới.
+            </>
+          )
+        }
+        confirmLabel={isDemotion ? "Hạ vai trò" : "Bổ nhiệm"}
+        busy={isPromoting}
+        error={roleError}
+        onCancel={() => !isPromoting && setRoleConfirmOpen(false)}
+        onConfirm={handleAssignRole}
+      />
     </div>
   );
 }

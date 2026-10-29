@@ -1,7 +1,8 @@
 import React from "react";
 import { TrendingUp } from "lucide-react";
+import CardErrorNotice from "./CardErrorNotice";
 
-export default function TenureStatsCard({ tenureData }) {
+export default function TenureStatsCard({ tenureData, error }) {
   const data = tenureData || { averageYears: 0, totalEmployees: 0, brackets: [] };
 
   return (
@@ -19,6 +20,7 @@ export default function TenureStatsCard({ tenureData }) {
           </span>
         </div>
 
+        {error && <CardErrorNotice message={error} />}
         <div className="flex flex-col gap-4 my-2">
           {data.brackets.map((item, idx) => (
             <div key={idx} className="flex flex-col gap-1.5">

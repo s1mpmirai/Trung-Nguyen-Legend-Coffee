@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   UserPlus,
   Search,
-  Upload,
   Download,
   RotateCcw,
   CheckCircle2,
@@ -21,15 +20,22 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  MapPin,
   Briefcase,
-  Trash2,
   AlertTriangle,
   X,
-  ShieldAlert,
+  CalendarClock,
+  CalendarX,
 } from "lucide-react";
 import AddEmployeeModal from "./components/AddEmployeeModal";
+import ConfirmDialog, { useEscapeKey } from "./components/ConfirmDialog";
 import apiClient from "../../services/apiClient";
+import {
+  formatDateVN,
+  getApiErrorMessage,
+  getManagerAccess,
+  isForbiddenError,
+  todayISO,
+} from "./managerUtils";
 
 // Kỳ báo cáo: 12 tháng gần nhất, định dạng "MM/YYYY"
 const buildReportMonths = () => {
@@ -108,23 +114,40 @@ const getInitials = (name) => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
-export default function EmployeeManagement({ initialTab = "list" }) {
+export default function EmployeeManagement({ initialTab = "list", userSession }) {
+  const access = getManagerAccess(userSession);
+  const canCreate = access.can("EMPLOYEE_CREATE");
+  const canDelete = access.can("EMPLOYEE_DELETE");
+  const canUpdate = access.can("EMPLOYEE_UPDATE");
+
   const [activeSubTab, setActiveSubTab] = useState(initialTab || "list");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState("success");
+  const [reportError, setReportError] = useState("");
 
-  // Quản lý Cho thôi việc / Xóa nhân sự
+  // Quản lý Cho thôi việc / Xóa nhân sự (có ngày hiệu lực)
   const [deactivateModalEmp, setDeactivateModalEmp] = useState(null);
   const [reactivateModalEmp, setReactivateModalEmp] = useState(null);
+  const [cancelScheduleEmp, setCancelScheduleEmp] = useState(null);
   const [deactivateReason, setDeactivateReason] = useState("Nghỉ việc theo nguyện vọng cá nhân");
   const [deactivateNote, setDeactivateNote] = useState("");
+  const [deactivateDate, setDeactivateDate] = useState(() => todayISO());
+  const [deactivateError, setDeactivateError] = useState("");
+  const [statusActionError, setStatusActionError] = useState("");
   const [isSubmittingDeactivate, setIsSubmittingDeactivate] = useState(false);
 
-  const showToast = (msg) => {
+  const showToast = (msg, type = "success") => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(""), 4000);
+    setToastType(type);
+    setTimeout(() => setToastMessage(""), type === "error" ? 6000 : 4500);
   };
+
+  const closeDeactivateModal = () => {
+    if (!isSubmittingDeactivate) setDeactivateModalEmp(null);
+  };
+  useEscapeKey(Boolean(deactivateModalEmp), closeDeactivateModal, isSubmittingDeactivate);
 
   useEffect(() => {
     if (initialTab) {
@@ -190,16 +213,25 @@ export default function EmployeeManagement({ initialTab = "list" }) {
 
     const salaryNum = Number(item.muc_luong) || 0;
 
+    // Cùng ngưỡng với khung lương của báo cáo backend: [0;10), [10;20), [20;30), từ 30 triệu trở lên
     let salaryTier = "10to20";
     if (salaryNum < 10000000) salaryTier = "under10";
-    else if (salaryNum >= 10000000 && salaryNum < 20000000) salaryTier = "10to20";
-    else if (salaryNum >= 20000000 && salaryNum <= 30000000) salaryTier = "20to30";
-    else if (salaryNum > 30000000) salaryTier = "above30";
+    else if (salaryNum < 20000000) salaryTier = "10to20";
+    else if (salaryNum < 30000000) salaryTier = "20to30";
+    else salaryTier = "above30";
+
+    // Thôi việc đã lên lịch: vẫn DANG_LAM nhưng có ngày nghỉ việc trong tương lai
+    const terminationDate = item.ngay_nghi_viec ? String(item.ngay_nghi_viec).slice(0, 10) : null;
+    const scheduledTerminationDate =
+      isWorking && terminationDate && terminationDate > todayISO() ? terminationDate : null;
 
     return {
       id: item.ma_nv,
       name: item.ho_ten,
-      email: item.email || `${item.ma_nv.toLowerCase()}@trungnguyen.com.vn`,
+      email: item.email || "",
+      rawStatus: item.trang_thai,
+      scheduledTerminationDate,
+      managerId: item.ma_nql || null,
       dept: item.ten_pb || item.ma_pb || "Phòng ban",
       role: item.ten_cv || item.ma_cv || "Nhân viên",
       location: item.ten_cn || "Trụ sở chính Trung Nguyên",
@@ -234,7 +266,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
       setEmployees((res?.items || []).map(mapApiEmployee));
     } catch (err) {
       setEmployees([]);
-      showToast(`Không tải được danh sách nhân sự: ${err.message}`);
+      showToast(`Không tải được danh sách nhân sự: ${getApiErrorMessage(err)}`, "error");
     } finally {
       setIsLoading(false);
     }
@@ -245,9 +277,14 @@ export default function EmployeeManagement({ initialTab = "list" }) {
     const [thang, nam] = monthKey.split("/").map(Number);
     try {
       setMonthlyReport(await apiClient.get("/employees/reports/monthly", { params: { thang, nam } }));
+      setReportError("");
     } catch (err) {
       setMonthlyReport(null);
-      showToast(`Không tải được báo cáo tháng ${monthKey}: ${err.message}`);
+      setReportError(
+        isForbiddenError(err)
+          ? "Bạn không có quyền xem báo cáo nhân sự (cần quyền REPORT_VIEW). Danh sách bên dưới hiển thị toàn bộ nhân sự thay vì theo kỳ báo cáo."
+          : `Không tải được báo cáo tháng ${monthKey}: ${getApiErrorMessage(err)}`
+      );
     }
   };
 
@@ -282,66 +319,118 @@ export default function EmployeeManagement({ initialTab = "list" }) {
       loai_hd: newEmp.loai_hd,
       trinh_do: newEmp.trinh_do,
       chuyen_nganh: newEmp.chuyen_nganh,
+      // Bỏ trống = backend tự gán Trưởng phòng ban làm quản lý trực tiếp
+      ma_nql: newEmp.ma_nql || null,
     };
     try {
       const res = await apiClient.post("/employees/create_employee", apiPayload);
       showToast(`Đã thêm thành công nhân sự ${res.ho_ten} (${res.ma_nv}) vào hệ thống!`);
       refreshAll();
+      return true;
     } catch (err) {
-      showToast(`Thêm nhân sự thất bại: ${err.message}`);
+      showToast(`Thêm nhân sự thất bại: ${getApiErrorMessage(err)}`, "error");
+      return false;
     }
   };
+
+  // Danh sách chọn "Quản lý trực tiếp" khi thêm nhân sự: chỉ nhân sự chưa nghỉ việc
+  const managerOptions = useMemo(
+    () =>
+      employees
+        .filter((e) => e.status !== "resigned")
+        .map((e) => ({ id: e.id, name: e.name, dept: e.dept, role: e.role })),
+    [employees]
+  );
 
   // Mở modal xác nhận cho thôi việc / xóa
   const handleOpenDeactivateModal = (emp) => {
     setDeactivateModalEmp(emp);
     setDeactivateReason("Nghỉ việc theo nguyện vọng cá nhân");
     setDeactivateNote("");
+    setDeactivateDate(emp.scheduledTerminationDate || todayISO());
+    setDeactivateError("");
   };
 
   // Mở modal xác nhận khôi phục trạng thái làm việc
   const handleOpenReactivateModal = (emp) => {
     setReactivateModalEmp(emp);
+    setStatusActionError("");
   };
 
-  // Xác nhận xóa nhân sự: chuyển "Đã nghỉ việc" và khóa tài khoản (không xóa dữ liệu, không xóa tài khoản)
+  // Mở hộp thoại hủy lịch thôi việc đã lên lịch
+  const handleOpenCancelSchedule = (emp) => {
+    setCancelScheduleEmp(emp);
+    setStatusActionError("");
+  };
+
+  const isFutureTermination = Boolean(deactivateDate) && deactivateDate > todayISO();
+
+  // Xác nhận cho thôi việc với ngày hiệu lực:
+  // - Hôm nay / quá khứ: chuyển "Đã nghỉ việc", khóa tài khoản, thanh lý hợp đồng ngay
+  // - Tương lai: lên lịch, nhân sự vẫn làm việc & đăng nhập đến ngày hiệu lực
+  // (không xóa dữ liệu, không xóa tài khoản)
   const handleConfirmDeactivate = async () => {
-    if (!deactivateModalEmp) return;
+    if (!deactivateModalEmp || isSubmittingDeactivate) return;
+    if (!deactivateDate) {
+      setDeactivateError("Vui lòng chọn ngày hiệu lực thôi việc.");
+      return;
+    }
     const emp = deactivateModalEmp;
     setIsSubmittingDeactivate(true);
+    setDeactivateError("");
     try {
-      const fullReason = deactivateNote ? `${deactivateReason}: ${deactivateNote}` : deactivateReason;
-      await apiClient.delete(`/employees/${emp.id}`, { params: { ly_do: fullReason } });
-      showToast(`Đã xóa nhân sự ${emp.name} (${emp.id}) khỏi danh sách đang làm việc và khóa tài khoản!`);
+      const fullReason = deactivateNote.trim() ? `${deactivateReason}: ${deactivateNote.trim()}` : deactivateReason;
+      const res = await apiClient.delete(`/employees/${emp.id}`, {
+        params: { ly_do: fullReason, ngay_hieu_luc: deactivateDate },
+      });
+      showToast(
+        res?.message ||
+          (isFutureTermination
+            ? `Đã lên lịch thôi việc cho ${emp.name} (${emp.id}) từ ngày ${formatDateVN(deactivateDate)}.`
+            : `Đã cho thôi việc ${emp.name} (${emp.id}) và khóa tài khoản đăng nhập.`)
+      );
       setDeactivateModalEmp(null);
       refreshAll();
     } catch (err) {
-      showToast("Không thể xóa nhân sự: " + err.message);
+      setDeactivateError(getApiErrorMessage(err, "Không thể cho thôi việc nhân sự này."));
     } finally {
       setIsSubmittingDeactivate(false);
     }
   };
 
-  // Xác nhận khôi phục nhân sự
-  const handleConfirmReactivate = async () => {
-    if (!reactivateModalEmp) return;
-    const emp = reactivateModalEmp;
+  // Đưa nhân sự về "Đang làm việc": dùng cho Khôi phục (đã nghỉ) và Hủy lịch thôi việc (chưa đến ngày hiệu lực)
+  const submitBackToWorking = async (emp, successMessage, onDone) => {
+    if (isSubmittingDeactivate) return;
     setIsSubmittingDeactivate(true);
+    setStatusActionError("");
     try {
       // khoa_tai_khoan = true: đồng bộ tài khoản theo trạng thái (Đang làm -> mở khóa đăng nhập)
       await apiClient.put(`/employees/${emp.id}/status`, {
         trang_thai: "DANG_LAM",
         khoa_tai_khoan: true,
       });
-      showToast(`Đã khôi phục trạng thái Đang làm việc cho nhân sự ${emp.name} (${emp.id})!`);
-      setReactivateModalEmp(null);
+      showToast(successMessage);
+      onDone();
       refreshAll();
     } catch (err) {
-      console.error("Lỗi khi khôi phục nhân sự:", err);
-      showToast("Lỗi khi khôi phục trạng thái: " + err.message);
+      setStatusActionError(getApiErrorMessage(err, "Không thể cập nhật trạng thái nhân sự."));
     } finally {
       setIsSubmittingDeactivate(false);
     }
+  };
+
+  const handleConfirmReactivate = () => {
+    if (!reactivateModalEmp) return;
+    const emp = reactivateModalEmp;
+    submitBackToWorking(emp, `Đã khôi phục trạng thái Đang làm việc cho nhân sự ${emp.name} (${emp.id})!`, () =>
+      setReactivateModalEmp(null)
+    );
+  };
+
+  const handleConfirmCancelSchedule = () => {
+    if (!cancelScheduleEmp) return;
+    const emp = cancelScheduleEmp;
+    submitBackToWorking(emp, `Đã hủy lịch thôi việc của ${emp.name} (${emp.id}).`, () => setCancelScheduleEmp(null));
   };
 
 
@@ -376,8 +465,23 @@ export default function EmployeeManagement({ initialTab = "list" }) {
     const active = employees.filter((e) => e.status !== "resigned");
     const withSalary = active.filter((e) => e.salaryNum > 0);
     const withTenure = active.filter((e) => e.joinDate !== "—");
+    const tenureTotal = withTenure.length || 1;
+    const tenureShare = {
+      core: Math.round((withTenure.filter((e) => e.tenureYears >= 3).length / tenureTotal) * 100),
+      mid: Math.round(
+        (withTenure.filter((e) => e.tenureYears >= 1 && e.tenureYears < 3).length / tenureTotal) * 100
+      ),
+    };
+    tenureShare.junior = withTenure.length ? Math.max(0, 100 - tenureShare.core - tenureShare.mid) : 0;
     if (active.length === 0 || withSalary.length === 0) {
-      return { degreePct: 0, avgTenure: "0", avgSalary: "0", minSalary: "0tr", maxSalary: "0tr" };
+      return {
+        degreePct: 0,
+        avgTenure: "0",
+        avgSalary: "0",
+        minSalary: "0tr",
+        maxSalary: "0tr",
+        tenureShare: { core: 0, mid: 0, junior: 0 },
+      };
     }
 
     const uniOrPost = active.filter(
@@ -401,6 +505,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
       avgSalary,
       minSalary: `${(minSal / 1000000).toFixed(1)}tr`,
       maxSalary: `${(maxSal / 1000000).toFixed(1)}tr`,
+      tenureShare,
     };
   }, [employees]);
 
@@ -446,8 +551,8 @@ export default function EmployeeManagement({ initialTab = "list" }) {
           const ty = emp.tenureYears || 0;
           if (selectedTenure === "under1" && ty >= 1) return false;
           if (selectedTenure === "1to3" && (ty < 1 || ty >= 3)) return false;
-          if (selectedTenure === "3to5" && (ty < 3 || ty > 5)) return false;
-          if (selectedTenure === "above5" && ty <= 5) return false;
+          if (selectedTenure === "3to5" && (ty < 3 || ty >= 5)) return false;
+          if (selectedTenure === "above5" && ty < 5) return false;
         }
         if (selectedSalaryRange !== "all") {
           if (emp.salaryTier !== selectedSalaryRange) return false;
@@ -576,16 +681,28 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                 <Download className="w-3.5 h-3.5" />
                 <span>Xuất danh sách</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setIsAddModalOpen(true)}
-                className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>+ Thêm nhân sự</span>
-              </button>
+              {canCreate && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>+ Thêm nhân sự</span>
+                </button>
+              )}
             </div>
           </div>
+
+          {reportError && (
+            <div
+              role="alert"
+              className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2"
+            >
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>{reportError}</span>
+            </div>
+          )}
 
           {/* 4 Thẻ KPI Trạng thái nhân sự (Nhấp để lọc nhanh) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -869,16 +986,17 @@ export default function EmployeeManagement({ initialTab = "list" }) {
 
               <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-100">
                 <div className="w-full h-1.5 rounded-full bg-slate-100 flex overflow-hidden">
-                  <div className="h-full bg-emerald-600" style={{ width: "45%" }}></div>
-                  <div className="h-full bg-sky-500" style={{ width: "35%" }}></div>
-                  <div className="h-full bg-slate-300" style={{ width: "20%" }}></div>
+                  <div className="h-full bg-emerald-600" style={{ width: `${reportStats.tenureShare.core}%` }}></div>
+                  <div className="h-full bg-sky-500" style={{ width: `${reportStats.tenureShare.mid}%` }}></div>
+                  <div className="h-full bg-slate-300" style={{ width: `${reportStats.tenureShare.junior}%` }}></div>
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-500">
                   <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> &gt;3 năm (Nòng cốt)
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Từ 3 năm (Nòng cốt):{" "}
+                    {reportStats.tenureShare.core}%
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span> 1-3 năm
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span> 1–3 năm: {reportStats.tenureShare.mid}%
                   </span>
                 </div>
               </div>
@@ -1102,7 +1220,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                             <span className="font-mono font-semibold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded text-[10px]">
                               {emp.id}
                             </span>
-                            <span className="truncate">{emp.email}</span>
+                            <span className="truncate">{emp.email || "Chưa có email"}</span>
                           </div>
                         </div>
                       </div>
@@ -1189,30 +1307,68 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                         ></span>
                         {emp.statusText}
                       </span>
+                      {emp.scheduledTerminationDate && (
+                        <span
+                          className="mt-1.5 mx-auto w-fit flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap"
+                          title="Đã lên lịch thôi việc: nhân sự vẫn làm việc và đăng nhập đến ngày hiệu lực"
+                        >
+                          <CalendarClock className="w-3 h-3" />
+                          Nghỉ việc từ {formatDateVN(emp.scheduledTerminationDate)}
+                        </span>
+                      )}
                     </td>
 
                     {/* Cột 8: Thao tác (Cho thôi việc / Xóa nhân sự / Khôi phục) */}
                     <td className="py-3.5 px-4 text-center">
-                      {emp.status === "resigned" ? (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenReactivateModal(emp)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
-                          title="Khôi phục trạng thái Đang làm việc cho nhân sự này"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Khôi phục</span>
-                        </button>
+                      {access.maNv && emp.id === access.maNv ? (
+                        <span className="text-[11px] italic text-slate-400" title="Không thể tự thay đổi trạng thái của chính mình">
+                          Tài khoản của bạn
+                        </span>
+                      ) : emp.status === "resigned" ? (
+                        canUpdate ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReactivateModal(emp)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
+                            title="Khôi phục trạng thái Đang làm việc cho nhân sự này"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Khôi phục</span>
+                          </button>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDeactivateModal(emp)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
-                          title="Cho thôi việc / Xóa nhân sự khỏi danh sách hoạt động"
-                        >
-                          <UserX className="w-3.5 h-3.5 text-rose-600" />
-                          <span>Thôi việc / Xóa</span>
-                        </button>
+                        <div className="flex flex-col items-center gap-1.5">
+                          {emp.scheduledTerminationDate && canUpdate && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCancelSchedule(emp)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs"
+                              title="Hủy quyết định thôi việc đã lên lịch, nhân sự tiếp tục làm việc"
+                            >
+                              <CalendarX className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Hủy lịch thôi việc</span>
+                            </button>
+                          )}
+                          {canDelete ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDeactivateModal(emp)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 text-[11px] font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
+                              title={
+                                emp.scheduledTerminationDate
+                                  ? "Đổi ngày hiệu lực hoặc cho thôi việc ngay"
+                                  : "Cho thôi việc với ngày hiệu lực (khóa tài khoản khi đến ngày)"
+                              }
+                            >
+                              <UserX className="w-3.5 h-3.5 text-rose-600" />
+                              <span>{emp.scheduledTerminationDate ? "Đổi ngày thôi việc" : "Thôi việc / Xóa"}</span>
+                            </button>
+                          ) : (
+                            !emp.scheduledTerminationDate && <span className="text-slate-300">—</span>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -1286,12 +1442,23 @@ export default function EmployeeManagement({ initialTab = "list" }) {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSave={handleAddEmployee}
+        managerOptions={managerOptions}
       />
 
       {/* ──────────────── MODAL XÁC NHẬN: CHO THÔI VIỆC / XÓA NHÂN SỰ ──────────────── */}
       {deactivateModalEmp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeDeactivateModal();
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deactivate-dialog-title"
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]"
+          >
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
               <div className="flex items-center gap-2.5">
@@ -1299,25 +1466,27 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                   <UserX className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900">
+                  <h3 id="deactivate-dialog-title" className="font-bold text-sm text-slate-900">
                     Xác nhận Thôi việc / Xóa nhân sự
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Ngừng công tác và khóa quyền truy cập của nhân sự
+                    Ngừng công tác và khóa quyền truy cập của nhân sự từ ngày hiệu lực
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setDeactivateModalEmp(null)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                onClick={closeDeactivateModal}
+                disabled={isSubmittingDeactivate}
+                aria-label="Đóng"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer disabled:opacity-40"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 flex flex-col gap-4 text-xs">
+            <div className="p-6 flex flex-col gap-4 text-xs overflow-y-auto">
               {/* Card tóm tắt nhân viên */}
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
                 <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-700 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
@@ -1336,6 +1505,27 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                     {deactivateModalEmp.role} • {deactivateModalEmp.dept}
                   </div>
                 </div>
+              </div>
+
+              {/* Ngày hiệu lực thôi việc (bắt buộc) */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="ngay-hieu-luc-thoi-viec" className="font-bold text-slate-700">
+                  Ngày hiệu lực thôi việc <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="ngay-hieu-luc-thoi-viec"
+                  type="date"
+                  required
+                  value={deactivateDate}
+                  onChange={(e) => {
+                    setDeactivateDate(e.target.value);
+                    if (deactivateError) setDeactivateError("");
+                  }}
+                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-500 shadow-2xs w-full sm:w-56"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Mặc định là hôm nay. Có thể chọn một ngày trong tương lai để lên lịch thôi việc.
+                </p>
               </div>
 
               {(
@@ -1366,31 +1556,53 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                 />
               </div>
 
-              {/* Thông báo chính sách */}
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-[11px] leading-relaxed flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  Nhân sự sẽ chuyển sang 'Đã nghỉ việc' và tài khoản đăng nhập bị KHÓA (không xóa tài khoản).
-                  Toàn bộ hồ sơ, hợp đồng, chấm công, bảng lương được giữ lại để đối soát và báo cáo.
-                </span>
-              </div>
+              {/* Thông báo chính sách theo ngày hiệu lực */}
+              {isFutureTermination ? (
+                <div className="p-3 rounded-xl bg-sky-50 border border-sky-200/80 text-sky-900 text-[11px] leading-relaxed flex items-start gap-2">
+                  <CalendarClock className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Lên lịch thôi việc từ ngày {formatDateVN(deactivateDate)}.</strong> Đến trước ngày đó nhân sự vẫn
+                    ở trạng thái Đang làm việc, vẫn chấm công và đăng nhập bình thường. Đến ngày hiệu lực, hệ thống tự động
+                    chuyển sang "Đã nghỉ việc", khóa tài khoản và thanh lý hợp đồng. Có thể hủy lịch trước ngày hiệu lực.
+                  </span>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-[11px] leading-relaxed flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Thôi việc có hiệu lực ngay.</strong> Nhân sự chuyển sang "Đã nghỉ việc", tài khoản đăng nhập bị
+                    KHÓA NGAY và hợp đồng được thanh lý (không xóa tài khoản). Toàn bộ hồ sơ, hợp đồng, chấm công, bảng lương
+                    được giữ lại để đối soát và báo cáo.
+                  </span>
+                </div>
+              )}
+
+              {deactivateError && (
+                <div
+                  role="alert"
+                  className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-medium flex items-start gap-2"
+                >
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{deactivateError}</span>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
               <button
                 type="button"
-                onClick={() => setDeactivateModalEmp(null)}
+                onClick={closeDeactivateModal}
                 disabled={isSubmittingDeactivate}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
               >
                 Hủy bỏ
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDeactivate}
-                disabled={isSubmittingDeactivate}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                disabled={isSubmittingDeactivate || !deactivateDate}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmittingDeactivate ? (
                   <>
@@ -1400,7 +1612,7 @@ export default function EmployeeManagement({ initialTab = "list" }) {
                 ) : (
                   <>
                     <UserX className="w-3.5 h-3.5" />
-                    <span>Xác nhận xóa nhân sự</span>
+                    <span>{isFutureTermination ? "Lên lịch thôi việc" : "Cho thôi việc ngay"}</span>
                   </>
                 )}
               </button>
@@ -1409,52 +1621,66 @@ export default function EmployeeManagement({ initialTab = "list" }) {
         </div>
       )}
 
-      {/* ──────────────── MODAL XÁC NHẬN: KHÔI PHỤC TRẠNG THÁI LÀM VIỆC ──────────────── */}
-      {reactivateModalEmp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
-            <div className="p-6 flex flex-col gap-4 text-center items-center">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-xs">
-                <RotateCcw className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-bold text-base text-slate-900">Khôi phục trạng thái làm việc</h3>
-                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                  Khôi phục nhân sự <strong>{reactivateModalEmp.name}</strong> ({reactivateModalEmp.id}) trở lại trạng thái <strong>Đang làm việc</strong> và mở khóa tài khoản?
-                </p>
-              </div>
-            </div>
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setReactivateModalEmp(null)}
-                disabled={isSubmittingDeactivate}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmReactivate}
-                disabled={isSubmittingDeactivate}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {isSubmittingDeactivate ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                )}
-                <span>Xác nhận khôi phục</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ──────────────── HỘP THOẠI XÁC NHẬN: KHÔI PHỤC TRẠNG THÁI LÀM VIỆC ──────────────── */}
+      <ConfirmDialog
+        open={Boolean(reactivateModalEmp)}
+        tone="success"
+        icon={RotateCcw}
+        title="Khôi phục trạng thái làm việc"
+        description={
+          reactivateModalEmp && (
+            <>
+              Khôi phục nhân sự <strong>{reactivateModalEmp.name}</strong> ({reactivateModalEmp.id}) trở lại trạng thái{" "}
+              <strong>Đang làm việc</strong> và mở khóa tài khoản đăng nhập?
+            </>
+          )
+        }
+        confirmLabel="Xác nhận khôi phục"
+        busy={isSubmittingDeactivate}
+        error={statusActionError}
+        onCancel={() => !isSubmittingDeactivate && setReactivateModalEmp(null)}
+        onConfirm={handleConfirmReactivate}
+      />
+
+      {/* ──────────────── HỘP THOẠI XÁC NHẬN: HỦY LỊCH THÔI VIỆC ──────────────── */}
+      <ConfirmDialog
+        open={Boolean(cancelScheduleEmp)}
+        tone="warning"
+        icon={CalendarX}
+        title="Hủy lịch thôi việc"
+        description={
+          cancelScheduleEmp && (
+            <>
+              Hủy quyết định thôi việc từ ngày{" "}
+              <strong>{formatDateVN(cancelScheduleEmp.scheduledTerminationDate)}</strong> của{" "}
+              <strong>{cancelScheduleEmp.name}</strong> ({cancelScheduleEmp.id})? Nhân sự tiếp tục làm việc bình thường,
+              tài khoản không bị khóa khi đến ngày đó.
+            </>
+          )
+        }
+        confirmLabel="Hủy lịch thôi việc"
+        cancelLabel="Giữ nguyên"
+        busy={isSubmittingDeactivate}
+        error={statusActionError}
+        onCancel={() => !isSubmittingDeactivate && setCancelScheduleEmp(null)}
+        onConfirm={handleConfirmCancelSchedule}
+      />
 
       {/* Toast thông báo */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-xl flex items-center gap-3 text-xs font-semibold animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div
+          role={toastType === "error" ? "alert" : "status"}
+          className={`fixed bottom-6 right-6 z-[90] max-w-md p-4 rounded-xl border shadow-xl flex items-center gap-3 text-xs font-semibold animate-in fade-in slide-in-from-bottom-3 duration-200 ${
+            toastType === "error"
+              ? "border-rose-200 bg-rose-50 text-rose-800"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          {toastType === "error" ? (
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          )}
           <span>{toastMessage}</span>
         </div>
       )}

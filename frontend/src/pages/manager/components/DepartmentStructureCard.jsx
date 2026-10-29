@@ -1,19 +1,9 @@
 import React from "react";
-import { Building2 } from "lucide-react";
+import CardErrorNotice from "./CardErrorNotice";
 
-export default function DepartmentStructureCard({ departments }) {
-  const depts = departments || [
-    { id: "PB01", name: "Ban Giám Đốc", count: 1, color: "#0284c7" },
-    { id: "PB02", name: "Phòng Hành chính - Nhân sự", count: 3, color: "#0ea5e9" },
-    { id: "PB03", name: "Phòng Kế toán - Tài chính", count: 2, color: "#38bdf8" },
-    { id: "PB04", name: "Phòng R&D & Kiểm soát CL", count: 2, color: "#10b981" },
-    { id: "PB05", name: "Phòng Kinh doanh & Tiếp thị", count: 3, color: "#f59e0b" },
-    { id: "PB06", name: "Phòng Chuỗi Cung ứng & Kho vận", count: 3, color: "#6366f1" },
-    { id: "PB07", name: "Xưởng Rang Xay Buôn Ma Thuột", count: 3, color: "#8b5cf6" },
-    { id: "PB08", name: "Xưởng Đóng Gói Bình Dương", count: 2, color: "#ec4899" },
-  ];
-
-  const total = depts.reduce((sum, d) => sum + d.count, 0) || 19;
+export default function DepartmentStructureCard({ departments, error }) {
+  const depts = departments || [];
+  const total = depts.reduce((sum, d) => sum + d.count, 0);
 
   return (
     <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
@@ -30,10 +20,15 @@ export default function DepartmentStructureCard({ departments }) {
           </span>
         </div>
 
+        {error && <CardErrorNotice message={error} />}
+        {!error && depts.length === 0 && (
+          <p className="py-10 text-center text-xs text-slate-400">Chưa có dữ liệu nhân sự</p>
+        )}
+
         {/* Danh sách phòng ban */}
         <div className="flex flex-col gap-3 my-2">
           {depts.map((d) => {
-            const pct = Math.round((d.count / total) * 100);
+            const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
             return (
               <div key={d.id} className="flex flex-col gap-1.5">
                 <div className="flex justify-between items-center text-xs">
@@ -60,8 +55,8 @@ export default function DepartmentStructureCard({ departments }) {
       </div>
 
       <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 mt-4">
-        <span>Toàn bộ cơ cấu phòng ban & xưởng</span>
-        <span className="font-semibold text-slate-700">8 phòng ban & xưởng</span>
+        <span>Nhân sự đang làm việc theo phòng ban</span>
+        <span className="font-semibold text-slate-700">{depts.length} phòng ban</span>
       </div>
     </div>
   );

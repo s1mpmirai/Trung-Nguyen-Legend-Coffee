@@ -1,17 +1,22 @@
 import React, { useState } from "react";
+import CardErrorNotice from "./CardErrorNotice";
 
-export default function AttendanceTrendCard({ attendanceData }) {
+export default function AttendanceTrendCard({ attendanceData, error }) {
   const [hoverIndex, setHoverIndex] = useState(null);
 
   const records = attendanceData || [];
 
-  if (records.length === 0) {
+  if (error || records.length === 0) {
     return (
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col">
         <h2 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-sm text-slate-900 tracking-wider uppercase">
           Xu hướng chấm công
         </h2>
-        <p className="py-10 text-center text-xs text-slate-400">Chưa có dữ liệu chấm công</p>
+        {error ? (
+          <CardErrorNotice message={error} />
+        ) : (
+          <p className="py-10 text-center text-xs text-slate-400">Chưa có dữ liệu chấm công</p>
+        )}
       </div>
     );
   }

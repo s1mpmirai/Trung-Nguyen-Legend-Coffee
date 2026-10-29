@@ -1,7 +1,8 @@
 import React from "react";
 import { CheckCircle2 } from "lucide-react";
+import CardErrorNotice from "./CardErrorNotice";
 
-export default function PayrollDepartmentCard({ payrollData }) {
+export default function PayrollDepartmentCard({ payrollData, error }) {
   const data = payrollData || { totalCost: "—", averageSalary: "—", salaryRange: "—", brackets: [], departments: [] };
 
   return (
@@ -30,7 +31,8 @@ export default function PayrollDepartmentCard({ payrollData }) {
         </div>
 
         <div className="flex flex-col gap-2.5">
-          {data.departments.length === 0 && (
+          {error && <CardErrorNotice message={error} />}
+          {!error && data.departments.length === 0 && (
             <p className="py-6 text-center text-xs text-slate-400">Chưa có dữ liệu lương</p>
           )}
           {data.departments.map((dept, idx) => (

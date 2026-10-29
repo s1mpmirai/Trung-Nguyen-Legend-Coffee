@@ -1,7 +1,8 @@
 import React from "react";
-import { FileText, AlertCircle, Calendar } from "lucide-react";
+import { AlertCircle, Calendar } from "lucide-react";
+import CardErrorNotice from "./CardErrorNotice";
 
-export default function ExpiringContractsCard({ contracts, onNavigateTab }) {
+export default function ExpiringContractsCard({ contracts, error, onNavigateTab }) {
   const list = contracts || [];
 
   // Helper tính số ngày còn lại từ chuỗi ngày DD/MM/YYYY
@@ -36,7 +37,8 @@ export default function ExpiringContractsCard({ contracts, onNavigateTab }) {
         </div>
 
         <div className="flex flex-col gap-3 my-2">
-          {list.length === 0 && (
+          {error && <CardErrorNotice message={error} />}
+          {!error && list.length === 0 && (
             <p className="py-6 text-center text-xs text-slate-400">Không có hợp đồng sắp hết hạn trong 60 ngày tới</p>
           )}
           {list.map((c) => {

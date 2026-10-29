@@ -5,6 +5,7 @@ export { default as AttendanceManagement } from "./AttendanceManagement";
 export { default as PayrollManagement } from "./PayrollManagement";
 export { default as RolePermissions } from "./RolePermissions";
 export { default as AddEmployeeModal } from "./components/AddEmployeeModal";
+export { default as ProfileRequestsPanel } from "./components/ProfileRequestsPanel";
 export { default as ManagerSidebar } from "./components/ManagerSidebar";
 export { default as ManagerHeader } from "./components/ManagerHeader";
 export { default as StatMetricCards } from "./components/StatMetricCards";
