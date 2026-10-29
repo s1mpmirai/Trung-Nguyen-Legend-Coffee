@@ -5,15 +5,30 @@ import {
   SlidersHorizontal,
   RotateCcw,
   RefreshCw,
-  Loader2,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
   Phone,
   Mail,
+  Filter,
 } from "lucide-react";
 import { getEmployeesList, getDepartments, getPositions } from "../../../services/adminService";
 import SortableHeader, { nextSort } from "../../../components/common/SortableHeader";
+import { SkeletonRows } from "../../../components/common/TableSkeleton";
+import EmptyState from "../../../components/common/EmptyState";
+import ErrorState from "../../../components/common/ErrorState";
+import {
+  TABLE_SCROLL,
+  TABLE,
+  THEAD,
+  THEAD_ROW,
+  TH,
+  TBODY,
+  TR,
+  TD,
+  STICKY_TH,
+  STICKY_TD,
+} from "../../../components/common/tableStyles";
 
 // Nhãn hiển thị khớp ENUM trong CSDL (00_full_hrm_lite.sql)
 const STATUS_OPTIONS = [
@@ -26,9 +41,9 @@ const STATUS_OPTIONS = [
 
 const CONTRACT_TYPE_OPTIONS = [
   { value: "THU_VIEC", label: "Thử việc" },
-  { value: "XAC_DINH_1_NAM", label: "Xác định 1 năm" },
-  { value: "XAC_DINH_3_NAM", label: "Xác định 3 năm" },
-  { value: "KHONG_XAC_DINH", label: "Không xác định" },
+  { value: "XAC_DINH_1_NAM", label: "Xác định thời hạn 1 năm" },
+  { value: "XAC_DINH_3_NAM", label: "Xác định thời hạn 3 năm" },
+  { value: "KHONG_XAC_DINH", label: "Không xác định thời hạn" },
   { value: "THOI_VU", label: "Thời vụ" },
 ];
 
@@ -73,7 +88,7 @@ export default function AdminEmployeesTab() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [loadError, setLoadError] = useState(null);
 
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
@@ -100,7 +115,7 @@ export default function AdminEmployeesTab() {
 
   const fetchEmployees = useCallback(async () => {
     setIsLoading(true);
-    setErrorMessage("");
+    setLoadError(null);
     try {
       const params = { page, page_size: pageSize, sort_by: sort.by, sort_order: sort.order };
       Object.entries(filters).forEach(([key, val]) => {
@@ -115,7 +130,7 @@ export default function AdminEmployeesTab() {
       console.error("Lỗi tải danh bạ nhân sự:", err);
       setEmployees([]);
       setTotal(0);
-      setErrorMessage(err.message || "Không thể tải danh bạ nhân sự. Vui lòng thử lại!");
+      setLoadError(err);
     } finally {
       setIsLoading(false);
     }
@@ -166,6 +181,8 @@ export default function AdminEmployeesTab() {
   };
 
   const advancedCount = ADVANCED_FIELDS.filter((k) => String(filters[k]).trim() !== "").length;
+  // Đếm TẤT CẢ điều kiện đang áp dụng: từ khóa, phòng ban, chức vụ, trạng thái và các trường nâng cao
+  const activeFilterCount = Object.keys(EMPTY_FILTERS).filter((k) => String(filters[k]).trim() !== "").length;
   const statusInfo = (value) => STATUS_OPTIONS.find((s) => s.value === value);
   const contractLabel = (value) => CONTRACT_TYPE_OPTIONS.find((c) => c.value === value)?.label || value || "—";
 
@@ -274,14 +291,25 @@ export default function AdminEmployeesTab() {
             <span>Tìm kiếm nâng cao{advancedCount > 0 ? ` (${advancedCount})` : ""}</span>
           </button>
 
+          {activeFilterCount > 0 && (
+            <span
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200"
+              aria-live="polite"
+            >
+              <Filter size={11} aria-hidden="true" />
+              Đang lọc: {activeFilterCount} điều kiện
+            </span>
+          )}
+
           <button
             type="button"
             onClick={handleReset}
-            className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition cursor-pointer"
+            disabled={activeFilterCount === 0 && sort.by === "ma_nv" && sort.order === "asc"}
+            className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             title="Xóa toàn bộ điều kiện tìm kiếm và sắp xếp"
           >
-            <RotateCcw size={13} />
-            <span>Đặt lại</span>
+            <RotateCcw size={13} aria-hidden="true" />
+            <span>Đặt lại bộ lọc</span>
           </button>
         </div>
 
@@ -403,70 +431,70 @@ export default function AdminEmployeesTab() {
         )}
       </div>
 
-      {errorMessage && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl flex items-center gap-3 text-xs font-semibold">
-          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
       {/* ── BẢNG KẾT QUẢ ── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        {isLoading ? (
-          <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
-            <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
-            <span className="text-xs font-medium">Đang tải danh bạ nhân sự...</span>
-          </div>
-        ) : employees.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 text-xs font-medium">
-            {errorMessage ? "Không có dữ liệu để hiển thị." : "Không tìm thấy nhân sự nào phù hợp với điều kiện tìm kiếm."}
-          </div>
+        {loadError && !isLoading ? (
+          <ErrorState error={loadError} onRetry={fetchEmployees} />
+        ) : !isLoading && employees.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title={activeFilterCount > 0 ? "Không tìm thấy nhân sự phù hợp" : "Chưa có hồ sơ nhân sự"}
+            description={
+              activeFilterCount > 0
+                ? `Không có nhân sự nào khớp với ${activeFilterCount} điều kiện đang áp dụng.`
+                : "Danh bạ sẽ hiển thị tại đây khi có hồ sơ nhân sự."
+            }
+            hasFilters={activeFilterCount > 0}
+            onResetFilters={handleReset}
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider">
-                  <SortableHeader className="py-3 px-4" label="Mã NV" field="ma_nv" sort={sort} onSort={handleSort} />
-                  <SortableHeader className="py-3 px-4" label="Họ tên" field="ho_ten" sort={sort} onSort={handleSort} />
-                  <SortableHeader className="py-3 px-4" label="Phòng ban" field="ten_pb" sort={sort} onSort={handleSort} />
-                  <SortableHeader className="py-3 px-4" label="Chức vụ" field="ten_cv" sort={sort} onSort={handleSort} />
-                  <th className="py-3 px-4">Liên hệ</th>
-                  <SortableHeader className="py-3 px-4" label="Ngày vào làm" field="ngay_vao_lam" sort={sort} onSort={handleSort} />
-                  <th className="py-3 px-4">Loại HĐ</th>
-                  <SortableHeader className="py-3 px-4 text-right" label="Lương cơ bản" field="luong_co_ban" sort={sort} onSort={handleSort} />
-                  <SortableHeader className="py-3 px-4" label="Trạng thái" field="trang_thai" sort={sort} onSort={handleSort} />
+          <div className={TABLE_SCROLL}>
+            <table className={TABLE} aria-busy={isLoading}>
+              <thead className={THEAD}>
+                <tr className={THEAD_ROW}>
+                  <SortableHeader className={`${TH} ${STICKY_TH} min-w-[96px]`} label="Mã NV" field="ma_nv" sort={sort} onSort={handleSort} />
+                  <SortableHeader className={`${TH} min-w-[200px]`} label="Họ tên" field="ho_ten" sort={sort} onSort={handleSort} />
+                  <SortableHeader className={TH} label="Phòng ban" field="ten_pb" sort={sort} onSort={handleSort} />
+                  <SortableHeader className={TH} label="Chức vụ" field="ten_cv" sort={sort} onSort={handleSort} />
+                  <th scope="col" className={TH}>Liên hệ</th>
+                  <SortableHeader className={TH} label="Ngày vào làm" field="ngay_vao_lam" sort={sort} onSort={handleSort} />
+                  <th scope="col" className={TH}>Loại HĐ</th>
+                  <SortableHeader className={`${TH} text-right`} align="right" label="Lương cơ bản" field="luong_co_ban" sort={sort} onSort={handleSort} />
+                  <SortableHeader className={TH} label="Trạng thái" field="trang_thai" sort={sort} onSort={handleSort} />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {employees.map((emp) => {
+              <tbody className={TBODY}>
+                {isLoading ? (
+                  <SkeletonRows rows={8} columns={9} />
+                ) : employees.map((emp) => {
                   const status = statusInfo(emp.trang_thai);
                   return (
-                    <tr key={emp.ma_nv} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-slate-900">{emp.ma_nv}</td>
-                      <td className="py-3.5 px-4">
+                    <tr key={emp.ma_nv} className={TR}>
+                      <td className={`${TD} ${STICKY_TD} font-mono font-bold text-slate-900 whitespace-nowrap`}>{emp.ma_nv}</td>
+                      <td className={TD}>
                         <div className="flex flex-col">
-                          <span className="font-semibold text-slate-900">{emp.ho_ten}</span>
-                          <span className="text-[11px] text-slate-400">
+                          <span className="font-semibold text-slate-900 whitespace-nowrap">{emp.ho_ten}</span>
+                          <span className="text-[11px] text-slate-400 whitespace-nowrap">
                             {GENDER_LABELS[emp.gioi_tinh] || emp.gioi_tinh || "—"} • {formatDate(emp.ngay_sinh)}
                           </span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-700">{emp.ten_pb || "—"}</td>
-                      <td className="py-3.5 px-4 text-slate-700">{emp.ten_cv || "—"}</td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex flex-col gap-0.5 text-[11px] text-slate-500">
+                      <td className={`${TD} text-slate-700 whitespace-nowrap`}>{emp.ten_pb || "—"}</td>
+                      <td className={`${TD} text-slate-700 whitespace-nowrap`}>{emp.ten_cv || "—"}</td>
+                      <td className={TD}>
+                        <div className="flex flex-col gap-0.5 text-[11px] text-slate-500 whitespace-nowrap">
                           <span className="flex items-center gap-1">
-                            <Phone size={11} /> {emp.sdt || "—"}
+                            <Phone size={11} aria-hidden="true" /> {emp.sdt || "—"}
                           </span>
                           <span className="flex items-center gap-1">
-                            <Mail size={11} /> {emp.email || "—"}
+                            <Mail size={11} aria-hidden="true" /> {emp.email || "—"}
                           </span>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-700">{formatDate(emp.ngay_vao_lam)}</td>
-                      <td className="py-3.5 px-4 text-slate-700">{contractLabel(emp.loai_hd)}</td>
-                      <td className="py-3.5 px-4 text-right font-semibold text-slate-900">{formatVND(emp.muc_luong)}</td>
-                      <td className="py-3.5 px-4">
+                      <td className={`${TD} text-slate-700 whitespace-nowrap`}>{formatDate(emp.ngay_vao_lam)}</td>
+                      <td className={`${TD} text-slate-700 whitespace-nowrap`}>{contractLabel(emp.loai_hd)}</td>
+                      <td className={`${TD} text-right font-semibold text-slate-900 whitespace-nowrap`}>{formatVND(emp.muc_luong)}</td>
+                      <td className={`${TD} whitespace-nowrap`}>
                         <span
                           className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                             status?.badge || "bg-slate-100 text-slate-600 border-slate-200"

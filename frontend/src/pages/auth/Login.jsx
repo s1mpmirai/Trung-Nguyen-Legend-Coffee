@@ -1,19 +1,35 @@
 import React, { useState } from 'react';
-import { ShieldCheck, User, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
-// Import logo từ thư mục local trong src/assets/logo/
+import { User, Lock, Eye, EyeOff, Loader2, Info } from 'lucide-react';
+import apiClient from '../../services/apiClient';
+import { getApiErrorMessage } from '../employee/utils/format';
+// Import logo từ thư mục local trong src/assets/logo/ (logo trắng trên nền nâu)
 import logoImg from '../../assets/logo/logo.png';
 
+// "Ghi nhớ đăng nhập" chỉ lưu MÃ NHÂN VIÊN trên thiết bị này – không bao giờ lưu mật khẩu
+const REMEMBER_KEY = 'tnl_remembered_ma_nv';
+
+const readRememberedId = () => {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
 export default function Login({ onLoginSuccess }) {
-  const [employeeId, setEmployeeId] = useState('NV10');
-  const [password, setPassword] = useState('1');
-  const [rememberMe, setRememberMe] = useState(true);
+  const [employeeId, setEmployeeId] = useState(readRememberedId);
+  const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => Boolean(readRememberedId()));
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLoading) return;
     setErrorMessage('');
+    setInfoMessage('');
 
     if (!employeeId.trim()) {
       setErrorMessage('Vui lòng nhập Mã nhân viên');
@@ -30,30 +46,20 @@ export default function Login({ onLoginSuccess }) {
     try {
       const cleanId = employeeId.trim().toUpperCase().replace('-', '');
 
-      let response = await fetch('/api/v1/auth/employee-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ma_nv: cleanId,
-          mat_khau: password,
-        }),
+      const data = await apiClient.post('/auth/employee-login', {
+        ma_nv: cleanId,
+        mat_khau: password,
       });
 
-      if (!response.ok) {
-        let errorMsg = 'Mã nhân viên hoặc mật khẩu không chính xác';
-        try {
-          const errData = await response.json();
-          if (errData && errData.detail) {
-            errorMsg = errData.detail;
-          }
-        } catch (_) {}
-        setErrorMessage(errorMsg);
-        setIsLoading(false);
-        return;
-      }
-
-      const data = await response.json();
       const role = String(data.ma_vai_tro || 'NHAN_VIEN').toUpperCase();
+
+      // Ghi nhớ (hoặc quên) mã nhân viên trên thiết bị này
+      try {
+        if (rememberMe) localStorage.setItem(REMEMBER_KEY, cleanId);
+        else localStorage.removeItem(REMEMBER_KEY);
+      } catch {
+        /* Trình duyệt chặn bộ nhớ cục bộ: bỏ qua, không ảnh hưởng đăng nhập */
+      }
 
       // Mọi nhân sự (kể cả Quản lý / Admin) đều được vào Cổng nhân viên để chấm công cá nhân
       localStorage.setItem('user_role', role);
@@ -80,34 +86,39 @@ export default function Login({ onLoginSuccess }) {
       }
     } catch (err) {
       setIsLoading(false);
-      setErrorMessage('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
+      setErrorMessage(
+        err?.status
+          ? getApiErrorMessage(err, 'Mã nhân viên hoặc mật khẩu không chính xác')
+          : 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.'
+      );
     }
   };
 
   return (
     <div className="flex-1 flex flex-col justify-between bg-white min-h-[780px]">
-      {/* ───────────────── HEADER: Xanh Sky-500 + Sóng Wave ───────────────── */}
-      <div className="relative bg-gradient-to-b from-[#0284C7] via-[#0EA5E9] to-[#38BDF8] pt-10 pb-28 px-6 flex flex-col items-center justify-center text-white overflow-hidden shadow-md">
-        
-        {/* Họa tiết vòng sáng background */}
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
-        <div className="absolute top-1/2 -left-16 w-40 h-40 bg-sky-300/20 rounded-full blur-lg pointer-events-none"></div>
+      {/* ───────────────── HEADER: Nâu cà phê Trung Nguyên + Sóng Wave ───────────────── */}
+      <div className="relative bg-gradient-to-b from-coffee-800 via-coffee-600 to-coffee-500 pt-10 pb-28 px-6 flex flex-col items-center justify-center text-white overflow-hidden shadow-md">
+
+        {/* Họa tiết vòng sáng vàng đồng */}
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-gold-400/20 rounded-full blur-xl pointer-events-none"></div>
+        <div className="absolute top-1/2 -left-16 w-40 h-40 bg-gold-300/15 rounded-full blur-lg pointer-events-none"></div>
 
         {/* Logo Trung Nguyên */}
         <div className="relative z-10 flex flex-col items-center text-center my-2">
           <img
             src={logoImg}
-            alt="Trung Nguyen Legend Logo"
-            className="w-44 max-h-28 object-contain filter drop-shadow-md transition-transform hover:scale-105"
+            alt="Trung Nguyên Legend"
+            className="w-44 max-h-28 object-contain filter drop-shadow-md"
           />
         </div>
 
-        {/* Hiệu ứng lượn sóng Wave SVG sâu và cong rõ rệt */}
+        {/* Hiệu ứng lượn sóng Wave SVG */}
         <div className="absolute bottom-0 left-0 right-0 w-full overflow-hidden leading-none pointer-events-none z-10">
           <svg
             className="relative block w-full h-20 text-white fill-white"
             viewBox="0 0 1200 120"
             preserveAspectRatio="none"
+            aria-hidden="true"
           >
             <path
               d="M0,25 C200,120 400,0 650,60 C900,120 1060,10 1200,30 L1200,120 L0,120 Z"
@@ -116,46 +127,57 @@ export default function Login({ onLoginSuccess }) {
         </div>
       </div>
 
-      {/* ───────────────── PHẦN FORM: Liền mạch trực tiếp với sóng ───────────────── */}
+      {/* ───────────────── PHẦN FORM ───────────────── */}
       <div className="relative bg-white px-6 pt-2 pb-6 flex-1 flex flex-col justify-between">
 
         <div className="space-y-5">
           {/* Tiêu đề & mô tả */}
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
+            <h1 className="text-2xl font-bold text-coffee-900 tracking-tight">
               Chào mừng trở lại!
-            </h2>
+            </h1>
             <p className="text-xs text-slate-500 mt-1 font-normal">
-              Hệ thống thông tin & chấm công nhân sự
+              Cổng thông tin nhân viên – Chấm công, đơn từ & bảng lương
             </p>
           </div>
 
           {/* Thông báo lỗi nếu có */}
           {errorMessage && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-xl text-xs font-medium text-center animate-shake">
+            <div role="alert" className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-medium text-center animate-shake">
               {errorMessage}
             </div>
           )}
 
+          {/* Hướng dẫn quên mật khẩu */}
+          {infoMessage && (
+            <div role="status" className="p-3 bg-gold-50 border border-gold-200 text-coffee-800 rounded-xl text-xs font-medium flex items-start gap-2">
+              <Info size={15} className="flex-shrink-0 mt-0.5 text-gold-700" />
+              <span>{infoMessage}</span>
+            </div>
+          )}
+
           {/* Form đăng nhập */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+
             {/* Input 1: Mã nhân viên */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700">
+              <label htmlFor="login-employee-id" className="block text-xs font-semibold text-slate-700">
                 Mã nhân viên
               </label>
               <div className="relative flex items-center">
-                <div className="absolute left-3.5 text-slate-400">
+                <div className="absolute left-3.5 text-slate-400" aria-hidden="true">
                   <User size={18} />
                 </div>
                 <input
+                  id="login-employee-id"
                   type="text"
                   value={employeeId}
                   onChange={(e) => setEmployeeId(e.target.value)}
-                  placeholder="Ví dụ: NV10, NV11, NV12..."
+                  placeholder="Ví dụ: NV10"
+                  autoComplete="username"
+                  autoCapitalize="characters"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] focus:border-transparent focus:bg-white transition-all shadow-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-coffee-50/60 border border-coffee-100 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent focus:bg-white transition-all shadow-sm"
                 />
               </div>
             </div>
@@ -163,64 +185,62 @@ export default function Login({ onLoginSuccess }) {
             {/* Input 2: Mật khẩu */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center">
-                <label className="block text-xs font-semibold text-slate-700">
+                <label htmlFor="login-password" className="block text-xs font-semibold text-slate-700">
                   Mật khẩu
                 </label>
-                <a
-                  href="#forgot"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Vui lòng liên hệ Phòng Nhân sự (Hotline: 1900 6868) để cấp lại mật khẩu.');
-                  }}
-                  className="text-[11px] font-medium text-[#0EA5E9] hover:underline"
+                <button
+                  type="button"
+                  onClick={() =>
+                    setInfoMessage('Vui lòng liên hệ Phòng Nhân sự hoặc Quản trị viên hệ thống để được cấp lại mật khẩu.')
+                  }
+                  className="text-[11px] font-semibold text-coffee-600 hover:text-coffee-800 hover:underline min-h-[32px] px-1"
                 >
                   Quên mật khẩu?
-                </a>
+                </button>
               </div>
               <div className="relative flex items-center">
-                <div className="absolute left-3.5 text-slate-400">
+                <div className="absolute left-3.5 text-slate-400" aria-hidden="true">
                   <Lock size={18} />
                 </div>
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Nhập mật khẩu của bạn"
+                  autoComplete="current-password"
                   required
-                  className="w-full pl-10 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] focus:border-transparent focus:bg-white transition-all shadow-sm"
+                  className="w-full pl-10 pr-12 py-3 bg-coffee-50/60 border border-coffee-100 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent focus:bg-white transition-all shadow-sm"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 text-slate-400 hover:text-slate-600 focus:outline-none p-1"
+                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  className="absolute right-1.5 w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-coffee-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
 
-            {/* Checkbox: Ghi nhớ đăng nhập */}
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center space-x-2.5 cursor-pointer text-xs text-slate-600 select-none">
+            {/* Checkbox: Ghi nhớ mã nhân viên (không lưu mật khẩu) */}
+            <div className="flex items-center pt-1">
+              <label className="flex items-center space-x-2.5 cursor-pointer text-xs text-slate-600 select-none min-h-[32px]">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#0EA5E9] focus:ring-[#0EA5E9] border-slate-300 accent-[#0EA5E9] transition-colors"
+                  className="w-4 h-4 rounded border-slate-300 accent-coffee-600"
                 />
-                <span>Ghi nhớ đăng nhập</span>
+                <span>Ghi nhớ mã nhân viên trên thiết bị này</span>
               </label>
-
-              <span className="text-[11px] text-slate-400 font-normal">
-                Phiên bản v2.4.0
-              </span>
             </div>
 
             {/* Nút bấm Đăng nhập */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full mt-3 py-3.5 px-4 bg-[#0EA5E9] hover:bg-[#0284C7] active:scale-[0.98] text-white font-semibold text-sm rounded-xl shadow-lg shadow-sky-500/35 transition-all flex items-center justify-center space-x-2 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2"
+              className="w-full mt-3 min-h-[48px] py-3.5 px-4 bg-coffee-600 hover:bg-coffee-800 active:scale-[0.98] text-white font-semibold text-sm rounded-xl shadow-lg shadow-coffee-600/30 transition-all flex items-center justify-center space-x-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 disabled:opacity-80 disabled:cursor-wait"
             >
               {isLoading ? (
                 <>
@@ -241,7 +261,7 @@ export default function Login({ onLoginSuccess }) {
                   window.history.pushState(null, '', '/login-manage');
                   window.dispatchEvent(new Event('app-route-change'));
                 }}
-                className="inline-flex items-center space-x-1.5 text-xs font-medium text-slate-500 hover:text-[#0EA5E9] transition-colors py-1.5 px-3 rounded-lg hover:bg-sky-50"
+                className="inline-flex items-center space-x-1.5 text-xs font-medium text-slate-500 hover:text-coffee-700 transition-colors py-2 px-3 rounded-lg hover:bg-coffee-50"
               >
                 <span>Bạn là Quản lý / Admin? Đăng nhập Cổng Điều Hành →</span>
               </a>
@@ -249,23 +269,10 @@ export default function Login({ onLoginSuccess }) {
           </form>
         </div>
 
-        {/* ───────────────── FOOTER BẢO MẬT & HỖ TRỢ ───────────────── */}
-        <div className="mt-8 pt-4 border-t border-slate-100 flex flex-col items-center space-y-2 text-center">
-          <div className="inline-flex items-center space-x-1.5 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
-            <ShieldCheck size={14} className="text-emerald-600" />
-            <span className="text-[11px] font-medium text-emerald-700">
-              Bảo mật mã hóa 256-bit SSL
-            </span>
-          </div>
-
-          <p className="text-[11px] text-slate-400">
-            Hỗ trợ nội bộ:{' '}
-            <a
-              href="tel:19006868"
-              className="text-[#0EA5E9] font-semibold hover:underline"
-            >
-              1900 6868
-            </a>
+        {/* ───────────────── FOOTER ───────────────── */}
+        <div className="mt-8 pt-4 border-t border-coffee-100 text-center">
+          <p className="text-[11px] text-slate-500">
+            © {new Date().getFullYear()} Trung Nguyên Legend • Hệ thống thông tin nhân sự nội bộ
           </p>
         </div>
       </div>
