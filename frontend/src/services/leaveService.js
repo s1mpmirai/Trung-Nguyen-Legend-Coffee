@@ -8,16 +8,29 @@ import apiClient from "./apiClient";
 /**
  * [Nhân viên] Lịch sử đơn từ của cá nhân
  * GET /api/v1/leaves/my-history/{ma_nv}
+ * options.throwOnError = true: ném lỗi để giao diện hiển thị trạng thái lỗi thay vì danh sách rỗng
  */
-export async function getLeaveHistory(ma_nv) {
+export async function getLeaveHistory(ma_nv, options = {}) {
   try {
     const cleanId = String(ma_nv || "").trim().toUpperCase().replace("-", "");
     const data = await apiClient.get(`/leaves/my-history/${cleanId}`);
     return Array.isArray(data) ? data : [];
   } catch (e) {
+    if (options.throwOnError) throw e;
     console.error("Error fetching leaves history:", e);
     return [];
   }
+}
+
+/**
+ * [Nhân viên] Số dư phép năm do server tính (12 ngày + thâm niên, tính theo tỷ lệ năm đầu)
+ * GET /api/v1/leaves/balance/{ma_nv}?nam=YYYY
+ * -> { ma_nv, nam, tong_phep_nam, da_su_dung, dang_cho_duyet, con_lai, han_dung_phep }
+ * Ném lỗi khi không tải được để giao diện hiển thị trạng thái lỗi (không dùng số giả).
+ */
+export async function getLeaveBalance(ma_nv, nam = null) {
+  const cleanId = String(ma_nv || "").trim().toUpperCase().replace("-", "");
+  return apiClient.get(`/leaves/balance/${cleanId}`, { params: { nam: nam || undefined } });
 }
 
 /**
@@ -54,6 +67,7 @@ export async function reviewLeave(ma_don, { trang_thai, y_kien_duyet }) {
 /**
  * [Nhân viên] Gửi đơn xin nghỉ phép/nghỉ việc
  * POST /api/v1/leaves/request
+ * Server tự tính so_ngay (ngày làm việc, trừ ngày lễ); chỉ gửi so_ngay = 0.5 khi xin nghỉ nửa ngày.
  */
 export async function submitLeaveRequest(leaveData) {
   return apiClient.post("/leaves/request", leaveData);

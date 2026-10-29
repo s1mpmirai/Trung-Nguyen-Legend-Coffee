@@ -10,9 +10,30 @@
  * - Quản lý Chức vụ & Bậc lương (POSITIONS)
  * - Quản lý Hợp đồng lao động (CONTRACTS)
  * - Danh bạ nhân sự: tìm kiếm nâng cao, lọc, sắp xếp (EMPLOYEES)
+ * - Phiên đăng nhập (/auth/me, đổi mật khẩu lần đầu, đăng nhập Cổng Điều hành)
  */
 
 import apiClient from "./apiClient";
+
+// ── 0. AUTH / PHIÊN ĐĂNG NHẬP ─────────────────────────────────────────
+// Đăng nhập Cổng Điều hành (Admin / Quản lý / Trưởng nhóm / nhân sự được cấp quyền nghiệp vụ)
+export async function loginManagePortal(ma_nv, mat_khau) {
+  return apiClient.post("/auth/manager-login", { ma_nv, mat_khau });
+}
+
+// Nguồn sự thật về vai trò / quyền / họ tên của phiên hiện tại (thay cho dữ liệu localStorage)
+export async function getMe() {
+  return apiClient.get("/auth/me");
+}
+
+// Đổi mật khẩu tạm ở lần đăng nhập đầu: bắt buộc gửi token trả về từ bước đăng nhập
+export async function firstTimeChangePassword(mat_khau_moi, token) {
+  return apiClient.post(
+    "/auth/first-time-change-password",
+    { mat_khau_moi },
+    token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+  );
+}
 
 // ── 1. ADMIN DASHBOARD STATS ──────────────────────────────────────────
 export async function getAdminStats() {
@@ -66,6 +87,12 @@ export async function assignRoleToEmployee(ma_nv, roleData) {
 
 export async function updateCustomPermissions(ma_nv, permissionData) {
   return apiClient.put(`/permissions/employee/${ma_nv}/custom-permissions`, permissionData);
+}
+
+// [Chỉ ADMIN] Thay toàn bộ quyền mặc định của một vai trò (không áp dụng cho vai trò ADMIN).
+// Trả về ma trận mới cùng cấu trúc GET /permissions/matrix.
+export async function updateRolePermissions(ma_vai_tro, ma_quyen = []) {
+  return apiClient.put(`/permissions/roles/${ma_vai_tro}`, { ma_quyen });
 }
 
 // ── 4. DEPARTMENTS (PHÒNG BAN) ────────────────────────────────────────
@@ -137,6 +164,7 @@ export async function updateContract(ma_hd, contractData) {
 
 export async function liquidateContract(ma_hd, data = {}) {
   // Backend nhận ngày thanh lý qua query string (?ngay_ket_thuc=YYYY-MM-DD), không đọc body
+  // (API không có trường lý do thanh lý).
   return apiClient.put(`/contracts/${ma_hd}/liquidate`, null, {
     params: { ngay_ket_thuc: data.ngay_ket_thuc || undefined },
   });

@@ -1,8 +1,9 @@
 /**
  * managerService.js
  *
- * Tổng hợp số liệu cho Dashboard Cổng Quản lý. Toàn bộ số liệu lấy từ CSDL thật qua API;
- * khối nào không tải được (lỗi mạng / không đủ quyền) sẽ hiển thị trống thay vì số liệu giả.
+ * Tổng hợp số liệu cho Dashboard Cổng Quản lý. Toàn bộ số liệu lấy từ CSDL thật qua API.
+ * Các API được gọi song song bằng Promise.allSettled: một API lỗi (mạng / 403 không đủ quyền)
+ * không làm trống cả Dashboard; khối tương ứng nhận thông báo lỗi riêng qua `errors`.
  */
 
 import apiClient from "./apiClient";
@@ -43,6 +44,14 @@ const formatMoneyShort = (value) => {
 
 const valueOf = (settled) => (settled.status === "fulfilled" ? settled.value : null);
 
+/** Thông báo lỗi ngắn gọn cho từng khối Dashboard (null nếu tải thành công) */
+const errorOf = (settled) => {
+  if (settled.status === "fulfilled") return null;
+  const err = settled.reason || {};
+  if (err.status === 403) return "Bạn không có quyền xem số liệu này.";
+  return err.message ? `Không tải được dữ liệu: ${err.message}` : "Không tải được dữ liệu.";
+};
+
 /** Tháng liền trước: bảng lương được tính sau khi kết thúc tháng */
 const previousMonth = () => {
   const now = new Date();
@@ -53,7 +62,7 @@ const previousMonth = () => {
 
 export const getManagerDashboardStats = async () => {
   const kyLuong = previousMonth();
-  const [empSettled, attSettled, leaveSettled, payrollSettled, trendSettled, statsSettled] =
+  const [empSettled, attSettled, leaveSettled, payrollSettled, trendSettled, statsSettled, profileSettled] =
     await Promise.allSettled([
       apiClient.get("/employees/get_employee_list", { params: { page: 1, page_size: 200 } }),
       apiClient.get("/attendance/daily"),
@@ -61,6 +70,7 @@ export const getManagerDashboardStats = async () => {
       apiClient.get("/payroll/summary", { params: kyLuong }),
       apiClient.get("/attendance/trend", { params: { days: 7 } }),
       apiClient.get("/employees/reports/statistics"),
+      apiClient.get("/employees/manager/profile-requests", { params: { trang_thai: "CHO_DUYET" } }),
     ]);
 
   // 1. Quân số & cơ cấu phòng ban (nhân sự đang làm việc)
@@ -89,8 +99,10 @@ export const getManagerDashboardStats = async () => {
   const lateToday = daily.filter((item) => isCheckedIn(item) && item.loai_cong === "DI_TRE").length;
   const onTimeToday = activeToday - lateToday;
 
-  // 3. Đơn chờ duyệt (đã lọc theo phạm vi quản lý ở backend)
+  // 3. Đơn chờ duyệt (đã lọc theo phạm vi quản lý ở backend) & yêu cầu sửa hồ sơ chờ duyệt
   const pendingLeavesCount = (valueOf(leaveSettled) || []).length;
+  const profileRequests = valueOf(profileSettled);
+  const pendingProfileCount = Array.isArray(profileRequests) ? profileRequests.length : null;
 
   // 4. Quỹ lương tháng trước
   const payroll = valueOf(payrollSettled);
@@ -170,12 +182,13 @@ export const getManagerDashboardStats = async () => {
       lateToday,
       notCheckedIn: Math.max(0, totalEmployees - activeToday),
       pendingLeavesCount,
-      pendingProfileCount: 0,
-      totalPendingCount: pendingLeavesCount,
+      pendingProfileCount,
+      totalPendingCount: pendingLeavesCount + (pendingProfileCount || 0),
       monthlyPayroll: hasPayroll
         ? `${Number(payroll.tong_tien_net).toLocaleString("vi-VN")} đ`
         : `Chưa tính lương T${kyLuong.thang}/${kyLuong.nam}`,
-      payrollStatus: hasPayroll ? `Lương Net tháng ${payroll.thang}/${payroll.nam}` : "Chưa có bảng lương",
+      payrollPeriod: `Kỳ lương tháng ${kyLuong.thang}/${kyLuong.nam}`,
+      payrollStatus: hasPayroll ? `${payroll.tong_nhan_vien} nhân sự có bảng lương` : "Chưa có bảng lương",
     },
     departments,
     attendance7Days,
@@ -183,5 +196,14 @@ export const getManagerDashboardStats = async () => {
     education,
     tenure,
     salaryByDept,
+    errors: {
+      employees: errorOf(empSettled),
+      attendanceToday: errorOf(attSettled),
+      leaves: errorOf(leaveSettled),
+      profileRequests: errorOf(profileSettled),
+      payroll: errorOf(payrollSettled),
+      trend: errorOf(trendSettled),
+      statistics: errorOf(statsSettled),
+    },
   };
 };
