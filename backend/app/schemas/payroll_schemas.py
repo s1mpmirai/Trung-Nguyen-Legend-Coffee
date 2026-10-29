@@ -11,6 +11,9 @@ class payroll_month_response(BaseModel):
     nam: int
     ma_nv: str
     ho_ten: Optional[str] = None
+    ten_pb: Optional[str] = None
+    ten_cv: Optional[str] = None
+    so_nguoi_pt: Optional[int] = None
     luong_co_ban: float = 0
     he_so_luong: float = 1.0
     so_cong_chuan: float = 22.0

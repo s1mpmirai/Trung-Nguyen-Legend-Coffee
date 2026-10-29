@@ -4,7 +4,7 @@ from typing import Annotated, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import CurrentAccount, require_permission
+from app.core.permissions import CurrentAccount, manager_scope, require_permission
 from app.db.session import get_db
 from app.schemas.attendance_schemas import AttendanceAdjustRequest
 from app.services import attendance_service
@@ -61,7 +61,7 @@ def adjust_attendance_endpoint(
     """
     try:
         return attendance_service.adjust_attendance_by_manager(
-            db, ma_cc, data, nguoi_dieu_chinh=account["ma_nv"]
+            db, ma_cc, data, nguoi_dieu_chinh=account["ma_nv"], ma_nql=manager_scope(account)
         )
     except PermissionError as err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err
@@ -101,10 +101,10 @@ def get_attendance_lock_status_endpoint(
 )
 def toggle_attendance_lock_endpoint(
     data: dict[str, Any],
-    account: CurrentAccount,
+    account: Annotated[dict, Depends(require_permission("ATTENDANCE_LOCK"))],
     db: DbSession = None,
 ):
-    """Quản lý thực hiện Chốt hoặc Mở khóa bảng công tháng."""
+    """Quản lý thực hiện Chốt hoặc Mở khóa bảng công tháng (quyền ATTENDANCE_LOCK, Trưởng nhóm không có)."""
     if not data.get("thang") or not data.get("nam"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Thiếu tháng hoặc năm cần chốt công")
     thang = int(data["thang"])
@@ -112,9 +112,12 @@ def toggle_attendance_lock_endpoint(
     khoa = bool(data.get("khoa", True))
     ghi_chu = str(data.get("ghi_chu") or "")
     nguoi_chot = account["ma_nv"]
-    return attendance_service.toggle_monthly_attendance_lock(
-        db=db, thang=thang, nam=nam, is_locked=khoa, nguoi_chot=nguoi_chot, ghi_chu=ghi_chu
-    )
+    try:
+        return attendance_service.toggle_monthly_attendance_lock(
+            db=db, thang=thang, nam=nam, is_locked=khoa, nguoi_chot=nguoi_chot, ghi_chu=ghi_chu
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
 
 
 @router.get(

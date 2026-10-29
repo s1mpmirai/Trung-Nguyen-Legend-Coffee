@@ -1,4 +1,5 @@
-from datetime import date, datetime
+import json
+from datetime import date, timedelta, datetime
 from typing import Any, Optional
 
 from sqlalchemy import text
@@ -433,7 +434,7 @@ def adjust_attendance_record(
         WHERE ma_cc = :ma_cc
     """)
     db.execute(update_sql, params)
-    db.commit()
+    # Người gọi (service) commit cùng với nhật ký điều chỉnh
 
     select_sql = text("""
         SELECT * FROM bang_cham_cong WHERE ma_cc = :ma_cc
@@ -478,16 +479,22 @@ def log_attendance_adjustment(
     gio_ra_cu: Optional[str] = None,
     gio_ra_moi: Optional[str] = None,
     ly_do: Optional[str] = None,
+    nguoi_dieu_chinh: Optional[str] = None,
+    noi_dung: Optional[dict[str, Any]] = None,
 ) -> None:
-    """Ghi log lịch sử sửa đổi chấm công của Quản lý."""
+    """Ghi log lịch sử sửa đổi chấm công của Quản lý (mọi trường thay đổi, người sửa)."""
     insert_sql = text("""
         INSERT INTO lich_su_dieu_chinh_cong (
-            ma_cc, ma_nv, thang, nam, gio_vao_cu, gio_vao_moi, gio_ra_cu, gio_ra_moi, ly_do
+            ma_cc, ma_nv, thang, nam, gio_vao_cu, gio_vao_moi, gio_ra_cu, gio_ra_moi, ly_do,
+            nguoi_dieu_chinh, noi_dung
         ) VALUES (
-            :ma_cc, :ma_nv, :thang, :nam, :gio_vao_cu, :gio_vao_moi, :gio_ra_cu, :gio_ra_moi, :ly_do
+            :ma_cc, :ma_nv, :thang, :nam, :gio_vao_cu, :gio_vao_moi, :gio_ra_cu, :gio_ra_moi, :ly_do,
+            :nguoi_dieu_chinh, :noi_dung
         )
     """)
     db.execute(insert_sql, {
+        "nguoi_dieu_chinh": nguoi_dieu_chinh,
+        "noi_dung": json.dumps(noi_dung, ensure_ascii=False, default=str) if noi_dung else None,
         "ma_cc": ma_cc,
         "ma_nv": ma_nv,
         "thang": thang,
@@ -519,6 +526,16 @@ def get_all_shifts(db: Session) -> list[dict[str, Any]]:
     return results
 
 
+def _time_to_str(val: Any, default: str) -> str:
+    """TIME của MariaDB trả về timedelta (vd 8:00:00) -> chuỗi HH:MM:SS có đủ 2 chữ số."""
+    if val is None:
+        return default
+    if isinstance(val, timedelta):
+        secs = int(val.total_seconds())
+        return f"{secs // 3600:02d}:{secs % 3600 // 60:02d}:{secs % 60:02d}"
+    return str(val)[:8].zfill(8)
+
+
 def get_shift_by_code(db: Session, ma_ca: str) -> Optional[dict[str, Any]]:
     """Lấy thông tin một ca làm việc theo mã ca."""
     query = text("""
@@ -531,8 +548,8 @@ def get_shift_by_code(db: Session, ma_ca: str) -> Optional[dict[str, Any]]:
     if not row:
         return None
     d = dict(row._mapping)
-    d["gio_vao_str"] = str(d.get("gio_vao"))[:8] if d.get("gio_vao") else "08:00:00"
-    d["gio_ra_str"] = str(d.get("gio_ra"))[:8] if d.get("gio_ra") else "17:00:00"
+    d["gio_vao_str"] = _time_to_str(d.get("gio_vao"), "08:00:00")
+    d["gio_ra_str"] = _time_to_str(d.get("gio_ra"), "17:00:00")
     d["so_gio_chuan"] = float(d.get("so_gio_chuan") or 8.0)
     d["he_so"] = float(d.get("he_so") or 1.0)
     return d
@@ -610,12 +627,30 @@ def get_monthly_attendance_lock(db: Session, thang: int, nam: int) -> dict[str, 
     }
 
 
+def count_finalized_payroll(db: Session, thang: int, nam: int) -> int:
+    """Số bảng lương của tháng đã duyệt hoặc đã chi trả."""
+    return int(db.execute(
+        text("SELECT COUNT(*) FROM bang_luong WHERE thang = :thang AND nam = :nam AND trang_thai <> 'NHAP'"),
+        {"thang": thang, "nam": nam},
+    ).scalar() or 0)
+
+
 def set_monthly_attendance_lock(
     db: Session, thang: int, nam: int, is_locked: bool, nguoi_chot: str | None = None, ghi_chu: str = ""
 ) -> dict[str, Any]:
-    """Khóa hoặc Mở khóa bảng công tháng."""
+    """Khóa hoặc Mở khóa bảng công tháng. Khi chốt, công còn chờ duyệt được xác nhận luôn."""
     ensure_attendance_lock_table(db)
     trang_thai = "DA_CHOT" if is_locked else "CHO_CHOT"
+    if is_locked:
+        db.execute(
+            text("""
+                UPDATE bang_cham_cong
+                SET trang_thai_duyet = 'DA_DUYET'
+                WHERE trang_thai_duyet = 'CHO_DUYET'
+                  AND MONTH(ngay_cong) = :thang AND YEAR(ngay_cong) = :nam
+            """),
+            {"thang": thang, "nam": nam},
+        )
     upsert_sql = text("""
         INSERT INTO chot_cong_thang (thang, nam, trang_thai, nguoi_chot, ngay_chot, ghi_chu)
         VALUES (:thang, :nam, :trang_thai, :nguoi_chot, NOW(), :ghi_chu)

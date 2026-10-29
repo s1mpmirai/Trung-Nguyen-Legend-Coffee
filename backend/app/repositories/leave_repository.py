@@ -183,30 +183,7 @@ def review_leave(
 
     updated_leave = get_leave_by_id(db, ma_don)
 
-    # Nếu đơn xin thôi việc (NGHI_VIEC) được duyệt -> Tự động chuyển trạng thái nhân sự sang DA_NGHI_VIEC và khóa tài khoản
-    if trang_thai == "DA_DUYET" and updated_leave.get("loai_don") == "NGHI_VIEC":
-        ma_nv = updated_leave.get("ma_nv")
-        ngay_nghi = updated_leave.get("ngay_ket_thuc") or updated_leave.get("ngay_bat_dau")
-        db.execute(
-            text("""
-                UPDATE nhan_vien
-                SET trang_thai = 'DA_NGHI_VIEC',
-                    ngay_nghi_viec = COALESCE(:ngay_nghi, CURDATE()),
-                    ngay_cap_nhat = NOW()
-                WHERE ma_nv = :ma_nv
-            """),
-            {"ma_nv": ma_nv, "ngay_nghi": ngay_nghi},
-        )
-        db.execute(
-            text("""
-                UPDATE tai_khoan
-                SET trang_thai = 'KHOA',
-                    ngay_cap_nhat = NOW()
-                WHERE ma_nv = :ma_nv
-            """),
-            {"ma_nv": ma_nv},
-        )
-
+    # Hệ quả nghiệp vụ (ghi bảng công, lên lịch thôi việc) do leave_service._apply_approved_leave xử lý
     return updated_leave
 
 
@@ -242,3 +219,31 @@ def sum_annual_leave_days(db: Session, ma_nv: str, nam: int, exclude_ma_don: str
         text(query), {"ma_nv": ma_nv, "nam": nam, "exclude_ma_don": exclude_ma_don}
     ).scalar()
     return float(total or 0)
+
+
+def annual_leave_usage(db: Session, ma_nv: str, nam: int) -> dict[str, float]:
+    """Số ngày phép năm đã được duyệt và đang chờ duyệt trong năm."""
+    row = db.execute(
+        text("""
+            SELECT
+                COALESCE(SUM(CASE WHEN trang_thai = 'DA_DUYET' THEN so_ngay END), 0) AS da_duyet,
+                COALESCE(SUM(CASE WHEN trang_thai = 'CHO_DUYET' THEN so_ngay END), 0) AS cho_duyet
+            FROM don_tu
+            WHERE ma_nv = :ma_nv
+              AND loai_don = 'NGHI_PHEP'
+              AND YEAR(ngay_bat_dau) = :nam
+        """),
+        {"ma_nv": ma_nv, "nam": nam},
+    ).mappings().first()
+    return {"da_duyet": float(row["da_duyet"] or 0), "cho_duyet": float(row["cho_duyet"] or 0)}
+
+
+def get_first_contract_start(db: Session, ma_nv: str):
+    """Ngày vào làm = ngày bắt đầu hợp đồng đầu tiên (không tính HĐ đã hủy)."""
+    return db.execute(
+        text("""
+            SELECT MIN(ngay_bat_dau) FROM hop_dong_lao_dong
+            WHERE ma_nv = :ma_nv AND trang_thai <> 'DA_HUY'
+        """),
+        {"ma_nv": ma_nv},
+    ).scalar()

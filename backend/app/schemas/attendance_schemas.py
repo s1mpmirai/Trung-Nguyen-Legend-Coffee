@@ -5,9 +5,8 @@ from pydantic import BaseModel, Field
 
 
 class CheckInRequest(BaseModel):
-    """Schema cho yêu cầu chấm công vào / ra."""
-    ma_nv: str = Field(..., description="Mã nhân viên (vd: NV01, NV10)")
-    location: Optional[dict[str, Any]] = Field(None, description="Tọa độ GPS và địa điểm chấm công")
+    """Schema cho yêu cầu chấm công vào / ra (chấm công web theo ca, không dùng định vị)."""
+    ma_nv: Optional[str] = Field(None, description="Bỏ qua: luôn chấm công cho tài khoản đang đăng nhập")
 
 
 class CheckInResponse(BaseModel):
@@ -35,11 +34,10 @@ class AttendanceRecord(BaseModel):
     dia_diem_cham: Optional[str] = None
     dia_diem_chi_nhanh: Optional[str] = None
     van_phong: Optional[str] = None
-    hinh_thuc: Optional[str] = "GPS"
+    hinh_thuc: Optional[str] = "WEB"
     trang_thai: Optional[str] = "Đúng giờ"
     loai_cong: Optional[str] = "CONG_DU"
     so_gio_lam: Optional[float] = 0.0
-    so_gio_tang_ca: Optional[float] = 0.0
     so_cong: Optional[float] = 1.0
     trang_thai_duyet: Optional[str] = "CHO_DUYET"
     ghi_chu: Optional[str] = ""
@@ -51,15 +49,15 @@ class AttendanceRecord(BaseModel):
 class AttendanceDashboardResponse(BaseModel):
     """Dữ liệu hiển thị trang Dashboard chấm công cá nhân."""
     employee: dict[str, Any]
-    location: dict[str, Any]
+    ca_lam_viec: dict[str, Any]
     monthlyStats: dict[str, Any]
     recentRecords: list[dict[str, Any]]
 
 
 class AttendanceHistorySummary(BaseModel):
     so_ngay_cong: float = 0.0
-    so_gio_ot: float = 0.0
     so_lan_di_muon: int = 0
+    so_lan_ve_som: int = 0
     so_ngay_phep: int = 0
 
 

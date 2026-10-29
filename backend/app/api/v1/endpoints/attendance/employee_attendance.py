@@ -30,8 +30,8 @@ def get_attendance_dashboard_endpoint(
     """
     Lấy thông tin tổng hợp chấm công của nhân viên:
     - Hồ sơ cá nhân & đơn vị công tác
-    - Tọa độ GPS chi nhánh hợp lệ
-    - Thống kê tháng (Số ngày công, số lần đi muộn, số giờ OT, phép năm)
+    - Ca làm việc áp dụng hôm nay (giờ vào/ra chuẩn, thời gian cho phép trễ/về sớm) và trạng thái chấm công
+    - Thống kê tháng hiện tại (Số ngày công, số lần đi muộn, phép năm)
     - 10 bản ghi chấm công gần nhất
     """
     clean_id = ensure_self_or_permission(account, ma_nv, "ATTENDANCE_MANAGE")
@@ -51,9 +51,9 @@ def check_in_endpoint(
     account: CurrentAccount,
     db: DbSession = None,
 ):
-    """Nhân viên thực hiện chấm công vào ca với tọa độ vị trí."""
+    """Nhân viên chấm công vào ca (thời điểm lấy theo giờ máy chủ)."""
     # Chỉ được chấm công cho chính mình
-    return attendance_service.employee_check_in(db, account["ma_nv"], payload.location)
+    return attendance_service.employee_check_in(db, account["ma_nv"])
 
 
 @router.post(
@@ -68,7 +68,7 @@ def check_out_endpoint(
 ):
     """Nhân viên thực hiện chấm công ra ca kết thúc ngày làm việc."""
     # Chỉ được chấm công cho chính mình
-    return attendance_service.employee_check_out(db, account["ma_nv"], payload.location)
+    return attendance_service.employee_check_out(db, account["ma_nv"])
 
 
 @router.get(

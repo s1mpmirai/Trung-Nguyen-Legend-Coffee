@@ -2,7 +2,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
-def get_payroll_by_month(db: Session, ma_nv: str, thang: int, nam: int) -> dict | None:
+# Bảng lương nháp (NHAP) có thể còn thay đổi: nhân viên chỉ được xem bảng đã duyệt / đã chi trả
+OFFICIAL_FILTER = "AND bl.trang_thai IN ('DA_DUYET', 'DA_TRA')"
+
+
+def get_payroll_by_month(db: Session, ma_nv: str, thang: int, nam: int, chi_da_duyet: bool = False) -> dict | None:
     """Lấy bảng lương 1 tháng cụ thể của nhân viên."""
     query = """
         SELECT
@@ -18,28 +22,32 @@ def get_payroll_by_month(db: Session, ma_nv: str, thang: int, nam: int) -> dict 
             bl.luong_net,
             bl.trang_thai, bl.ghi_chu,
             bl.ngay_tao, bl.ngay_cap_nhat,
-            nv.ho_ten
+            nv.ho_ten, nv.so_nguoi_pt, pb.ten_pb, cv.ten_cv
         FROM bang_luong bl
         JOIN nhan_vien nv ON bl.ma_nv = nv.ma_nv
+        LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
+        LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
         WHERE bl.ma_nv = :ma_nv
           AND bl.thang = :thang
           AND bl.nam   = :nam
+          {loc}
         LIMIT 1
-    """
+    """.format(loc=OFFICIAL_FILTER if chi_da_duyet else "")
     row = db.execute(
         text(query), {"ma_nv": ma_nv, "thang": thang, "nam": nam}
     ).mappings().first()
     return dict(row) if row else None
 
 
-def get_payroll_months(db: Session, ma_nv: str) -> list[dict]:
+def get_payroll_months(db: Session, ma_nv: str, chi_da_duyet: bool = False) -> list[dict]:
     """Lấy danh sách các tháng/năm đã có bảng lương của nhân viên."""
     query = """
         SELECT thang, nam, trang_thai, luong_net
-        FROM bang_luong
+        FROM bang_luong bl
         WHERE ma_nv = :ma_nv
+          {loc}
         ORDER BY nam DESC, thang DESC
-    """
+    """.format(loc=OFFICIAL_FILTER if chi_da_duyet else "")
     rows = db.execute(text(query), {"ma_nv": ma_nv}).mappings().all()
     return [dict(r) for r in rows]
 
@@ -105,8 +113,7 @@ def get_payroll_inputs(db: Session, start, end) -> list[dict]:
             hd.luong_co_ban AS luong_hop_dong, hd.ty_le_huong, hd.loai_hd,
             bl.muc_luong AS luong_bac, bl.he_so AS he_so_luong,
             COALESCE(cv.phu_cap_chuc_vu, 0) AS phu_cap_chuc_vu,
-            COALESCE(cc.so_cong, 0) AS so_cong_thuc_te,
-            COALESCE(cc.so_gio_tang_ca, 0) AS so_gio_tang_ca
+            COALESCE(cc.so_cong, 0) AS so_cong_thuc_te
         FROM nhan_vien nv
         LEFT JOIN (
             SELECT hd1.*
@@ -122,9 +129,12 @@ def get_payroll_inputs(db: Session, start, end) -> list[dict]:
         LEFT JOIN bac_luong bl ON nv.ma_bac = bl.ma_bac
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
         LEFT JOIN (
-            SELECT ma_nv, SUM(so_cong) AS so_cong, SUM(so_gio_tang_ca) AS so_gio_tang_ca
+            -- Chỉ công đã duyệt mới được trả lương (khi chốt công, công chờ duyệt được duyệt luôn;
+            -- công bị từ chối không được tính)
+            SELECT ma_nv, SUM(so_cong) AS so_cong
             FROM bang_cham_cong
             WHERE ngay_cong BETWEEN :start AND :end
+              AND trang_thai_duyet = 'DA_DUYET'
             GROUP BY ma_nv
         ) cc ON cc.ma_nv = nv.ma_nv
         WHERE NOT (nv.trang_thai = 'DA_NGHI_VIEC' AND COALESCE(nv.ngay_nghi_viec, '1900-01-01') < :start)
@@ -190,7 +200,7 @@ def upsert_payroll_line(db: Session, line: dict) -> None:
     db.execute(text(query), line)
 
 
-def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
+def get_payroll_by_year(db: Session, ma_nv: str, nam: int, chi_da_duyet: bool = False) -> dict | None:
     """
     Lấy tổng hợp lương cả năm của nhân viên từ database.
     - Nếu năm đó đủ 12 tháng: cộng và trừ đầy đủ 12 tháng.
@@ -215,8 +225,9 @@ def get_payroll_by_year(db: Session, ma_nv: str, nam: int) -> dict | None:
         JOIN nhan_vien nv ON bl.ma_nv = nv.ma_nv
         WHERE bl.ma_nv = :ma_nv
           AND bl.nam = :nam
+          {loc}
         ORDER BY bl.thang ASC
-    """
+    """.format(loc=OFFICIAL_FILTER if chi_da_duyet else "")
     rows = db.execute(text(query), {"ma_nv": ma_nv, "nam": nam}).mappings().all()
     if not rows:
         return None

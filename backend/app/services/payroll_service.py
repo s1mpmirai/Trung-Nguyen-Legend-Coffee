@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.repositories import payroll_repository
 from app.repositories.attendance_repository import get_monthly_attendance_lock
+from app.repositories.holiday_repository import get_holidays
 from app.repositories.payroll_repository import (
     get_payroll_by_month,
     get_payroll_by_year,
@@ -27,8 +28,10 @@ BIEU_THUE_TNCN = [
     (100_000_000, 0.30),
     (float("inf"), 0.35),
 ]
-HE_SO_TANG_CA = 1.5                  # Tăng ca ngày thường = 150% đơn giá giờ
-GIO_CONG_CHUAN_NGAY = 8
+# HĐ thử việc (dưới 3 tháng): khấu trừ 10% trên tổng thu nhập từ 2 triệu/lần chi trả, không giảm trừ gia cảnh
+# (Thông tư 111/2013/TT-BTC, Điều 25 khoản 1 điểm i)
+THUE_SUAT_KHAU_TRU_THU_VIEC = 0.10
+NGUONG_KHAU_TRU_THU_VIEC = 2_000_000
 # Nghỉ không hưởng lương từ 14 ngày làm việc trở lên trong tháng thì không đóng BHXH tháng đó
 NGUONG_NGAY_KHONG_DONG_BH = 14
 
@@ -36,19 +39,21 @@ NGUONG_NGAY_KHONG_DONG_BH = 14
 PAYROLL_STATUS_FLOW = {"NHAP": {"DA_DUYET"}, "DA_DUYET": {"DA_TRA", "NHAP"}, "DA_TRA": set()}
 
 
-def get_employee_payroll_month(db: Session, ma_nv: str, thang: int, nam: int) -> dict | None:
-    """Lấy bảng lương 1 tháng cụ thể. Trả về None nếu chưa có dữ liệu."""
-    return get_payroll_by_month(db, ma_nv, thang, nam)
+def get_employee_payroll_month(
+    db: Session, ma_nv: str, thang: int, nam: int, chi_da_duyet: bool = False
+) -> dict | None:
+    """Lấy bảng lương 1 tháng cụ thể. chi_da_duyet: nhân viên chỉ thấy bảng lương đã duyệt / đã trả."""
+    return get_payroll_by_month(db, ma_nv, thang, nam, chi_da_duyet)
 
 
-def get_employee_payroll_year(db: Session, ma_nv: str, nam: int) -> dict | None:
+def get_employee_payroll_year(db: Session, ma_nv: str, nam: int, chi_da_duyet: bool = False) -> dict | None:
     """Lấy bảng tổng hợp lương cả năm của nhân viên. Trả về None nếu chưa có dữ liệu."""
-    return get_payroll_by_year(db, ma_nv, nam)
+    return get_payroll_by_year(db, ma_nv, nam, chi_da_duyet)
 
 
-def get_employee_payroll_history(db: Session, ma_nv: str) -> dict:
+def get_employee_payroll_history(db: Session, ma_nv: str, chi_da_duyet: bool = False) -> dict:
     """Lấy danh sách tháng đã có bảng lương."""
-    months = get_payroll_months(db, ma_nv)
+    months = get_payroll_months(db, ma_nv, chi_da_duyet)
     return {"items": months}
 
 
@@ -66,33 +71,32 @@ def tinh_thue_tncn(thu_nhap_tinh_thue: float) -> int:
 
 def compute_payroll_line(emp: dict, so_cong_chuan: int, tien_thuong: float = 0, khau_tru_khac: float = 0) -> dict:
     """
-    Tính 1 dòng bảng lương:
+    Tính 1 dòng bảng lương (đề tài không tính làm thêm giờ):
       Lương thực hưởng  = Lương hợp đồng x Tỷ lệ hưởng (thử việc 85%)
-      Lương theo công   = Lương thực hưởng / Công chuẩn x Công thực tế
-      Tiền tăng ca      = Lương thực hưởng / Công chuẩn / 8 x Giờ tăng ca x 150%
+      Lương theo công   = Lương thực hưởng / Công chuẩn x Công thực tế (công đã duyệt)
       Phụ cấp chức vụ   = Phụ cấp x (Công thực tế / Công chuẩn), tối đa 100%
-      Gross             = Lương theo công + Tăng ca + Phụ cấp + Thưởng
+      Gross             = Lương theo công + Phụ cấp + Thưởng
       BH (10.5%)        = (Lương hợp đồng + Phụ cấp chức vụ) có áp trần; không đóng khi thử việc
                           hoặc nghỉ không lương >= 14 ngày trong tháng
-      Thu nhập tính thuế = Gross - phần tăng ca được miễn thuế - BH - Giảm trừ gia cảnh
+      Thuế TNCN         = HĐ thử việc: 10% x Gross (nếu Gross >= 2 triệu)
+                          Còn lại: lũy tiến trên (Gross - BH - Giảm trừ gia cảnh)
       Net               = Gross - BH - Thuế TNCN - Khấu trừ khác
     """
     luong_hop_dong = float(emp["luong_hop_dong"] or emp["luong_bac"] or 0)
     ty_le_huong = float(emp["ty_le_huong"] or 100) / 100
     phu_cap_chuc_vu = float(emp["phu_cap_chuc_vu"] or 0)
     so_cong_thuc_te = float(emp["so_cong_thuc_te"] or 0)
-    so_gio_tang_ca = float(emp["so_gio_tang_ca"] or 0)
     so_nguoi_pt = int(emp["so_nguoi_pt"] or 0)
+    la_thu_viec = emp.get("loai_hd") == "THU_VIEC"
 
     luong_thuc_huong = luong_hop_dong * ty_le_huong
     don_gia_ngay = luong_thuc_huong / so_cong_chuan
     luong_theo_cong = round(don_gia_ngay * so_cong_thuc_te)
-    tien_tang_ca = round(don_gia_ngay / GIO_CONG_CHUAN_NGAY * so_gio_tang_ca * HE_SO_TANG_CA)
     tong_phu_cap = round(phu_cap_chuc_vu * min(1.0, so_cong_thuc_te / so_cong_chuan))
-    luong_gross = luong_theo_cong + tien_tang_ca + tong_phu_cap + round(tien_thuong)
+    luong_gross = luong_theo_cong + tong_phu_cap + round(tien_thuong)
 
     so_ngay_khong_luong = so_cong_chuan - so_cong_thuc_te
-    khong_dong_bh = emp.get("loai_hd") == "THU_VIEC" or so_ngay_khong_luong >= NGUONG_NGAY_KHONG_DONG_BH
+    khong_dong_bh = la_thu_viec or so_ngay_khong_luong >= NGUONG_NGAY_KHONG_DONG_BH
     luong_dong_bh = luong_hop_dong + phu_cap_chuc_vu
     if khong_dong_bh:
         bhxh = bhyt = bhtn = 0
@@ -102,11 +106,16 @@ def compute_payroll_line(emp: dict, so_cong_chuan: int, tien_thuong: float = 0, 
         bhtn = round(min(luong_dong_bh, TRAN_BHTN) * TY_LE_BHTN)
     tong_bh = bhxh + bhyt + bhtn
 
-    # Phần tiền tăng ca vượt đơn giá thường (50%) được miễn thuế TNCN
-    tang_ca_mien_thue = round(tien_tang_ca * (HE_SO_TANG_CA - 1) / HE_SO_TANG_CA)
-    giam_tru_gia_canh = GIAM_TRU_BAN_THAN + GIAM_TRU_NGUOI_PHU_THUOC * so_nguoi_pt
-    thu_nhap_tinh_thue = max(0, luong_gross - tang_ca_mien_thue - tong_bh - giam_tru_gia_canh)
-    thue_tncn = tinh_thue_tncn(thu_nhap_tinh_thue)
+    if la_thu_viec:
+        giam_tru_gia_canh = 0
+        thu_nhap_tinh_thue = luong_gross
+        thue_tncn = (
+            round(luong_gross * THUE_SUAT_KHAU_TRU_THU_VIEC) if luong_gross >= NGUONG_KHAU_TRU_THU_VIEC else 0
+        )
+    else:
+        giam_tru_gia_canh = GIAM_TRU_BAN_THAN + GIAM_TRU_NGUOI_PHU_THUOC * so_nguoi_pt
+        thu_nhap_tinh_thue = max(0, luong_gross - tong_bh - giam_tru_gia_canh)
+        thue_tncn = tinh_thue_tncn(thu_nhap_tinh_thue)
 
     tong_khau_tru = tong_bh + thue_tncn + round(khau_tru_khac)
     return {
@@ -115,9 +124,10 @@ def compute_payroll_line(emp: dict, so_cong_chuan: int, tien_thuong: float = 0, 
         "he_so_luong": float(emp["he_so_luong"] or 1.0),
         "so_cong_chuan": so_cong_chuan,
         "so_cong_thuc_te": so_cong_thuc_te,
-        "so_gio_tang_ca": so_gio_tang_ca,
+        "so_nguoi_pt": so_nguoi_pt,
+        "so_gio_tang_ca": 0,
         "luong_theo_cong": luong_theo_cong,
-        "tien_tang_ca": tien_tang_ca,
+        "tien_tang_ca": 0,
         "tong_phu_cap": tong_phu_cap,
         "tien_thuong": round(tien_thuong),
         "luong_gross": luong_gross,
@@ -130,7 +140,7 @@ def compute_payroll_line(emp: dict, so_cong_chuan: int, tien_thuong: float = 0, 
         "khau_tru_khac": round(khau_tru_khac),
         "tong_khau_tru": tong_khau_tru,
         "luong_net": luong_gross - tong_khau_tru,
-        "ghi_chu": "Thử việc: không đóng BH bắt buộc" if emp.get("loai_hd") == "THU_VIEC" else None,
+        "ghi_chu": "Thử việc: không đóng BH bắt buộc, khấu trừ thuế 10%" if la_thu_viec else None,
     }
 
 
@@ -142,7 +152,7 @@ def calculate_payroll_month(db: Session, thang: int, nam: int) -> dict:
         )
 
     start, end = month_bounds(thang, nam)
-    so_cong_chuan = standard_workdays(thang, nam)
+    so_cong_chuan = standard_workdays(thang, nam, get_holidays(db, start, end))
     existing = payroll_repository.get_payroll_rows_of_month(db, thang, nam)
 
     so_da_tinh = 0
