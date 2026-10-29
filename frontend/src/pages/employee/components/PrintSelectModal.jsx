@@ -1,168 +1,172 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { X, Printer, CalendarDays, CalendarRange, Loader2 } from "lucide-react";
 
 /**
- * PrintSelectModal – Hộp thoại popup lựa chọn in phiếu lương theo tháng hoặc theo năm.
- * Hỗ trợ chọn năm cụ thể từ danh sách các năm đã làm việc của nhân viên.
+ * PrintSelectModal – Hộp thoại chọn in phiếu lương tháng đang xem hoặc bảng tổng hợp cả năm.
+ * Danh sách năm lấy từ các kỳ lương THỰC TẾ đã duyệt (availableMonths) và được làm mới mỗi lần mở.
+ * Chọn năm để in KHÔNG làm thay đổi năm đang xem trên màn hình.
  */
 function PrintSelectModal({
   isOpen,
   month,
   year,
-  startYear = 2010,
+  availableMonths = [],
   hasMonthData,
+  isPreparing = false,
   onClose,
   onPrintMonth,
   onPrintYear,
 }) {
-  const currentYear = new Date().getFullYear();
-  const [selectedPrintYear, setSelectedPrintYear] = useState(year || currentYear);
+  // Các năm có ít nhất 1 bảng lương đã duyệt / đã chi trả (giảm dần)
+  const yearsList = useMemo(() => {
+    const set = new Set(
+      availableMonths
+        .filter((m) => m.trang_thai === "DA_DUYET" || m.trang_thai === "DA_TRA")
+        .map((m) => Number(m.nam))
+        .filter(Boolean)
+    );
+    return Array.from(set).sort((a, b) => b - a);
+  }, [availableMonths]);
+
+  const [selectedPrintYear, setSelectedPrintYear] = useState(year);
+
+  // Mỗi lần mở: mặc định năm đang xem nếu năm đó có dữ liệu, ngược lại năm gần nhất có dữ liệu
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedPrintYear(yearsList.includes(year) ? year : (yearsList[0] ?? year));
+  }, [isOpen, year, yearsList]);
+
+  // Esc để đóng
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  // Tạo danh sách các năm đã làm việc (từ startYear đến năm hiện tại) theo thứ tự giảm dần
-  const effectiveStartYear = Math.min(Number(startYear) || 2024, currentYear);
-  const yearsList = [];
-  for (let y = currentYear; y >= effectiveStartYear; y--) {
-    yearsList.push(y);
-  }
+  const monthsInSelectedYear = availableMonths.filter(
+    (m) => Number(m.nam) === Number(selectedPrintYear) && (m.trang_thai === "DA_DUYET" || m.trang_thai === "DA_TRA")
+  ).length;
 
   return (
     <div className="pr-modal-overlay" onClick={onClose}>
       <div
-        className="pr-modal"
-        style={{ maxWidth: "480px" }}
+        className="pr-modal pr-modal--wide"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pr-print-title"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="pr-modal__header">
           <div>
-            <h3 className="pr-modal__title">In phiếu lương & Thu nhập</h3>
+            <h3 id="pr-print-title" className="pr-modal__title">In phiếu lương & thu nhập</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Chọn loại chứng từ bảng lương bạn muốn in hoặc xuất PDF
+              Chọn chứng từ cần in hoặc lưu PDF (khổ A4)
             </p>
           </div>
-          <button className="pr-modal__close" onClick={onClose} type="button">
-            ✕
+          <button className="pr-modal__close" onClick={onClose} type="button" aria-label="Đóng">
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
 
-        {/* Danh sách 2 tùy chọn in */}
         <div className="p-4 space-y-3.5">
-          {/* Tùy chọn 1: In theo tháng */}
-          <div
-            className="border border-slate-200 hover:border-sky-500 rounded-xl p-3.5 bg-white hover:bg-sky-50/30 transition-all shadow-sm group"
-          >
+          {/* Tùy chọn 1: In phiếu lương tháng đang xem */}
+          <div className="border border-coffee-100 rounded-xl p-3.5 bg-white">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
-                  <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="1.8" />
-                </svg>
+              <div className="w-10 h-10 rounded-xl bg-coffee-50 text-coffee-700 flex items-center justify-center shrink-0">
+                <CalendarDays size={20} aria-hidden="true" />
               </div>
               <div className="flex-1">
-                <h4 className="text-sm font-bold text-slate-900 group-hover:text-sky-700">
-                  Phiếu lương Tháng {month}/{year}
-                </h4>
+                <h4 className="text-sm font-bold text-slate-900">Phiếu lương tháng {month}/{year}</h4>
                 <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                  Chi tiết bảng kê thu nhập Gross, phụ cấp, tăng ca, bảo hiểm và lương thực lĩnh (Net) của tháng.
+                  Chi tiết thu nhập (Gross), phụ cấp, bảo hiểm, thuế TNCN và lương thực lĩnh (NET) của tháng.
                 </p>
               </div>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-              <span
-                className={`text-[11px] font-semibold ${
-                  hasMonthData ? "text-emerald-600" : "text-amber-600"
-                }`}
-              >
-                {hasMonthData ? "✓ Đã có dữ liệu lương" : "⏳ Đang cập nhật"}
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+              <span className={`text-[11px] font-semibold ${hasMonthData ? "text-emerald-700" : "text-amber-800"}`}>
+                {hasMonthData ? "Đã có phiếu lương" : "Chưa có phiếu lương đã duyệt"}
               </span>
               <button
                 type="button"
+                disabled={!hasMonthData || isPreparing}
                 onClick={() => {
                   onPrintMonth();
                   onClose();
                 }}
-                className="px-3.5 py-1.5 bg-[#0284c7] hover:bg-[#0369a1] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                className="min-h-[40px] px-3.5 bg-coffee-600 hover:bg-coffee-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none disabled:cursor-not-allowed"
               >
-                <svg viewBox="0 0 24 24" fill="none" width="14" height="14">
-                  <rect x="6" y="2" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.8" />
-                  <rect x="4" y="8" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M8 14h8M8 17h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
+                <Printer size={14} aria-hidden="true" />
                 In phiếu tháng
               </button>
             </div>
           </div>
 
-          {/* Tùy chọn 2: In theo năm (Có dropdown chọn năm đã làm việc) */}
-          <div
-            className="border border-slate-200 hover:border-indigo-500 rounded-xl p-3.5 bg-white hover:bg-indigo-50/30 transition-all shadow-sm group"
-          >
+          {/* Tùy chọn 2: In bảng tổng hợp năm */}
+          <div className="border border-coffee-100 rounded-xl p-3.5 bg-white">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
-                  <rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
+              <div className="w-10 h-10 rounded-xl bg-gold-50 text-gold-700 flex items-center justify-center shrink-0">
+                <CalendarRange size={20} aria-hidden="true" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <h4 className="text-sm font-bold text-slate-900 group-hover:text-indigo-700">
-                    Bảng tổng hợp thu nhập cả năm
-                  </h4>
-                  {/* Dropdown chọn năm */}
-                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
-                    <span className="text-[11px] font-medium text-slate-500">Năm:</span>
-                    <select
-                      value={selectedPrintYear}
-                      onChange={(e) => setSelectedPrintYear(Number(e.target.value))}
-                      className="text-xs font-bold text-indigo-700 bg-transparent border-none outline-none cursor-pointer"
-                    >
-                      {yearsList.map((y) => (
-                        <option key={y} value={y}>
-                          Năm {y}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <h4 className="text-sm font-bold text-slate-900">Bảng tổng hợp thu nhập cả năm</h4>
+                  {yearsList.length > 0 && (
+                    <label className="flex items-center gap-1.5 bg-coffee-50 border border-coffee-100 rounded-lg px-2 min-h-[36px]">
+                      <span className="text-[11px] font-medium text-slate-600">Năm:</span>
+                      <select
+                        value={selectedPrintYear}
+                        onChange={(e) => setSelectedPrintYear(Number(e.target.value))}
+                        className="text-xs font-bold text-coffee-800 bg-transparent border-none outline-none cursor-pointer"
+                      >
+                        {yearsList.map((y) => (
+                          <option key={y} value={y}>
+                            Năm {y}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </div>
 
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  Bảng kê 12 tháng công tác, tổng Gross, các khoản bảo hiểm, quyết toán thuế TNCN và Net cả năm {selectedPrintYear}.
+                  Bảng kê các tháng có lương, tổng Gross, bảo hiểm, thuế TNCN đã khấu trừ và NET cả năm – dùng để đối chiếu, quyết toán thuế.
                 </p>
               </div>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
               <span className="text-[11px] font-semibold text-slate-500">
-                Lịch sử từ năm {effectiveStartYear} đến {currentYear}
+                {yearsList.length > 0
+                  ? `${monthsInSelectedYear} tháng có phiếu lương trong năm ${selectedPrintYear}`
+                  : "Chưa có dữ liệu"}
               </span>
               <button
                 type="button"
+                disabled={yearsList.length === 0 || isPreparing}
                 onClick={() => {
                   onPrintYear(selectedPrintYear);
                   onClose();
                 }}
-                className="px-3.5 py-1.5 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                className="min-h-[40px] px-3.5 bg-gold-700 hover:bg-coffee-800 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none disabled:cursor-not-allowed"
               >
-                <svg viewBox="0 0 24 24" fill="none" width="14" height="14">
-                  <rect x="6" y="2" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.8" />
-                  <rect x="4" y="8" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M8 14h8M8 17h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-                In bảng năm {selectedPrintYear}
+                {isPreparing ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Printer size={14} aria-hidden="true" />}
+                In bảng năm {yearsList.length > 0 ? selectedPrintYear : ""}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200/80 rounded-b-2xl flex justify-end">
+        <div className="px-4 py-2.5 bg-coffee-50 border-t border-coffee-100 rounded-b-2xl flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-all cursor-pointer"
+            className="min-h-[40px] px-4 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-all"
           >
             Đóng
           </button>

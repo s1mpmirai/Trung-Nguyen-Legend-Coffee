@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { CalendarClock, AlertCircle, RefreshCw } from "lucide-react";
 
 /* ── Sub-components ────────────────────────────────────────────── */
 import SharedEmployeeHeader from "./components/SharedEmployeeHeader";
@@ -8,11 +9,19 @@ import WorkContactSection from "./components/WorkContactSection";
 import AccountSettingsSection from "./components/AccountSettingsSection";
 import BottomNavBar from "./components/BottomNavBar";
 import EditProfileModal from "./components/EditProfileModal";
+import ChangePasswordModal from "./components/ChangePasswordModal";
+import PendingRequestBanner from "./components/PendingRequestBanner";
+import EmployeeToast from "./components/EmployeeToast";
+import useToast from "./utils/useToast";
+import { getApiErrorMessage } from "./utils/format";
 
 /* ── Services ──────────────────────────────────────────────────── */
 import {
   getEmployeeProfile,
-  updateEmployeeContact,
+  getPendingProfileRequest,
+  requestProfileUpdate,
+  cancelProfileRequest,
+  changePassword,
 } from "../../services/employeeService";
 
 /* ── Styles ────────────────────────────────────────────────────── */
@@ -20,139 +29,142 @@ import "./styles/EmployeeProfile.css";
 
 /**
  * EmployeeProfile – Trang Hồ sơ & Thông tin cá nhân của nhân viên (Employee Portal)
- * Chế độ chỉ xem thông tin (đã bỏ toàn bộ các nút sửa).
+ * - Nhân viên KHÔNG sửa trực tiếp hồ sơ: gửi yêu cầu chỉnh sửa để Quản lý phê duyệt
+ * - Hiển thị yêu cầu đang chờ duyệt (cũ -> mới) và cho phép hủy
+ * - Thông báo ngày nghỉ việc dự kiến (nếu đã lên lịch thôi việc)
+ * - Đổi mật khẩu tài khoản
  */
 function EmployeeProfile({ userSession, onLogout }) {
   const [employee, setEmployee] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [toast, setToast] = useState(null);
-
-  // Trạng thái modal chỉnh sửa thông tin
+  const [pendingRequest, setPendingRequest] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const { toast, showToast, hideToast } = useToast(4500);
 
   // Mã nhân viên hiện tại
   const currentMaNv = userSession?.ma_nv || localStorage.getItem("user_ma_nv");
 
-  // Hiển thị toast thông báo
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
-
-  /* ── 1. Tải dữ liệu hồ sơ từ API khi mở trang ────────────────── */
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadProfile() {
-      setIsLoading(true);
-      try {
-        const profile = await getEmployeeProfile(currentMaNv);
-        if (isMounted && profile) {
-          setEmployee(profile);
-        }
-      } catch (err) {
-        console.warn("Không tải được hồ sơ:", err.message);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
+  /* ── 1. Tải hồ sơ + yêu cầu chỉnh sửa đang chờ duyệt ─────────── */
+  const loadPendingRequest = useCallback(async () => {
+    try {
+      setPendingRequest((await getPendingProfileRequest(currentMaNv)) || null);
+    } catch (err) {
+      console.warn("Không tải được yêu cầu chỉnh sửa hồ sơ:", err?.message);
     }
-
-    loadProfile();
-
-    return () => {
-      isMounted = false;
-    };
   }, [currentMaNv]);
 
-  /* ── 2. Xử lý gửi yêu cầu chỉnh sửa thông tin cá nhân ─────────── */
-  const handleSaveProfile = async (formData) => {
+  const loadProfile = useCallback(async () => {
+    setIsLoading(true);
+    const profile = await getEmployeeProfile(currentMaNv);
+    setEmployee(profile);
+    setIsLoading(false);
+  }, [currentMaNv]);
+
+  useEffect(() => {
+    loadProfile();
+    loadPendingRequest();
+  }, [loadProfile, loadPendingRequest]);
+
+  /* ── 2. Gửi yêu cầu chỉnh sửa (chờ Quản lý duyệt) ─────────────── */
+  const handleSubmitProfileRequest = async (payload) => {
+    const created = await requestProfileUpdate(currentMaNv, payload);
+    setPendingRequest(created || null);
+    showToast("Đã gửi yêu cầu chỉnh sửa. Hồ sơ sẽ được cập nhật sau khi Quản lý phê duyệt.", "success");
+  };
+
+  /* ── 3. Hủy yêu cầu đang chờ duyệt ─────────────────────────────── */
+  const handleCancelProfileRequest = async (request) => {
     try {
-      // Lưu lên CSDL rồi hiển thị đúng dữ liệu backend trả về
-      const updated = await updateEmployeeContact(currentMaNv, formData);
-      if (updated) setEmployee(updated);
-      showToast("Đã cập nhật thông tin cá nhân thành công!");
+      await cancelProfileRequest(request.ma_yc);
+      setPendingRequest(null);
+      showToast(`Đã hủy yêu cầu chỉnh sửa #${request.ma_yc}.`, "success");
     } catch (err) {
-      showToast(err.message || "Gửi yêu cầu thất bại", "error");
-      throw err;
+      showToast(getApiErrorMessage(err, "Hủy yêu cầu thất bại. Vui lòng thử lại."), "error");
+      loadPendingRequest();
     }
   };
 
-  /* ── 3. Xử lý đăng xuất ──────────────────────────────────────── */
-  const handleLogout = () => {
-    if (onLogout) {
-      onLogout();
-      return;
-    }
-    if (window.confirm("Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?")) {
-      localStorage.removeItem("user_ma_nv");
-      localStorage.removeItem("ma_nv");
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("user_role");
-      showToast("Đã đăng xuất thành công!", "info");
-      setTimeout(() => {
-        window.location.hash = "";
-        window.location.reload();
-      }, 500);
-    }
+  /* ── 4. Đổi mật khẩu ───────────────────────────────────────────── */
+  const handleChangePassword = async (payload) => {
+    await changePassword(payload);
+    showToast("Đổi mật khẩu thành công. Hãy dùng mật khẩu mới cho lần đăng nhập sau.", "success");
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#F8FAFC] min-h-screen pb-24 relative">
-      {/* ── Thông báo Toast nổi ─────────────────────────────────── */}
-      {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50 animate-bounce">
-          <div className="bg-slate-900/95 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center justify-between text-xs font-semibold border border-slate-700 backdrop-blur-md">
-            <span>{toast.message}</span>
-            <button onClick={() => setToast(null)} className="ml-2 text-slate-400 hover:text-white">✕</button>
-          </div>
-        </div>
-      )}
+    <div className="flex-1 flex flex-col bg-cream min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] relative">
+      <EmployeeToast message={toast?.message} type={toast?.type} onClose={hideToast} />
 
       {/* ── Header TrungNguyenHR chung ─────────────────────────── */}
-      <SharedEmployeeHeader
-        onLogout={handleLogout}
-        onNotificationClick={() => showToast("Bạn có 1 thông báo mới từ Phòng Nhân sự")}
-      />
+      <SharedEmployeeHeader onLogout={onLogout} />
 
       {/* ── Banner tiêu đề trang ────────────────────────────────── */}
       <div className="px-4 pt-3.5 pb-1">
-        <span className="text-[11px] font-extrabold tracking-wider text-[#0EA5E9] uppercase block">
-          THÔNG TIN TÀI KHOẢN
+        <span className="text-[11px] font-extrabold tracking-wider text-gold-700 uppercase block">
+          Thông tin tài khoản
         </span>
-        <h2 className="text-xl font-black text-slate-900 leading-tight mt-0.5">
+        <h1 className="text-xl font-extrabold text-coffee-900 leading-tight mt-0.5">
           Hồ sơ cá nhân
-        </h2>
+        </h1>
       </div>
 
-      {/* ── Nội dung chính (Xem & Sửa thông tin) ────────────────── */}
+      {/* ── Nội dung chính ──────────────────────────────────────── */}
       <main className="px-4 py-2.5 space-y-4">
-        {isLoading && !employee ? (
-          <div className="py-24 flex flex-col items-center justify-center text-slate-400">
-            <div className="w-8 h-8 border-2 border-[#0EA5E9] border-t-transparent rounded-full animate-spin mb-3"></div>
-            <p className="text-xs font-semibold text-slate-500">Đang tải thông tin hồ sơ...</p>
+        {isLoading ? (
+          <div className="py-24 flex flex-col items-center justify-center text-slate-500" role="status">
+            <div className="w-8 h-8 border-2 border-coffee-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p className="text-xs font-semibold">Đang tải thông tin hồ sơ...</p>
           </div>
         ) : !employee ? (
-          <div className="py-24 text-center text-xs font-semibold text-rose-500">
-            Không tải được hồ sơ. Vui lòng đăng nhập lại hoặc thử lại sau.
+          <div className="py-20 text-center space-y-3" role="alert">
+            <AlertCircle size={32} className="mx-auto text-rose-400" />
+            <p className="text-xs font-semibold text-rose-700">
+              Không tải được hồ sơ. Vui lòng thử lại hoặc đăng nhập lại.
+            </p>
+            <button
+              type="button"
+              onClick={loadProfile}
+              className="inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-xl bg-coffee-600 hover:bg-coffee-800 text-white text-xs font-bold"
+            >
+              <RefreshCw size={14} />
+              Thử lại
+            </button>
           </div>
         ) : (
           <>
+            {/* Thông báo đã lên lịch thôi việc (ngày nghỉ việc ở tương lai) */}
+            {employee.isTerminationScheduled && (
+              <section className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-3.5" role="status">
+                <CalendarClock size={18} className="text-amber-700 flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="text-xs text-amber-900">
+                  <p className="font-bold">Ngày nghỉ việc dự kiến {employee.terminationDate}</p>
+                  <p className="mt-0.5">
+                    Bạn vẫn làm việc và sử dụng tài khoản bình thường đến hết ngày này.
+                    {employee.terminationReason ? ` Lý do: ${employee.terminationReason}.` : ""}
+                  </p>
+                </div>
+              </section>
+            )}
+
             <ProfileHeader
               employee={employee}
+              onEdit={() => setIsEditModalOpen(true)}
+              hasPendingRequest={Boolean(pendingRequest)}
             />
 
-            <BasicInfoSection
-              employee={employee}
+            <PendingRequestBanner
+              request={pendingRequest}
+              onCancel={handleCancelProfileRequest}
               onEdit={() => setIsEditModalOpen(true)}
             />
 
-            <WorkContactSection
-              employee={employee}
-            />
+            <BasicInfoSection employee={employee} />
+
+            <WorkContactSection employee={employee} />
 
             <AccountSettingsSection
-              onLogout={handleLogout}
+              onChangePassword={() => setIsPasswordModalOpen(true)}
+              onLogout={onLogout}
             />
           </>
         )}
@@ -161,12 +173,20 @@ function EmployeeProfile({ userSession, onLogout }) {
       {/* ── Thanh điều hướng dưới cùng ─────────────────────────── */}
       <BottomNavBar activeTab="profile" />
 
-      {/* ── Modal Chỉnh sửa thông tin cá nhân ───────────────────── */}
+      {/* ── Modal gửi yêu cầu chỉnh sửa thông tin cá nhân ───────── */}
       <EditProfileModal
         isOpen={isEditModalOpen}
         employee={employee}
+        pendingRequest={pendingRequest}
         onClose={() => setIsEditModalOpen(false)}
-        onSave={handleSaveProfile}
+        onSubmit={handleSubmitProfileRequest}
+      />
+
+      {/* ── Modal đổi mật khẩu ──────────────────────────────────── */}
+      <ChangePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+        onSubmit={handleChangePassword}
       />
     </div>
   );

@@ -1,24 +1,40 @@
 import React from "react";
+import { KeyRound, ChevronRight, LogOut } from "lucide-react";
 
 /**
- * AccountSettingsSection – Phần "Tài khoản & Phiên đăng nhập"
+ * AccountSettingsSection – Phần "Tài khoản & Bảo mật"
  *
- * Hiển thị nút đăng xuất an toàn khỏi thiết bị.
+ * - Đổi mật khẩu tài khoản đang đăng nhập
+ * - Đăng xuất khỏi thiết bị
  *
- * @param {Function} onLogout – Callback đăng xuất
+ * @param {Function} onChangePassword – Mở hộp thoại đổi mật khẩu
+ * @param {Function} onLogout         – Callback đăng xuất
  */
-function AccountSettingsSection({ onLogout }) {
+function AccountSettingsSection({ onChangePassword, onLogout }) {
   return (
-    <section className="pt-1 pb-4">
-      <button
-        className="ep-logout-btn"
-        onClick={onLogout}
-        type="button"
-      >
-        <svg className="ep-logout-btn__icon" viewBox="0 0 20 20" fill="none" width="18" height="18">
-          <path d="M7 3H4a1 1 0 00-1 1v12a1 1 0 001 1h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M10 10h7m0 0l-3-3m3 3l-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+    <section className="space-y-3 pb-4" aria-labelledby="ep-account-title">
+      <div className="ep-card">
+        <div className="ep-card__header">
+          <div className="ep-card__header-left">
+            <KeyRound className="ep-card__icon" aria-hidden="true" />
+            <h3 id="ep-account-title" className="ep-card__title">Tài khoản & Bảo mật</h3>
+          </div>
+        </div>
+        <div className="ep-card__body pt-1">
+          <button className="ep-password-btn" type="button" onClick={onChangePassword}>
+            <span className="ep-password-btn__left">
+              <span className="ep-password-btn__text">
+                <span className="ep-password-btn__title">Đổi mật khẩu</span>
+                <span className="ep-password-btn__sub">Nên đổi mật khẩu định kỳ để bảo vệ tài khoản</span>
+              </span>
+            </span>
+            <ChevronRight size={18} className="ep-password-btn__arrow" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      <button className="ep-logout-btn" onClick={onLogout} type="button">
+        <LogOut size={18} className="ep-logout-btn__icon" aria-hidden="true" />
         Đăng xuất khỏi thiết bị này
       </button>
     </section>
