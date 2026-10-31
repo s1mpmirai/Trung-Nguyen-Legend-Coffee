@@ -1,6 +1,8 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScope, scope_condition
+
 
 def generate_leave_code(db: Session) -> str:
     """Sinh mã đơn từ tự động: DT0001, DT0002..."""
@@ -60,7 +62,7 @@ def get_leave_by_id(db: Session, ma_don: str) -> dict | None:
             dt.loai_don, dt.ngay_tao, dt.ngay_bat_dau, dt.ngay_ket_thuc,
             dt.so_ngay, dt.ly_do, dt.trang_thai,
             dt.nguoi_duyet, nd.ho_ten AS ten_nguoi_duyet,
-            dt.ngay_duyet, dt.y_kien_duyet, nv.ma_nql
+            dt.ngay_duyet, dt.y_kien_duyet, nv.ma_nql, nv.ma_pb
         FROM don_tu dt
         JOIN nhan_vien nv ON dt.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
@@ -111,9 +113,10 @@ def cancel_leave(db: Session, ma_don: str, ma_nv: str) -> dict | None:
     return get_leave_by_id(db, ma_don)
 
 
-def get_pending_leaves(db: Session, ma_nql: str | None = None) -> list[dict]:
-    """Quản lý lấy danh sách các đơn đang chờ duyệt (ma_nql: chỉ lấy đơn của cấp dưới trực tiếp)."""
-    query = """
+def get_pending_leaves(db: Session, scope: DataScope | None = None) -> list[dict]:
+    """Quản lý lấy danh sách các đơn đang chờ duyệt (scope: chỉ lấy đơn của nhân sự trong phạm vi quản lý)."""
+    scope_sql, params = scope_condition(scope)
+    query = f"""
         SELECT 
             dt.ma_don, dt.ma_nv, nv.ho_ten, pb.ten_pb,
             dt.loai_don, dt.ngay_tao, dt.ngay_bat_dau, dt.ngay_ket_thuc,
@@ -123,17 +126,17 @@ def get_pending_leaves(db: Session, ma_nql: str | None = None) -> list[dict]:
         FROM don_tu dt
         JOIN nhan_vien nv ON dt.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
-        WHERE dt.trang_thai = 'CHO_DUYET'
-          AND (:ma_nql IS NULL OR nv.ma_nql = :ma_nql)
+        WHERE dt.trang_thai = 'CHO_DUYET'{scope_sql}
         ORDER BY dt.ngay_tao ASC
     """
-    rows = db.execute(text(query), {"ma_nql": ma_nql}).mappings().all()
+    rows = db.execute(text(query), params).mappings().all()
     return [dict(r) for r in rows]
 
 
-def get_all_leaves(db: Session, trang_thai: str = None, ma_nql: str | None = None) -> list[dict]:
-    """Quản lý lấy toàn bộ đơn từ (có thể lọc theo trạng thái)."""
-    base_query = """
+def get_all_leaves(db: Session, trang_thai: str = None, scope: DataScope | None = None) -> list[dict]:
+    """Quản lý lấy toàn bộ đơn từ trong phạm vi quản lý (có thể lọc theo trạng thái)."""
+    scope_sql, params = scope_condition(scope)
+    base_query = f"""
         SELECT 
             dt.ma_don, dt.ma_nv, nv.ho_ten, pb.ten_pb,
             dt.loai_don, dt.ngay_tao, dt.ngay_bat_dau, dt.ngay_ket_thuc,
@@ -144,11 +147,10 @@ def get_all_leaves(db: Session, trang_thai: str = None, ma_nql: str | None = Non
         JOIN nhan_vien nv ON dt.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         LEFT JOIN nhan_vien nd ON dt.nguoi_duyet = nd.ma_nv
-        WHERE (:trang_thai IS NULL OR dt.trang_thai = :trang_thai)
-          AND (:ma_nql IS NULL OR nv.ma_nql = :ma_nql)
+        WHERE (:trang_thai IS NULL OR dt.trang_thai = :trang_thai){scope_sql}
         ORDER BY dt.ngay_tao DESC
     """
-    rows = db.execute(text(base_query), {"trang_thai": trang_thai, "ma_nql": ma_nql}).mappings().all()
+    rows = db.execute(text(base_query), {"trang_thai": trang_thai, **params}).mappings().all()
     return [dict(r) for r in rows]
 
 

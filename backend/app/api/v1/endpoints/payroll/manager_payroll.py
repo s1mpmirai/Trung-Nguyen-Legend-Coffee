@@ -19,6 +19,7 @@ from app.services.payroll_service import (
 # Toàn bộ API tính / duyệt lương yêu cầu quyền PAYROLL_MANAGE
 router = APIRouter(dependencies=[Depends(require_permission("PAYROLL_MANAGE"))])
 DbSession = Annotated[Session, Depends(get_db)]
+PayrollManager = Annotated[dict, Depends(require_permission("PAYROLL_MANAGE"))]
 
 
 @router.post(
@@ -27,6 +28,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 )
 def calculate_payroll_endpoint(
     data: payroll_calculate_request,
+    account: PayrollManager,
     db: DbSession = None,
 ):
     """
@@ -37,7 +39,7 @@ def calculate_payroll_endpoint(
     4. Lưu kết quả vào bảng bảng_lương.
     """
     try:
-        return calculate_payroll_month(db, data.thang, data.nam)
+        return calculate_payroll_month(db, data.thang, data.nam, nguoi_lap=account["ma_nv"])
     except ValueError as err:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
 
@@ -68,11 +70,14 @@ def get_company_payroll_endpoint(
 def update_payroll_status_endpoint(
     ma_bl: int,
     data: payroll_status_update,
+    account: PayrollManager,
     db: DbSession = None,
 ):
-    """Duyệt bảng lương (NHAP -> DA_DUYET -> DA_TRA)."""
+    """Duyệt bảng lương (NHAP -> DA_DUYET -> DA_TRA). Người lập không tự duyệt; không ai duyệt/chi trả lương của chính mình."""
     try:
-        return change_payroll_status(db, ma_bl, data.trang_thai)
+        return change_payroll_status(db, ma_bl, data.trang_thai, nguoi_thuc_hien=account["ma_nv"])
+    except PermissionError as err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err
     except LookupError as err:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err)) from err
     except ValueError as err:

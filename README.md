@@ -16,12 +16,13 @@ cp .env.example .env          # rồi đổi SECRET_KEY và các mật khẩu CS
 docker compose up -d --build
 ```
 
-Lần chạy đầu, MariaDB tự chạy lần lượt các file trong `database/migrations/` (`00` → `04`).
+Lần chạy đầu, MariaDB tự chạy lần lượt các file trong `database/migrations/` (`00` → `05`).
 
-**CSDL đã tồn tại từ phiên bản trước:** backend mới cần các cột/bảng thêm ở migration `04`. Chạy:
+**CSDL đã tồn tại từ phiên bản trước:** backend mới cần các cột/bảng thêm ở migration `04` và `05`. Chạy lần lượt:
 
 ```bash
 docker exec -i trungnguyen_hrm_lite sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"' < database/migrations/04_kiem_toan_bao_mat_nghiep_vu.sql
+docker exec -i trungnguyen_hrm_lite sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"' < database/migrations/05_pham_vi_phan_quyen.sql
 ```
 
 Muốn nạp lại toàn bộ dữ liệu mẫu đã chỉnh sửa (xóa sạch dữ liệu hiện có): sao lưu trước (mục 3), rồi `docker compose down -v && docker compose up -d --build`.
@@ -33,7 +34,9 @@ Mật khẩu dữ liệu mẫu là `1` (chỉ dùng để demo; tài khoản do 
 | Mã NV | Vai trò | Cổng đăng nhập |
 | --- | --- | --- |
 | NV01 | ADMIN | `/login-manage` → Cổng Admin |
-| NV02, NV03, NV04, NV05, NV06, NV08 | QUAN_LY | `/login-manage` → Cổng Quản lý |
+| NV02, NV08 | QUAN_LY (Phòng Nhân sự) + quyền riêng `ATTENDANCE_LOCK` | `/login-manage` → Cổng Quản lý (toàn công ty, chốt công) |
+| NV03 | QUAN_LY (Phòng Kế toán) + quyền riêng `PAYROLL_MANAGE` | `/login-manage` → Cổng Quản lý (phòng mình + tính lương toàn công ty) |
+| NV04, NV05, NV06, NV07 | QUAN_LY (trưởng phòng khác) | `/login-manage` → Cổng Quản lý (chỉ phòng mình) |
 | NV09 | TRUONG_NHOM | `/login-manage` → Cổng Quản lý (chỉ nhân sự cấp dưới trực tiếp) |
 | NV10 | NHAN_VIEN | `/login` → Cổng Nhân viên |
 | NV14 | NHAN_VIEN + quyền riêng `ACCOUNT_MANAGE` | `/login-manage` → Cổng Admin (chỉ mục Tài khoản) |
@@ -64,10 +67,10 @@ schtasks /Create /SC DAILY /ST 23:00 /TN "TNL-HRM-Backup" /TR "powershell -Execu
 
 - **Chấm công web theo ca:** mỗi ngày check-in 1 lần; trễ quá 15 phút → `DI_TRE` (từ lần thứ 4 trong tháng trừ 1 giờ công); ra ca sớm quá 15 phút → `VE_SOM`. Số công theo giờ thực làm: ≥ 7h = 1 công, 4–7h = 0,5 công, < 4h = 0. Không tính làm thêm giờ.
 - **Quản lý sửa công:** tối đa 3 lần sửa giờ vào/tháng/nhân viên; mọi thay đổi ghi vào `lich_su_dieu_chinh_cong` (người sửa, giá trị cũ → mới). Trưởng nhóm chỉ sửa công của cấp dưới trực tiếp.
-- **Chốt công:** chỉ vai trò có quyền `ATTENDANCE_LOCK`. Chốt = duyệt mọi công còn chờ; công bị từ chối không được trả lương. Không mở khóa được khi bảng lương tháng đã duyệt/chi trả. Tháng đã chốt không nhận thêm đơn nghỉ.
+- **Chốt công:** chỉ tài khoản có quyền `ATTENDANCE_LOCK` (mặc định Admin và Phòng Nhân sự). Chốt = duyệt mọi công còn chờ; công bị từ chối không được trả lương. Không mở khóa được khi bảng lương tháng đã duyệt/chi trả. Tháng đã chốt không nhận thêm đơn nghỉ.
 - **Đơn từ:** số ngày nghỉ do hệ thống tính (T2–T6, trừ ngày lễ trong bảng `ngay_le`). Nghỉ phép năm = 1 công có lương, kiểm tra quỹ phép (12 ngày + 1 ngày/5 năm thâm niên, năm đầu tính theo tháng). Nghỉ ốm, thai sản = 0 công (BHXH chi trả). Nghỉ không lương = 0 công. Không tự duyệt đơn của mình.
 - **Thôi việc có ngày hiệu lực:** ngày hiệu lực ở tương lai thì nhân sự vẫn làm việc và đăng nhập bình thường; đến ngày đó hệ thống tự chuyển `DA_NGHI_VIEC`, khóa tài khoản, thanh lý hợp đồng. Duyệt đơn xin nghỉ việc lên lịch thôi việc tại ngày kết thúc đơn. Không xóa cứng dữ liệu (FK `ON DELETE RESTRICT`).
-- **Tính lương:** chỉ khi đã chốt công; chạy lại nhiều lần không nhân đôi (khóa `thang, nam, ma_nv`; giữ thưởng/khấu trừ; không ghi đè bảng đã duyệt).
+- **Tính lương:** chỉ tài khoản có `PAYROLL_MANAGE` (mặc định Admin và Phòng Kế toán), chỉ khi đã chốt công. Tách nhiệm vụ: người bấm tính lương không được tự duyệt; không ai duyệt hay chi trả dòng lương của chính mình (bảng `bang_luong` ghi `nguoi_lap`, `nguoi_duyet`). Tính lại nhiều lần không nhân đôi (khóa `thang, nam, ma_nv`; giữ thưởng/khấu trừ; không ghi đè bảng đã duyệt).
   - Lương theo công = lương HĐ × tỷ lệ hưởng ÷ công chuẩn × công thực tế (công chuẩn = ngày T2–T6 trừ ngày lễ).
   - BH người lao động 8% + 1,5% + 1% trên (lương HĐ + phụ cấp chức vụ), trần 46,8 triệu (BHXH/BHYT) và 106,2 triệu (BHTN).
   - Thuế TNCN lũy tiến 5 bậc trên (Gross − BH − 15,5 triệu − 6,2 triệu × số người phụ thuộc). HĐ thử việc: không đóng BH, khấu trừ 10%.
@@ -78,6 +81,16 @@ schtasks /Create /SC DAILY /ST 23:00 /TN "TNL-HRM-Backup" /TR "powershell -Execu
 `EMPLOYEE_VIEW/CREATE/UPDATE/DELETE`, `LEAVE_VIEW/CREATE/APPROVE`, `ATTENDANCE_MANAGE`, `ATTENDANCE_LOCK`, `PAYROLL_VIEW/MANAGE`, `REPORT_VIEW`, `CONTRACT_MANAGE`, `ORG_MANAGE`, `ACCOUNT_MANAGE`, `PERMISSION_ASSIGN`.
 Quyền hiệu lực = quyền của vai trò ∪ quyền cấp riêng − quyền thu hồi, kiểm tra ở backend cho mọi API. Admin chỉnh ma trận vai trò × quyền ở Cổng Admin → Phân quyền RBAC.
 Cổng Admin chỉ dành cho ADMIN hoặc tài khoản có `ACCOUNT_MANAGE`.
+
+**Phạm vi dữ liệu** (áp dụng cho danh sách và hồ sơ nhân sự, đơn từ, chấm công, báo cáo, phân quyền):
+
+| Ai | Thấy và xử lý |
+| --- | --- |
+| ADMIN, Quản lý thuộc Phòng Nhân sự (`HR_DEPARTMENT_CODE`, mặc định `PB02`) | Toàn công ty |
+| Quản lý phòng ban khác | Nhân sự trong phòng mình + cấp dưới trực tiếp |
+| Trưởng nhóm, nhân viên được cấp quyền quản lý riêng | Chỉ cấp dưới trực tiếp (`ma_nql`) |
+
+`PAYROLL_MANAGE`, `ATTENDANCE_LOCK` có tác dụng toàn công ty nên chỉ Admin được cấp (cùng `ACCOUNT_MANAGE`, `PERMISSION_ASSIGN`, `ORG_MANAGE`, `CONTRACT_MANAGE`); Quản lý chỉ cấp được vai trò Nhân viên/Trưởng nhóm và các quyền nghiệp vụ còn lại cho nhân sự trong phạm vi của mình.
 
 ## 6. Kiểm thử
 

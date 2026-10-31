@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScope
 from app.core.datetime_utils import get_vietnam_now, get_vietnam_today
 from app.repositories import attendance_repository as repo
 from app.repositories.employee_repository import TOP_LEVEL_AUTO_APPROVE_NOTE, is_top_level_employee
@@ -602,11 +603,14 @@ def get_attendance_history(
 
 
 def get_daily_attendance_for_manager(
-    db: Session, target_date: Optional[date] = None, ma_pb: Optional[str] = None
+    db: Session,
+    target_date: Optional[date] = None,
+    ma_pb: Optional[str] = None,
+    scope: DataScope | None = None,
 ) -> list[dict[str, Any]]:
-    """Dành cho Quản lý: Lấy danh sách chấm công toàn công ty trong 1 ngày."""
+    """Dành cho Quản lý: Lấy danh sách chấm công trong 1 ngày của nhân sự thuộc phạm vi quản lý."""
     selected_date = target_date or get_vietnam_today()
-    rows = repo.get_daily_attendance_all(db, selected_date, ma_pb)
+    rows = repo.get_daily_attendance_all(db, selected_date, ma_pb, scope)
 
     results = []
     for r in rows:
@@ -636,13 +640,17 @@ def get_daily_attendance_for_manager(
 
 
 def get_monthly_summary_for_manager(
-    db: Session, month: Optional[int] = None, year: Optional[int] = None, ma_pb: Optional[str] = None
+    db: Session,
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    ma_pb: Optional[str] = None,
+    scope: DataScope | None = None,
 ) -> list[dict[str, Any]]:
-    """Dành cho Quản lý: Thống kê ngày công tháng của tất cả nhân viên."""
+    """Dành cho Quản lý: Thống kê ngày công tháng của nhân sự thuộc phạm vi quản lý."""
     now = get_vietnam_now()
     m = month or now.month
     y = year or now.year
-    rows = repo.get_monthly_attendance_summary(db, m, y, ma_pb)
+    rows = repo.get_monthly_attendance_summary(db, m, y, ma_pb, scope)
 
     return [
         {
@@ -666,14 +674,14 @@ def adjust_attendance_by_manager(
     ma_cc: int,
     data: AttendanceAdjustRequest,
     nguoi_dieu_chinh: str | None = None,
-    ma_nql: str | None = None,
+    scope: DataScope | None = None,
 ) -> dict[str, Any]:
     """
     Quản lý điều chỉnh bản ghi chấm công.
     Quy định: Chỉ Quản lý mới có quyền sửa giờ check-in (gio_vao) cho nhân viên,
     và tối đa 3 lần/tháng đối với mỗi nhân viên.
     Không được tự duyệt / điều chỉnh công của chính mình (công của Quản lý do cấp trên duyệt).
-    ma_nql khác None (Trưởng nhóm): chỉ điều chỉnh công của nhân sự cấp dưới trực tiếp.
+    scope khác None: chỉ điều chỉnh công của nhân sự trong phạm vi (phòng mình / cấp dưới trực tiếp).
     Mọi lần điều chỉnh đều ghi nhật ký (giá trị cũ / mới, người sửa).
     """
     record = repo.get_attendance_by_id(db, ma_cc)
@@ -681,10 +689,8 @@ def adjust_attendance_by_manager(
         raise ValueError(f"Không tìm thấy bản ghi chấm công mã {ma_cc}")
     if nguoi_dieu_chinh and record["ma_nv"] == nguoi_dieu_chinh:
         raise PermissionError("Bạn không thể tự duyệt hoặc điều chỉnh công của chính mình.")
-    if ma_nql is not None:
-        emp = get_employee_by_id(db, record["ma_nv"]) or {}
-        if emp.get("ma_nql") != ma_nql:
-            raise PermissionError("Bạn chỉ được điều chỉnh công của nhân sự do mình quản lý trực tiếp.")
+    if scope is not None and not scope.covers(get_employee_by_id(db, record["ma_nv"]) or {}):
+        raise PermissionError("Bạn chỉ được điều chỉnh công của nhân sự thuộc phạm vi mình quản lý.")
 
     fields = data.model_dump(exclude_unset=True)
     # Đề tài không tính làm thêm giờ: không cho ghi giờ OT
@@ -859,7 +865,7 @@ def toggle_monthly_attendance_lock(
     return repo.set_monthly_attendance_lock(db, thang, nam, is_locked, nguoi_chot, ghi_chu)
 
 
-def get_attendance_trend(db: Session, days: int = 7) -> list[dict[str, Any]]:
+def get_attendance_trend(db: Session, days: int = 7, scope: DataScope | None = None) -> list[dict[str, Any]]:
     """Thống kê số người đúng giờ / đi trễ trong N ngày làm việc gần nhất (tính cả hôm nay)."""
     working_days: list[date] = []
     current = get_vietnam_today()
@@ -869,8 +875,11 @@ def get_attendance_trend(db: Session, days: int = 7) -> list[dict[str, Any]]:
         current -= timedelta(days=1)
     working_days.reverse()
 
-    stats = {r["ngay_cong"]: r for r in repo.get_attendance_counts_by_day(db, working_days[0], working_days[-1])}
-    tong_nhan_su = repo.count_active_employees(db)
+    stats = {
+        r["ngay_cong"]: r
+        for r in repo.get_attendance_counts_by_day(db, working_days[0], working_days[-1], scope)
+    }
+    tong_nhan_su = repo.count_active_employees(db, scope)
     today = get_vietnam_today()
 
     result = []

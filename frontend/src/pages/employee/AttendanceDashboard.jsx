@@ -11,9 +11,6 @@ import {
   CheckCircle2,
   Clock,
   Hourglass,
-  Building2,
-  Coffee,
-  Timer,
   X,
   RefreshCw,
   Loader2,
@@ -234,7 +231,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
         </div>
 
         {/* 1. THẺ THÔNG TIN NHÂN VIÊN */}
-        <section className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_10px_rgba(62,39,35,0.04)] flex items-center justify-between">
+        <section className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_10px_rgba(14,165,233,0.06)] flex items-center justify-between">
           <div className="min-w-0 flex-1 pr-2">
             <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
               <span className="text-[10px] font-extrabold text-coffee-700 tracking-wider uppercase px-2 py-0.5 bg-coffee-50 rounded-md border border-coffee-100">
@@ -264,7 +261,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
         {/* 2. THẺ CA LÀM VIỆC HÔM NAY & 2 NÚT CHẤM CÔNG */}
         <section
           aria-labelledby="shift-card-title"
-          className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_10px_rgba(62,39,35,0.04)] space-y-3.5"
+          className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_10px_rgba(14,165,233,0.06)] space-y-3.5"
         >
           {/* Ca làm việc + trạng thái hôm nay */}
           <div className="bg-coffee-50 border border-coffee-100 rounded-xl p-3 space-y-3">
@@ -292,33 +289,6 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
                 {todayStatus.label}
               </span>
             </div>
-
-            {shift && (
-              <ul className="grid grid-cols-3 gap-2 text-[11px]">
-                <li className="bg-white rounded-lg px-2 py-1.5 border border-coffee-100">
-                  <span className="flex items-center gap-1 text-slate-500 font-medium">
-                    <Timer size={11} aria-hidden="true" /> Cho phép trễ
-                  </span>
-                  <span className="block font-bold text-coffee-800 mt-0.5">{shift.phut_cho_phep_tre ?? 15} phút</span>
-                </li>
-                <li className="bg-white rounded-lg px-2 py-1.5 border border-coffee-100">
-                  <span className="flex items-center gap-1 text-slate-500 font-medium">
-                    <Coffee size={11} aria-hidden="true" /> Nghỉ trưa
-                  </span>
-                  <span className="block font-bold text-coffee-800 mt-0.5">
-                    {Number(shift.nghi_trua_phut) > 0 ? `${shift.nghi_trua_phut} phút` : 'Không có'}
-                  </span>
-                </li>
-                <li className="bg-white rounded-lg px-2 py-1.5 border border-coffee-100 min-w-0">
-                  <span className="flex items-center gap-1 text-slate-500 font-medium">
-                    <Building2 size={11} aria-hidden="true" /> Chi nhánh
-                  </span>
-                  <span className="block font-bold text-coffee-800 mt-0.5 truncate" title={shift.chi_nhanh}>
-                    {shift.chi_nhanh || 'Chưa có dữ liệu'}
-                  </span>
-                </li>
-              </ul>
-            )}
 
             {/* Giờ vào / ra hôm nay */}
             <div className="grid grid-cols-2 gap-2">
@@ -377,7 +347,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
 
           <div className="grid grid-cols-2 gap-3">
             {/* Card 1: Ngày công */}
-            <div className="bg-white rounded-2xl p-3.5 border border-coffee-100 shadow-[0_2px_8px_rgba(62,39,35,0.03)] flex flex-col justify-between">
+            <div className="bg-white rounded-2xl p-3.5 border border-coffee-100 shadow-[0_2px_8px_rgba(14,165,233,0.05)] flex flex-col justify-between">
               <div className="flex items-start justify-between">
                 <span className="text-xs font-semibold text-slate-500">Ngày công</span>
                 <div className="w-7 h-7 rounded-lg bg-coffee-50 text-coffee-600 flex items-center justify-center">
@@ -401,7 +371,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
             </div>
 
             {/* Card 2: Đi muộn */}
-            <div className="bg-white rounded-2xl p-3.5 border border-coffee-100 shadow-[0_2px_8px_rgba(62,39,35,0.03)] flex flex-col justify-between">
+            <div className="bg-white rounded-2xl p-3.5 border border-coffee-100 shadow-[0_2px_8px_rgba(14,165,233,0.05)] flex flex-col justify-between">
               <div className="flex items-start justify-between">
                 <span className="text-xs font-semibold text-slate-500">Đi muộn</span>
                 <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
@@ -420,7 +390,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
             </div>
 
             {/* Card 3: Đơn phép đang chờ duyệt */}
-            <div className="bg-white rounded-2xl p-3.5 border border-coffee-100 shadow-[0_2px_8px_rgba(62,39,35,0.03)] flex flex-col justify-between">
+            <div className="bg-white rounded-2xl p-3.5 border border-coffee-100 shadow-[0_2px_8px_rgba(14,165,233,0.05)] flex flex-col justify-between">
               <div className="flex items-start justify-between">
                 <span className="text-xs font-semibold text-slate-500">Phép chờ duyệt</span>
                 <div className="w-7 h-7 rounded-lg bg-gold-50 text-gold-700 flex items-center justify-center">
@@ -439,7 +409,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
             </div>
 
             {/* Card 4: Phép năm còn lại */}
-            <div className="bg-white rounded-2xl p-3.5 border border-coffee-100 shadow-[0_2px_8px_rgba(62,39,35,0.03)] flex flex-col justify-between">
+            <div className="bg-white rounded-2xl p-3.5 border border-coffee-100 shadow-[0_2px_8px_rgba(14,165,233,0.05)] flex flex-col justify-between">
               <div className="flex items-start justify-between">
                 <span className="text-xs font-semibold text-slate-500">Phép năm còn</span>
                 <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -482,7 +452,7 @@ export default function AttendanceDashboard({ userSession, onLogout }) {
               (item) => isValidTime(item.gio_vao) && item.loai_cong !== 'NGHI_PHEP'
             );
             return validRecords.length > 0 ? (
-              <div className="bg-white rounded-2xl p-3 border border-coffee-100 shadow-[0_2px_10px_rgba(62,39,35,0.03)] space-y-2">
+              <div className="bg-white rounded-2xl p-3 border border-coffee-100 shadow-[0_2px_10px_rgba(14,165,233,0.05)] space-y-2">
                 {validRecords.map((item, idx) => {
                   const isToday = Boolean(item.is_today);
                   const weekdayLabel = isToday

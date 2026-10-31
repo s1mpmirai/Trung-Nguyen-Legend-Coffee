@@ -81,20 +81,29 @@ def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def get_payroll_status(db: Session, ma_bl: int) -> str | None:
-    return db.execute(
-        text("SELECT trang_thai FROM bang_luong WHERE ma_bl = :ma_bl"), {"ma_bl": ma_bl}
-    ).scalar()
+def get_payroll_status_info(db: Session, ma_bl: int) -> dict | None:
+    """Trạng thái, chủ dòng lương và người lập (phục vụ kiểm tra tách nhiệm vụ khi duyệt)."""
+    row = db.execute(
+        text("SELECT trang_thai, ma_nv, nguoi_lap, nguoi_duyet FROM bang_luong WHERE ma_bl = :ma_bl"),
+        {"ma_bl": ma_bl},
+    ).mappings().first()
+    return dict(row) if row else None
 
 
-def update_payroll_status(db: Session, ma_bl: int, trang_thai: str) -> dict | None:
-    """Cập nhật trạng thái duyệt/chi trả bảng lương."""
+def update_payroll_status(db: Session, ma_bl: int, trang_thai: str, nguoi_duyet: str | None = None) -> dict | None:
+    """Cập nhật trạng thái duyệt/chi trả; ghi người duyệt khi duyệt, xóa khi mở lại về Nháp."""
     query = """
         UPDATE bang_luong
-        SET trang_thai = :trang_thai, ngay_cap_nhat = NOW()
+        SET trang_thai = :trang_thai,
+            nguoi_duyet = CASE
+                WHEN :trang_thai = 'DA_DUYET' THEN :nguoi_duyet
+                WHEN :trang_thai = 'NHAP' THEN NULL
+                ELSE nguoi_duyet
+            END,
+            ngay_cap_nhat = NOW()
         WHERE ma_bl = :ma_bl
     """
-    result = db.execute(text(query), {"ma_bl": ma_bl, "trang_thai": trang_thai})
+    result = db.execute(text(query), {"ma_bl": ma_bl, "trang_thai": trang_thai, "nguoi_duyet": nguoi_duyet})
     db.commit()
     if result.rowcount == 0:
         return None
@@ -165,14 +174,14 @@ def upsert_payroll_line(db: Session, line: dict) -> None:
             luong_theo_cong, tien_tang_ca, tong_phu_cap, tien_thuong,
             luong_gross, bhxh, bhyt, bhtn,
             giam_tru_gia_canh, thu_nhap_tinh_thue, thue_tncn, khau_tru_khac,
-            tong_khau_tru, luong_net, trang_thai, ghi_chu
+            tong_khau_tru, luong_net, trang_thai, ghi_chu, nguoi_lap
         ) VALUES (
             :thang, :nam, :ma_nv, :luong_co_ban, :he_so_luong,
             :so_cong_chuan, :so_cong_thuc_te, :so_gio_tang_ca,
             :luong_theo_cong, :tien_tang_ca, :tong_phu_cap, :tien_thuong,
             :luong_gross, :bhxh, :bhyt, :bhtn,
             :giam_tru_gia_canh, :thu_nhap_tinh_thue, :thue_tncn, :khau_tru_khac,
-            :tong_khau_tru, :luong_net, 'NHAP', :ghi_chu
+            :tong_khau_tru, :luong_net, 'NHAP', :ghi_chu, :nguoi_lap
         )
         ON DUPLICATE KEY UPDATE
             luong_co_ban       = VALUES(luong_co_ban),
@@ -195,9 +204,10 @@ def upsert_payroll_line(db: Session, line: dict) -> None:
             tong_khau_tru      = VALUES(tong_khau_tru),
             luong_net          = VALUES(luong_net),
             ghi_chu            = VALUES(ghi_chu),
+            nguoi_lap          = VALUES(nguoi_lap),
             ngay_cap_nhat      = NOW()
     """
-    db.execute(text(query), line)
+    db.execute(text(query), {"nguoi_lap": None, **line})
 
 
 def get_payroll_by_year(db: Session, ma_nv: str, nam: int, chi_da_duyet: bool = False) -> dict | None:

@@ -3,6 +3,7 @@ from datetime import date
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScope
 from app.core.datetime_utils import get_vietnam_today
 from app.repositories import leave_repository
 from app.repositories.attendance_repository import get_monthly_attendance_lock
@@ -179,14 +180,14 @@ def cancel_employee_leave(db: Session, ma_don: str, ma_nv: str) -> dict:
     return leave
 
 
-def get_pending_leaves_for_manager(db: Session, ma_nql: str | None = None) -> list[dict]:
-    """Quản lý lấy danh sách các đơn đang chờ duyệt (ma_nql: chỉ lấy đơn của cấp dưới trực tiếp)."""
-    return leave_repository.get_pending_leaves(db, ma_nql)
+def get_pending_leaves_for_manager(db: Session, scope: DataScope | None = None) -> list[dict]:
+    """Quản lý lấy danh sách các đơn đang chờ duyệt (scope: chỉ lấy đơn của nhân sự trong phạm vi)."""
+    return leave_repository.get_pending_leaves(db, scope)
 
 
-def get_all_leaves_for_manager(db: Session, trang_thai: str = None, ma_nql: str | None = None) -> list[dict]:
+def get_all_leaves_for_manager(db: Session, trang_thai: str = None, scope: DataScope | None = None) -> list[dict]:
     """Quản lý xem danh sách tất cả đơn từ."""
-    return leave_repository.get_all_leaves(db, trang_thai, ma_nql)
+    return leave_repository.get_all_leaves(db, trang_thai, scope)
 
 
 def _sync_leave_to_attendance(db: Session, leave: dict) -> None:
@@ -250,12 +251,12 @@ def review_leave_by_manager(
     ma_don: str,
     data: leave_review_request,
     nguoi_duyet: str,
-    ma_nql: str | None = None,
+    scope: DataScope | None = None,
 ) -> dict:
     """
     Quản lý phê duyệt hoặc từ chối đơn.
-    nguoi_duyet lấy từ tài khoản đang đăng nhập; ma_nql khác None nghĩa là người duyệt
-    chỉ được duyệt đơn của nhân sự cấp dưới trực tiếp (vai trò Trưởng nhóm).
+    nguoi_duyet lấy từ tài khoản đang đăng nhập; scope khác None nghĩa là người duyệt
+    chỉ được duyệt đơn của nhân sự trong phạm vi (phòng mình / cấp dưới trực tiếp).
     """
     if data.trang_thai not in ["DA_DUYET", "TU_CHOI"]:
         raise ValueError("Trạng thái duyệt chỉ có thể là DA_DUYET hoặc TU_CHOI.")
@@ -267,8 +268,8 @@ def review_leave_by_manager(
         raise ValueError("Đơn này đã được xử lý trước đó, không thể duyệt lại.")
     if leave["ma_nv"] == nguoi_duyet:
         raise PermissionError("Bạn không thể tự duyệt đơn của chính mình.")
-    if ma_nql is not None and leave.get("ma_nql") != ma_nql:
-        raise PermissionError("Bạn chỉ được duyệt đơn của nhân sự do mình quản lý trực tiếp.")
+    if scope is not None and not scope.covers(leave):
+        raise PermissionError("Bạn chỉ được duyệt đơn của nhân sự thuộc phạm vi mình quản lý.")
     if data.trang_thai == "TU_CHOI" and not (data.y_kien_duyet or "").strip():
         raise ValueError("Vui lòng nhập lý do từ chối đơn.")
     if data.trang_thai == "DA_DUYET" and leave["loai_don"] == "NGHI_PHEP":

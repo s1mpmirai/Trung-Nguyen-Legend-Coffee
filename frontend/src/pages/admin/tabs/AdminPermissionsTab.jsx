@@ -94,7 +94,14 @@ const roleBadgeClass = (role) =>
     : "bg-slate-100 text-slate-600 border border-slate-200";
 
 // Quyền chỉ Admin mới được cấp / thu hồi (máy chủ trả 403 với người khác)
-const ADMIN_ONLY_PERMISSIONS = ["ACCOUNT_MANAGE", "PERMISSION_ASSIGN", "ORG_MANAGE", "CONTRACT_MANAGE"];
+const ADMIN_ONLY_PERMISSIONS = [
+  "ACCOUNT_MANAGE",
+  "PERMISSION_ASSIGN",
+  "ORG_MANAGE",
+  "CONTRACT_MANAGE",
+  "PAYROLL_MANAGE",
+  "ATTENDANCE_LOCK",
+];
 
 const permLabel = (perm) => PERMISSION_MAP[perm?.ma_quyen || perm]?.label || perm?.ten_quyen || perm?.ma_quyen || perm;
 

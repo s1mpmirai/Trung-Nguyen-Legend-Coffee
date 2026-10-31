@@ -38,9 +38,17 @@ def get_employee_permissions(db: Session, ma_nv: str) -> dict[str, Any]:
     return perms
 
 
-# Người không phải ADMIN chỉ được cấp các vai trò / quyền nghiệp vụ, không được cấp quyền quản trị
+# Người không phải ADMIN chỉ được cấp các vai trò / quyền nghiệp vụ trong phạm vi của mình.
+# Quyền quản trị và quyền có tác dụng toàn công ty (tính lương, chốt công) chỉ Admin cấp.
 ROLES_ASSIGNABLE_BY_MANAGER = {"NHAN_VIEN", "TRUONG_NHOM"}
-ADMIN_ONLY_PERMISSIONS = {"ACCOUNT_MANAGE", "PERMISSION_ASSIGN", "ORG_MANAGE", "CONTRACT_MANAGE"}
+ADMIN_ONLY_PERMISSIONS = {
+    "ACCOUNT_MANAGE",
+    "PERMISSION_ASSIGN",
+    "ORG_MANAGE",
+    "CONTRACT_MANAGE",
+    "PAYROLL_MANAGE",
+    "ATTENDANCE_LOCK",
+}
 
 
 def _check_can_change(db: Session, actor: dict[str, Any], clean_id: str) -> dict[str, Any]:
@@ -76,7 +84,7 @@ def update_custom_permissions(
 
     items = [p.model_dump() for p in data.permissions]
     if actor["ma_vai_tro"] != "ADMIN" and any(p["ma_quyen"] in ADMIN_ONLY_PERMISSIONS for p in items):
-        raise PermissionError("Chỉ Admin mới được cấp / thu hồi quyền quản trị tài khoản và phân quyền.")
+        raise PermissionError("Chỉ Admin mới được cấp / thu hồi quyền quản trị, tính lương và chốt công.")
     return permission_repository.update_employee_custom_permissions(db=db, ma_nv=clean_id, permissions=items)
 
 

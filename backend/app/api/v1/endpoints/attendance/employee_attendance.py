@@ -3,7 +3,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import CurrentAccount, ensure_self_or_permission
+from app.core.permissions import CurrentAccount, ensure_self_or_managed
 from app.db.session import get_db
 from app.schemas.attendance_schemas import (
     AttendanceDashboardResponse,
@@ -34,7 +34,7 @@ def get_attendance_dashboard_endpoint(
     - Thống kê tháng hiện tại (Số ngày công, số lần đi muộn, phép năm)
     - 10 bản ghi chấm công gần nhất
     """
-    clean_id = ensure_self_or_permission(account, ma_nv, "ATTENDANCE_MANAGE")
+    clean_id = ensure_self_or_managed(db, account, ma_nv, "ATTENDANCE_MANAGE")
     try:
         return attendance_service.get_attendance_dashboard(db, clean_id)
     except ValueError as err:
@@ -84,5 +84,5 @@ def get_attendance_history_endpoint(
     db: DbSession = None,
 ):
     """Tra cứu chi tiết từng ngày công, giờ vào/ra, OT, trạng thái theo tháng."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "ATTENDANCE_MANAGE")
+    clean_id = ensure_self_or_managed(db, account, ma_nv, "ATTENDANCE_MANAGE")
     return attendance_service.get_attendance_history(db, clean_id, month, year)

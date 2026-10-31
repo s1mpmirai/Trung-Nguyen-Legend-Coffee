@@ -144,8 +144,8 @@ def compute_payroll_line(emp: dict, so_cong_chuan: int, tien_thuong: float = 0, 
     }
 
 
-def calculate_payroll_month(db: Session, thang: int, nam: int) -> dict:
-    """[Quản lý] Tính bảng lương tháng từ bảng chấm công đã chốt."""
+def calculate_payroll_month(db: Session, thang: int, nam: int, nguoi_lap: str | None = None) -> dict:
+    """[Quản lý] Tính bảng lương tháng từ bảng chấm công đã chốt; nguoi_lap = người bấm tính (không được tự duyệt)."""
     if not get_monthly_attendance_lock(db, thang, nam).get("is_locked"):
         raise ValueError(
             f"Bảng chấm công tháng {thang}/{nam} chưa được chốt. Vui lòng chốt công trước khi tính lương."
@@ -170,7 +170,7 @@ def calculate_payroll_month(db: Session, thang: int, nam: int) -> dict:
                 tien_thuong=float(old["tien_thuong"] or 0) if old else 0,
                 khau_tru_khac=float(old["khau_tru_khac"] or 0) if old else 0,
             )
-            payroll_repository.upsert_payroll_line(db, {**line, "thang": thang, "nam": nam})
+            payroll_repository.upsert_payroll_line(db, {**line, "thang": thang, "nam": nam, "nguoi_lap": nguoi_lap})
             so_da_tinh += 1
         db.commit()
     except Exception:
@@ -201,11 +201,19 @@ def get_company_payroll_summary(db: Session, thang: int, nam: int) -> dict:
     }
 
 
-def change_payroll_status(db: Session, ma_bl: int, trang_thai: str) -> dict:
-    """[Quản lý] Duyệt / mở lại / chi trả lương theo quy trình NHAP <-> DA_DUYET -> DA_TRA."""
-    current = payroll_repository.get_payroll_status(db, ma_bl)
-    if current is None:
+def change_payroll_status(db: Session, ma_bl: int, trang_thai: str, nguoi_thuc_hien: str | None = None) -> dict:
+    """
+    [Quản lý] Duyệt / mở lại / chi trả lương theo quy trình NHAP <-> DA_DUYET -> DA_TRA.
+    Tách nhiệm vụ: người lập bảng lương không tự duyệt; không ai duyệt hay chi trả dòng lương của chính mình.
+    """
+    row = payroll_repository.get_payroll_status_info(db, ma_bl)
+    if row is None:
         raise LookupError(f"Không tìm thấy bảng lương có mã {ma_bl}")
+    current = row["trang_thai"]
     if trang_thai not in PAYROLL_STATUS_FLOW.get(current, set()):
         raise ValueError(f"Không thể chuyển bảng lương từ trạng thái {current} sang {trang_thai}")
-    return payroll_repository.update_payroll_status(db, ma_bl, trang_thai)
+    if nguoi_thuc_hien and trang_thai in ("DA_DUYET", "DA_TRA") and row["ma_nv"] == nguoi_thuc_hien:
+        raise PermissionError("Bạn không thể duyệt hoặc chi trả bảng lương của chính mình.")
+    if nguoi_thuc_hien and trang_thai == "DA_DUYET" and row.get("nguoi_lap") == nguoi_thuc_hien:
+        raise PermissionError("Người lập bảng lương không được tự duyệt. Cần một người có quyền tính lương khác duyệt.")
+    return payroll_repository.update_payroll_status(db, ma_bl, trang_thai, nguoi_duyet=nguoi_thuc_hien)

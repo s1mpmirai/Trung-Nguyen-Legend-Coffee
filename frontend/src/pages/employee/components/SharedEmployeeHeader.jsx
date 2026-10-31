@@ -18,7 +18,7 @@ export default function SharedEmployeeHeader({ onLogout }) {
   };
 
   return (
-    <header className="px-4 py-3 bg-white/95 backdrop-blur border-b border-coffee-100 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_3px_rgba(62,39,35,0.06)]">
+    <header className="px-4 py-3 bg-white/95 backdrop-blur border-b border-coffee-100 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_3px_rgba(14,165,233,0.06)]">
       {/* ── Cụm Logo: Nhấp vào quay trở lại trang Chấm công ── */}
       <button
         type="button"

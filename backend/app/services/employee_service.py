@@ -2,6 +2,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScope
 from app.core.datetime_utils import get_vietnam_today
 from app.repositories.employee_repository import (
     cancel_profile_update_request,
@@ -71,6 +72,7 @@ def employee_list(
     ngay_vao_den: str | None = None,
     sort_by: str = "ma_nv",
     sort_order: str = "asc",
+    scope: DataScope | None = None,
 ) -> dict:
     return get_employee_list(
         db=db,
@@ -89,6 +91,7 @@ def employee_list(
         ngay_vao_den=ngay_vao_den,
         sort_by=sort_by,
         sort_order=sort_order,
+        scope=scope,
     )
 
 def get_employee_profile(db: Session, ma_nv: str) -> dict:
@@ -125,9 +128,11 @@ def cancel_profile_update(db: Session, ma_yc: int, ma_nv: str | None = None) -> 
     return cancel_profile_update_request(db, ma_yc, ma_nv)
 
 
-def get_profile_requests_manager(db: Session, trang_thai: str | None = None) -> list[dict]:
-    """Quản lý lấy danh sách các yêu cầu cập nhật hồ sơ cá nhân."""
-    return get_profile_requests_for_manager(db, trang_thai)
+def get_profile_requests_manager(
+    db: Session, trang_thai: str | None = None, scope: DataScope | None = None
+) -> list[dict]:
+    """Quản lý lấy danh sách các yêu cầu cập nhật hồ sơ cá nhân của nhân sự thuộc phạm vi."""
+    return get_profile_requests_for_manager(db, trang_thai, scope)
 
 
 def review_profile_update(db: Session, ma_yc: int, data: profile_update_review_request) -> dict:

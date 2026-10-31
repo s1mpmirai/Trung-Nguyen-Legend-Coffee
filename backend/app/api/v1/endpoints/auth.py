@@ -2,7 +2,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.permissions import CurrentAccount
+from app.core.permissions import MANAGE_PORTAL_PERMISSIONS, CurrentAccount
 from app.db.session import get_db
 from app.schemas.auth_schemas import (
     first_time_password_request,
@@ -45,19 +45,7 @@ def management_login(
 
     role = str(user.get("ma_vai_tro") or "").upper()
     perms = user.get("permissions") or []
-    has_mgmt_perm = any(
-        p in perms
-        for p in (
-            "ACCOUNT_MANAGE",
-            "PERMISSION_ASSIGN",
-            "ATTENDANCE_MANAGE",
-            "LEAVE_APPROVE",
-            "PAYROLL_MANAGE",
-            "EMPLOYEE_VIEW",
-            "EMPLOYEE_CREATE",
-            "EMPLOYEE_UPDATE",
-        )
-    )
+    has_mgmt_perm = any(p in perms for p in MANAGE_PORTAL_PERMISSIONS)
 
     if role == "NHAN_VIEN" and not has_mgmt_perm:
         raise HTTPException(

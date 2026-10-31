@@ -202,44 +202,8 @@ export default function ManagerSidebar({
         </nav>
       </div>
 
-      {/* Bottom Actions & System Status */}
-      <div className={collapsed ? "px-2 flex flex-col items-center gap-2" : "px-4 flex flex-col gap-2"}>
-        {onSwitchToAdmin && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onSwitchToAdmin();
-            }}
-            className={`${
-              collapsed ? "w-10 h-10 p-0" : "w-full py-2.5 px-3"
-            } flex items-center justify-center gap-2 rounded-xl text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all cursor-pointer shadow-xs`}
-            title="Chuyển sang Cổng Quản Trị Viên (Admin)"
-          >
-            <Shield className="w-3.5 h-3.5 text-amber-600" />
-            {!collapsed && <span>Cổng Quản trị</span>}
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onSwitchToEmployee) {
-              onSwitchToEmployee();
-            } else {
-              navigateClean("attendance");
-            }
-          }}
-          className={`${
-            collapsed ? "w-10 h-10 p-0" : "w-full py-2.5 px-3"
-          } flex items-center justify-center gap-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-sky-600 hover:bg-sky-50 border border-slate-200/80 transition-all cursor-pointer`}
-          title="Chuyển sang giao diện Nhân viên"
-        >
-          <ArrowLeftRight className="w-3.5 h-3.5" />
-          {!collapsed && <span>Giao diện Nhân viên</span>}
-        </button>
-
+      {/* Bottom System Status */}
+      <div className={collapsed ? "px-2 flex flex-col items-center" : "px-4"}>
         {collapsed ? (
           <div
             className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center cursor-default"

@@ -28,7 +28,7 @@ export default function BottomNavBar({ activeTab = "attendance" }) {
   return (
     <nav
       aria-label="Điều hướng Cổng nhân viên"
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur border-t border-coffee-100 px-2 pt-1 pb-[env(safe-area-inset-bottom)] z-40 shadow-[0_-2px_12px_rgba(62,39,35,0.06)]"
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur border-t border-coffee-100 px-2 pt-1 pb-[env(safe-area-inset-bottom)] z-40 shadow-[0_-2px_12px_rgba(14,165,233,0.08)]"
     >
       <ul className="flex items-stretch justify-around">
         {NAV_ITEMS.map((item) => {

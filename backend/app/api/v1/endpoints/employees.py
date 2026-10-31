@@ -6,10 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import (
     CurrentAccount,
+    data_scope,
+    ensure_in_scope,
+    ensure_self_or_managed,
     ensure_self_or_permission,
     normalize_ma_nv,
     require_permission,
 )
+from app.repositories.employee_repository import get_profile_request_by_id
 from app.db.session import get_db
 from app.schemas.employee_schemas import (
     employee_contact_update,
@@ -48,10 +52,40 @@ EmployeeUpdater = Annotated[dict, Depends(require_permission("EMPLOYEE_UPDATE"))
 EmployeeRemover = Annotated[dict, Depends(require_permission("EMPLOYEE_DELETE"))]
 ReportViewer = Annotated[dict, Depends(require_permission("REPORT_VIEW"))]
 
+# Danh sách nhân sự toàn công ty cho các việc quản trị: ký hợp đồng, cấp tài khoản
+LIST_COMPANY_WIDE_PERMISSIONS = ("CONTRACT_MANAGE", "ACCOUNT_MANAGE")
+
 
 def _forbid_self_action(account: dict, ma_nv: str) -> None:
     if normalize_ma_nv(ma_nv) == account["ma_nv"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không thể tự thay đổi trạng thái của chính mình")
+
+
+def _report_department(account: dict, ma_pb: Optional[str]) -> Optional[str]:
+    """Báo cáo của người không quản lý toàn công ty luôn giới hạn trong phòng ban của họ."""
+    if data_scope(account) is None:
+        return ma_pb
+    return account.get("ma_pb")
+
+
+def _check_create_scope(account: dict, data: employee_profile_create) -> None:
+    """Quản lý phòng ban chỉ thêm nhân sự vào phòng mình; Trưởng nhóm chỉ thêm cấp dưới trực tiếp của mình."""
+    scope = data_scope(account)
+    if scope is None:
+        return
+    if scope.ma_pb:
+        if (data.ma_pb or "").strip().upper() != scope.ma_pb:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn chỉ được thêm nhân sự vào phòng ban mình quản lý.",
+            )
+        return
+    if data.ma_nql and normalize_ma_nv(data.ma_nql) != scope.ma_nql:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn chỉ được thêm nhân sự là cấp dưới trực tiếp của mình.",
+        )
+    data.ma_nql = scope.ma_nql
 
 
 @router.post("/create_employee", response_model=employee_profile_response)
@@ -60,6 +94,7 @@ def create_employee(
     db: DbSession,
     account: Annotated[dict, Depends(require_permission("EMPLOYEE_CREATE"))],
 ):
+    _check_create_scope(account, data)
     try:
         return create_employee_service(db, data)
     except ValueError as error:
@@ -102,6 +137,7 @@ def get_employee_list(
         ngay_vao_den=ngay_vao_den,
         sort_by=sort_by,
         sort_order=sort_order,
+        scope=data_scope(account, *LIST_COMPANY_WIDE_PERMISSIONS),
     )
 
 @router.get("/profile/{ma_nv}", response_model=employee_detail_response)
@@ -110,7 +146,7 @@ def get_profile(
     db: DbSession,
     account: CurrentAccount,
 ):
-    clean_id = ensure_self_or_permission(account, ma_nv, "EMPLOYEE_VIEW")
+    clean_id = ensure_self_or_managed(db, account, ma_nv, "EMPLOYEE_VIEW")
     try:
         return get_employee_profile(db, clean_id)
     except ValueError as error:
@@ -127,7 +163,7 @@ def update_profile(
     [Quản lý] Ghi trực tiếp thông tin liên hệ/ngân hàng vào hồ sơ.
     Nhân viên tự sửa hồ sơ phải dùng POST /profile/{ma_nv}/request-update (chờ Quản lý duyệt).
     """
-    clean_id = normalize_ma_nv(ma_nv)
+    clean_id = ensure_in_scope(db, account, ma_nv)
     try:
         return update_employee_contact(db, clean_id, data)
     except ValueError as error:
@@ -170,7 +206,7 @@ def get_pending_profile_request_endpoint(
     account: CurrentAccount,
 ):
     """Kiểm tra xem nhân viên có yêu cầu cập nhật thông tin nào đang ở trạng thái CHO_DUYET hay không."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "EMPLOYEE_UPDATE")
+    clean_id = ensure_self_or_managed(db, account, ma_nv, "EMPLOYEE_UPDATE")
     return get_pending_profile_update(db, clean_id)
 
 
@@ -203,8 +239,8 @@ def get_profile_requests_manager_endpoint(
         None, description="Lọc theo trạng thái: CHO_DUYET, DA_DUYET, TU_CHOI, DA_HUY"
     ),
 ):
-    """Quản lý xem danh sách các yêu cầu cập nhật hồ sơ cá nhân cần xét duyệt hoặc đã xử lý."""
-    return get_profile_requests_manager(db, trang_thai)
+    """Quản lý xem danh sách yêu cầu cập nhật hồ sơ của nhân sự thuộc phạm vi quản lý."""
+    return get_profile_requests_manager(db, trang_thai, data_scope(account))
 
 
 @router.put(
@@ -223,6 +259,9 @@ def review_profile_request_endpoint(
     - Nếu DA_DUYET: Hệ thống tự động ghi đè thông tin mới vào bảng nhan_vien trong DB và đổi trạng thái yêu cầu sang DA_DUYET.
     - Nếu TU_CHOI: Bảng nhan_vien giữ nguyên không đổi, trạng thái yêu cầu chuyển sang TU_CHOI.
     """
+    request = get_profile_request_by_id(db, ma_yc)
+    if request:
+        ensure_in_scope(db, account, request["ma_nv"])
     data.nguoi_duyet = account["ma_nv"]
     try:
         return review_profile_update(db, ma_yc, data)
@@ -249,7 +288,7 @@ def get_monthly_personnel_report_endpoint(
     - Danh sách nhân sự mới tuyển dụng trong tháng và tỷ lệ biến động nhân sự.
     """
     try:
-        return get_monthly_personnel_report(db, thang, nam, ma_pb)
+        return get_monthly_personnel_report(db, thang, nam, _report_department(account, ma_pb))
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
@@ -265,7 +304,7 @@ def get_hr_statistics_endpoint(
     so_ngay_het_han: int = Query(60, ge=1, le=365, description="Cảnh báo hợp đồng hết hạn trong N ngày tới"),
 ):
     """Thống kê nhân sự đang làm việc theo trình độ, thâm niên, khung lương, quỹ lương phòng ban và hợp đồng sắp hết hạn."""
-    return get_hr_statistics(db, ma_pb, so_ngay_het_han)
+    return get_hr_statistics(db, _report_department(account, ma_pb), so_ngay_het_han)
 
 
 @router.put(
@@ -287,6 +326,7 @@ def update_employee_status_endpoint(
     - NGHI_PHEP / NGHI_THAI_SAN: Cập nhật trạng thái nghỉ phép/thai sản dài ngày.
     """
     _forbid_self_action(account, ma_nv)
+    ensure_in_scope(db, account, ma_nv)
     try:
         return change_employee_status(db, ma_nv, data)
     except ValueError as error:
@@ -313,6 +353,7 @@ def deactivate_employee_endpoint(
     - Giữ nguyên toàn bộ lịch sử chấm công, bảng lương và hợp đồng trong CSDL.
     """
     _forbid_self_action(account, ma_nv)
+    ensure_in_scope(db, account, ma_nv)
     try:
         return deactivate_employee(db, ma_nv, ly_do, ngay_hieu_luc)
     except ValueError as error:
@@ -335,6 +376,7 @@ def delete_employee_endpoint(
     Không xóa bản ghi hay tài khoản để giữ lịch sử chấm công, bảng lương, hợp đồng.
     """
     _forbid_self_action(account, ma_nv)
+    ensure_in_scope(db, account, ma_nv)
     try:
         return delete_employee(db, ma_nv, ly_do, ngay_hieu_luc)
     except ValueError as error:

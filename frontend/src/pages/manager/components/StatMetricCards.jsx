@@ -6,6 +6,8 @@ const CardError = ({ message }) => <CardErrorNotice message={message} compact />
 
 export default function StatMetricCards({ stats, errors = {}, onNavigateTab }) {
   const data = stats || {};
+  // Không có quyền tính lương thì thẻ quỹ lương chỉ hiển thị thông báo, không dẫn sang trang lương
+  const openPayroll = data.canViewPayroll === false ? null : onNavigateTab;
   const fmt = (value) => (value === null || value === undefined ? "—" : value);
 
   return (
@@ -134,11 +136,11 @@ export default function StatMetricCards({ stats, errors = {}, onNavigateTab }) {
       <div
         role="button"
         tabIndex={0}
-        onClick={() => onNavigateTab && onNavigateTab("payroll")}
+        onClick={() => openPayroll && openPayroll("payroll")}
         onKeyDown={(e) => {
-          if ((e.key === "Enter" || e.key === " ") && onNavigateTab) {
+          if ((e.key === "Enter" || e.key === " ") && openPayroll) {
             e.preventDefault();
-            onNavigateTab("payroll");
+            openPayroll("payroll");
           }
         }}
         className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-sky-300 transition-all flex flex-col justify-between cursor-pointer group"

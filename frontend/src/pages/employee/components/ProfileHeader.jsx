@@ -9,7 +9,7 @@ function ProfileHeader({ employee, onEdit, hasPendingRequest = false }) {
   const { fullName, jobTitle, department, id, startDate, seniority, status, workingType } = employee;
 
   return (
-    <section className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_10px_rgba(62,39,35,0.04)] space-y-3">
+    <section className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_10px_rgba(14,165,233,0.06)] space-y-3">
       {/* Hàng trên: Badge phòng ban & Trạng thái + Nút Sửa */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center space-x-1.5 flex-wrap gap-y-1 min-w-0">

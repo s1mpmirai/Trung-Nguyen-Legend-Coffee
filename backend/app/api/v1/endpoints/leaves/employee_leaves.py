@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import CurrentAccount, ensure_self_or_permission
+from app.core.permissions import CurrentAccount, ensure_self_or_managed
 from app.db.session import get_db
 from app.schemas.leave_schemas import annual_leave_balance_response, leave_create, leave_response
 from app.services import leave_service
@@ -58,7 +58,7 @@ def get_leaves_by_employee_endpoint(
     db: DbSession = None,
 ):
     """Lấy toàn bộ lịch sử đơn từ mà nhân viên này đã từng nộp."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "LEAVE_APPROVE")
+    clean_id = ensure_self_or_managed(db, account, ma_nv, "LEAVE_APPROVE")
     return leave_service.get_employee_leave_history(db, clean_id)
 
 
@@ -74,7 +74,7 @@ def get_annual_leave_balance_endpoint(
     db: DbSession = None,
 ):
     """Phép năm = 12 ngày (tính theo tỷ lệ tháng ở năm đầu) + 1 ngày cho mỗi 5 năm thâm niên."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "LEAVE_APPROVE")
+    clean_id = ensure_self_or_managed(db, account, ma_nv, "LEAVE_APPROVE")
     return leave_service.get_annual_leave_balance(db, clean_id, nam)
 
 

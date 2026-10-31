@@ -60,14 +60,15 @@ const previousMonth = () => {
     : { thang: now.getMonth(), nam: now.getFullYear() };
 };
 
-export const getManagerDashboardStats = async () => {
+/** canViewPayroll: chỉ người có PAYROLL_MANAGE (Kế toán, Admin) mới tải quỹ lương toàn công ty */
+export const getManagerDashboardStats = async ({ canViewPayroll = true } = {}) => {
   const kyLuong = previousMonth();
   const [empSettled, attSettled, leaveSettled, payrollSettled, trendSettled, statsSettled, profileSettled] =
     await Promise.allSettled([
       apiClient.get("/employees/get_employee_list", { params: { page: 1, page_size: 200 } }),
       apiClient.get("/attendance/daily"),
       apiClient.get("/leaves/pending"),
-      apiClient.get("/payroll/summary", { params: kyLuong }),
+      canViewPayroll ? apiClient.get("/payroll/summary", { params: kyLuong }) : Promise.resolve(null),
       apiClient.get("/attendance/trend", { params: { days: 7 } }),
       apiClient.get("/employees/reports/statistics"),
       apiClient.get("/employees/manager/profile-requests", { params: { trang_thai: "CHO_DUYET" } }),
@@ -184,11 +185,14 @@ export const getManagerDashboardStats = async () => {
       pendingLeavesCount,
       pendingProfileCount,
       totalPendingCount: pendingLeavesCount + (pendingProfileCount || 0),
-      monthlyPayroll: hasPayroll
-        ? `${Number(payroll.tong_tien_net).toLocaleString("vi-VN")} đ`
-        : `Chưa tính lương T${kyLuong.thang}/${kyLuong.nam}`,
-      payrollPeriod: `Kỳ lương tháng ${kyLuong.thang}/${kyLuong.nam}`,
-      payrollStatus: hasPayroll ? `${payroll.tong_nhan_vien} nhân sự có bảng lương` : "Chưa có bảng lương",
+      canViewPayroll,
+      monthlyPayroll: !canViewPayroll
+        ? "Không thuộc phạm vi"
+        : hasPayroll
+          ? `${Number(payroll.tong_tien_net).toLocaleString("vi-VN")} đ`
+          : `Chưa tính lương T${kyLuong.thang}/${kyLuong.nam}`,
+      payrollPeriod: canViewPayroll ? `Kỳ lương tháng ${kyLuong.thang}/${kyLuong.nam}` : "Quỹ lương do bộ phận tính lương quản lý",
+      payrollStatus: !canViewPayroll ? "" : hasPayroll ? `${payroll.tong_nhan_vien} nhân sự có bảng lương` : "Chưa có bảng lương",
     },
     departments,
     attendance7Days,

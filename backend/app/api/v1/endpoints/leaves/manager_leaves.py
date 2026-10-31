@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import manager_scope, require_permission
+from app.core.permissions import data_scope, require_permission
 from app.db.session import get_db
 from app.schemas.leave_schemas import leave_response, leave_review_request
 from app.services import leave_service
@@ -22,8 +22,8 @@ def get_pending_leaves_endpoint(
     account: LeaveApprover,
     db: DbSession = None,
 ):
-    """Lấy các đơn đang CHO_DUYET (Trưởng nhóm chỉ thấy đơn của cấp dưới trực tiếp)."""
-    return leave_service.get_pending_leaves_for_manager(db, manager_scope(account))
+    """Lấy các đơn đang CHO_DUYET trong phạm vi quản lý (phòng mình / cấp dưới trực tiếp)."""
+    return leave_service.get_pending_leaves_for_manager(db, data_scope(account))
 
 
 @router.get(
@@ -38,8 +38,8 @@ def get_all_leaves_endpoint(
     account: LeaveApprover = None,
     db: DbSession = None,
 ):
-    """Quản lý xem danh sách đơn từ kèm bộ lọc trạng thái (Trưởng nhóm chỉ thấy đơn của cấp dưới)."""
-    return leave_service.get_all_leaves_for_manager(db, trang_thai, manager_scope(account))
+    """Quản lý xem danh sách đơn từ trong phạm vi quản lý, kèm bộ lọc trạng thái."""
+    return leave_service.get_all_leaves_for_manager(db, trang_thai, data_scope(account))
 
 
 @router.put(
@@ -59,7 +59,7 @@ def review_leave_endpoint(
     """
     try:
         return leave_service.review_leave_by_manager(
-            db, ma_don, data, nguoi_duyet=account["ma_nv"], ma_nql=manager_scope(account)
+            db, ma_don, data, nguoi_duyet=account["ma_nv"], scope=data_scope(account)
         )
     except PermissionError as err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err

@@ -8,7 +8,14 @@
  */
 
 /** Quyền chỉ ADMIN được cấp (backend trả 403 nếu Quản lý cố cấp) */
-export const ADMIN_ONLY_PERMISSIONS = ["ACCOUNT_MANAGE", "PERMISSION_ASSIGN", "ORG_MANAGE", "CONTRACT_MANAGE"];
+export const ADMIN_ONLY_PERMISSIONS = [
+  "ACCOUNT_MANAGE",
+  "PERMISSION_ASSIGN",
+  "ORG_MANAGE",
+  "CONTRACT_MANAGE",
+  "PAYROLL_MANAGE",
+  "ATTENDANCE_LOCK",
+];
 
 /** Vai trò Quản lý được phép bổ nhiệm (ADMIN / QUAN_LY chỉ ADMIN mới bổ nhiệm được) */
 export const ROLES_ASSIGNABLE_BY_MANAGER = ["NHAN_VIEN", "TRUONG_NHOM"];

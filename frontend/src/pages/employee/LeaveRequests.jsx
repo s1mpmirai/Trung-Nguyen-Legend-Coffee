@@ -420,7 +420,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
         <section
           aria-labelledby="leave-balance-title"
           aria-busy={balanceLoading}
-          className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_10px_rgba(62,39,35,0.04)] space-y-3"
+          className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_10px_rgba(14,165,233,0.06)] space-y-3"
         >
           <div className="flex items-center justify-between">
             <h2 id="leave-balance-title" className="flex items-center space-x-2 text-coffee-900 font-bold text-sm">
@@ -542,7 +542,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
             {filteredLeaves.map((item) => (
               <li
                 key={item.ma_don}
-                className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_8px_rgba(62,39,35,0.03)] space-y-3"
+                className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_8px_rgba(14,165,233,0.05)] space-y-3"
               >
                 {/* Hàng 1: Icon + Tên đơn + Mã đơn + Trạng thái */}
                 <div className="flex items-start justify-between gap-2">

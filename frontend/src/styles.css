@@ -3,37 +3,37 @@
 /* ═══════════════════════════════════════════════════════════════
    THƯƠNG HIỆU TRUNG NGUYÊN LEGEND
    - Font chữ: Be Vietnam Pro (tải từ Google Fonts trong index.html)
-   - Bảng màu ấm: nâu cà phê, nâu đậm, vàng đồng, nền kem
-   Chỉ khai báo token MỚI (coffee-*, gold-*, cream) để không ảnh hưởng
-   các màu mặc định đang dùng ở cổng Quản lý / Admin.
+   - Bảng màu: xanh biển (sky) thay cho nâu cà phê
+   Token coffee-* / gold-* được ánh xạ sang sky để toàn bộ cổng
+   nhân viên đổi màu mà không cần sửa từng file component.
    ═══════════════════════════════════════════════════════════════ */
 @theme {
   --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
 
-  /* Nâu cà phê (600 = màu thương hiệu chính, 800 = nâu đậm) */
-  --color-coffee-50: #fbf7f2;
-  --color-coffee-100: #f3e9df;
-  --color-coffee-200: #e6d3c1;
-  --color-coffee-300: #cfae91;
-  --color-coffee-400: #a87e5e;
-  --color-coffee-500: #7a5236;
-  --color-coffee-600: #5b3a29;
-  --color-coffee-700: #4a2f21;
-  --color-coffee-800: #3e2723;
-  --color-coffee-900: #2b1b17;
+  /* Xanh biển – ánh xạ coffee-* → sky-* */
+  --color-coffee-50:  #f0f9ff;
+  --color-coffee-100: #e0f2fe;
+  --color-coffee-200: #bae6fd;
+  --color-coffee-300: #7dd3fc;
+  --color-coffee-400: #38bdf8;
+  --color-coffee-500: #0ea5e9;
+  --color-coffee-600: #0284c7;
+  --color-coffee-700: #0369a1;
+  --color-coffee-800: #075985;
+  --color-coffee-900: #0c4a6e;
 
-  /* Vàng đồng (500 = điểm nhấn; dùng 700 cho chữ nhỏ trên nền sáng để đủ tương phản) */
-  --color-gold-50: #fbf5ea;
-  --color-gold-100: #f5e6c8;
-  --color-gold-200: #ebcf98;
-  --color-gold-300: #ddb46a;
-  --color-gold-400: #d2a350;
-  --color-gold-500: #c8963e;
-  --color-gold-600: #a87a2c;
-  --color-gold-700: #8a6224;
+  /* Sky nhạt – ánh xạ gold-* → sky nhạt để làm điểm nhấn */
+  --color-gold-50:  #f0f9ff;
+  --color-gold-100: #e0f2fe;
+  --color-gold-200: #bae6fd;
+  --color-gold-300: #7dd3fc;
+  --color-gold-400: #38bdf8;
+  --color-gold-500: #0ea5e9;
+  --color-gold-600: #0284c7;
+  --color-gold-700: #0369a1;
 
-  /* Nền kem của cổng nhân viên */
-  --color-cream: #fbf7f2;
+  /* Nền sáng sky của cổng nhân viên */
+  --color-cream: #f0f9ff;
 
   /* Hiệu ứng dùng chung (animate-slide-up, animate-fade-in, animate-scale-up, animate-shake) */
   --animate-slide-up: tnl-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;

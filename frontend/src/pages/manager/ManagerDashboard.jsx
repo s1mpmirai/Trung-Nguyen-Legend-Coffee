@@ -16,6 +16,7 @@ import PayrollManagement from "./PayrollManagement";
 import RolePermissions from "./RolePermissions";
 import ProfileRequestsPanel from "./components/ProfileRequestsPanel";
 import { getManagerDashboardStats } from "../../services/managerService";
+import { getManagerAccess } from "./managerUtils";
 
 export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmployee, onSwitchToAdmin }) {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -39,7 +40,9 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
       setIsLoading(true);
       setLoadError("");
       try {
-        const data = await getManagerDashboardStats();
+        const data = await getManagerDashboardStats({
+          canViewPayroll: getManagerAccess(userSession).can("PAYROLL_MANAGE"),
+        });
         if (isMounted) {
           setDashboardData(data);
           if (data?.summary?.pendingProfileCount != null) {
@@ -57,7 +60,7 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
     return () => {
       isMounted = false;
     };
-  }, [activeTab]);
+  }, [activeTab, userSession]);
 
   const errors = dashboardData?.errors || {};
 
@@ -81,6 +84,8 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
         userSession={userSession}
         onLogout={onLogout}
         collapsed={sidebarCollapsed}
+        onSwitchToAdmin={onSwitchToAdmin}
+        onSwitchToEmployee={onSwitchToEmployee}
       />
 
       {/* ───────────────── MAIN CONTENT AREA ───────────────── */}

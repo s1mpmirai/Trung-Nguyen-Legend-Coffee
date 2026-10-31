@@ -91,7 +91,7 @@ export default function AttendanceHistoryDetail({ userSession, onBack }) {
   return (
     <div className="flex-1 flex flex-col bg-cream min-h-screen pb-[calc(6rem+env(safe-area-inset-bottom))] relative">
       {/* ───────────────── HEADER: Chi tiết chấm công ───────────────── */}
-      <header className="px-4 py-3 bg-white border-b border-coffee-100 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_3px_rgba(62,39,35,0.05)]">
+      <header className="px-4 py-3 bg-white border-b border-coffee-100 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_3px_rgba(14,165,233,0.06)]">
         <button
           type="button"
           onClick={onBack}
@@ -117,7 +117,7 @@ export default function AttendanceHistoryDetail({ userSession, onBack }) {
       {/* ───────────────── MAIN CONTENT ───────────────── */}
       <main className="px-4 py-3.5 space-y-3.5">
         {/* 1. THANH CHỌN THÁNG / NĂM */}
-        <div className="bg-white rounded-2xl px-2 py-1.5 border border-coffee-100 shadow-[0_2px_8px_rgba(62,39,35,0.03)] flex items-center justify-between">
+        <div className="bg-white rounded-2xl px-2 py-1.5 border border-coffee-100 shadow-[0_2px_8px_rgba(14,165,233,0.05)] flex items-center justify-between">
           <button
             type="button"
             onClick={handlePrevMonth}
@@ -200,7 +200,7 @@ export default function AttendanceHistoryDetail({ userSession, onBack }) {
               return (
                 <li
                   key={item.ma_cc}
-                  className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_8px_rgba(62,39,35,0.03)] space-y-3"
+                  className="bg-white rounded-2xl p-4 border border-coffee-100 shadow-[0_2px_8px_rgba(14,165,233,0.05)] space-y-3"
                 >
                   {/* Hàng 1: Ngày + Thứ + Trạng thái */}
                   <div className="flex items-center justify-between gap-2">

@@ -5,6 +5,8 @@ from typing import Any, Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScope, scope_condition
+
 
 def get_employee_attendance_info(db: Session, ma_nv: str) -> Optional[dict[str, Any]]:
     """Lấy thông tin nhân viên, phòng ban, chi nhánh phục vụ chấm công."""
@@ -333,14 +335,14 @@ def get_attendance_history_by_employee(
 
 
 def get_daily_attendance_all(
-    db: Session, target_date: date, ma_pb: Optional[str] = None
+    db: Session, target_date: date, ma_pb: Optional[str] = None, scope: DataScope | None = None
 ) -> list[dict[str, Any]]:
-    """Dành cho Quản lý: Lấy danh sách chấm công toàn công ty trong 1 ngày."""
+    """Dành cho Quản lý: Lấy danh sách chấm công trong 1 ngày (scope: phạm vi quản lý, None = toàn công ty)."""
     ensure_attendance_columns(db)
-    params: dict[str, Any] = {"target_date": target_date}
-    where_pb = ""
+    where_pb, params = scope_condition(scope)
+    params["target_date"] = target_date
     if ma_pb:
-        where_pb = "AND nv.ma_pb = :ma_pb"
+        where_pb += " AND nv.ma_pb = :ma_pb"
         params["ma_pb"] = ma_pb
 
     query = text(f"""
@@ -383,13 +385,13 @@ def get_daily_attendance_all(
 
 
 def get_monthly_attendance_summary(
-    db: Session, month: int, year: int, ma_pb: Optional[str] = None
+    db: Session, month: int, year: int, ma_pb: Optional[str] = None, scope: DataScope | None = None
 ) -> list[dict[str, Any]]:
-    """Dành cho Quản lý: Thống kê công tháng của tất cả nhân viên."""
-    params: dict[str, Any] = {"month": month, "year": year}
-    where_pb = ""
+    """Dành cho Quản lý: Thống kê công tháng (scope: phạm vi quản lý, None = toàn công ty)."""
+    where_pb, params = scope_condition(scope)
+    params.update({"month": month, "year": year})
     if ma_pb:
-        where_pb = "AND nv.ma_pb = :ma_pb"
+        where_pb += " AND nv.ma_pb = :ma_pb"
         params["ma_pb"] = ma_pb
 
     query = text(f"""
@@ -671,20 +673,26 @@ def set_monthly_attendance_lock(
     return get_monthly_attendance_lock(db, thang, nam)
 
 
-def get_attendance_counts_by_day(db: Session, start: date, end: date) -> list[dict[str, Any]]:
-    """Đếm số lượt chấm công đúng giờ / đi trễ theo từng ngày."""
-    query = text("""
+def get_attendance_counts_by_day(
+    db: Session, start: date, end: date, scope: DataScope | None = None
+) -> list[dict[str, Any]]:
+    """Đếm số lượt chấm công đúng giờ / đi trễ theo từng ngày (scope: phạm vi quản lý)."""
+    where_scope, params = scope_condition(scope)
+    query = text(f"""
         SELECT
-            ngay_cong,
-            SUM(CASE WHEN gio_vao IS NOT NULL AND loai_cong <> 'DI_TRE' THEN 1 ELSE 0 END) AS dung_gio,
-            SUM(CASE WHEN gio_vao IS NOT NULL AND loai_cong = 'DI_TRE' THEN 1 ELSE 0 END) AS di_tre,
-            SUM(CASE WHEN gio_vao IS NOT NULL THEN 1 ELSE 0 END) AS da_cham_cong
-        FROM bang_cham_cong
-        WHERE ngay_cong BETWEEN :start AND :end
-        GROUP BY ngay_cong
+            bcc.ngay_cong,
+            SUM(CASE WHEN bcc.gio_vao IS NOT NULL AND bcc.loai_cong <> 'DI_TRE' THEN 1 ELSE 0 END) AS dung_gio,
+            SUM(CASE WHEN bcc.gio_vao IS NOT NULL AND bcc.loai_cong = 'DI_TRE' THEN 1 ELSE 0 END) AS di_tre,
+            SUM(CASE WHEN bcc.gio_vao IS NOT NULL THEN 1 ELSE 0 END) AS da_cham_cong
+        FROM bang_cham_cong bcc
+        JOIN nhan_vien nv ON nv.ma_nv = bcc.ma_nv
+        WHERE bcc.ngay_cong BETWEEN :start AND :end{where_scope}
+        GROUP BY bcc.ngay_cong
     """)
-    return [dict(r) for r in db.execute(query, {"start": start, "end": end}).mappings().all()]
+    return [dict(r) for r in db.execute(query, {"start": start, "end": end, **params}).mappings().all()]
 
 
-def count_active_employees(db: Session) -> int:
-    return int(db.execute(text("SELECT COUNT(*) FROM nhan_vien WHERE trang_thai = 'DANG_LAM'")).scalar() or 0)
+def count_active_employees(db: Session, scope: DataScope | None = None) -> int:
+    where_scope, params = scope_condition(scope)
+    query = text(f"SELECT COUNT(*) FROM nhan_vien nv WHERE nv.trang_thai = 'DANG_LAM'{where_scope}")
+    return int(db.execute(query, params).scalar() or 0)

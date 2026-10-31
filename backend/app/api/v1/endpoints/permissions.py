@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import CurrentAccount, ensure_self_or_permission, require_permission
+from app.core.permissions import CurrentAccount, ensure_in_scope, ensure_self_or_managed, require_permission
 from app.db.session import get_db
 from app.schemas.permission_schemas import (
     AssignRoleRequest,
@@ -86,7 +86,7 @@ def get_employee_permissions_endpoint(
     - Các quyền tùy chỉnh riêng được cấp thêm hoặc bị thu hồi.
     - Danh sách toàn bộ các quyền thực tế có hiệu lực.
     """
-    clean_id = ensure_self_or_permission(account, ma_nv, "PERMISSION_ASSIGN", "EMPLOYEE_VIEW")
+    clean_id = ensure_self_or_managed(db, account, ma_nv, "PERMISSION_ASSIGN", "EMPLOYEE_VIEW")
     try:
         return permission_service.get_employee_permissions(db, clean_id)
     except ValueError as err:
@@ -109,6 +109,7 @@ def assign_role_endpoint(
     - Ví dụ: Thăng chức nhân viên từ 'NHAN_VIEN' lên 'TRUONG_NHOM' hoặc 'QUAN_LY'.
     - Hệ thống tự động kích hoạt quyền tương ứng của vai trò mới và đồng bộ tài khoản đăng nhập.
     """
+    ensure_in_scope(db, account, ma_nv)
     try:
         return permission_service.assign_role_to_employee(db, ma_nv, data, actor=account)
     except PermissionError as err:
@@ -132,6 +133,7 @@ def update_custom_permissions_endpoint(
     Cấp thêm quyền đặc thù hoặc thu hồi quyền cụ thể của một nhân sự
     (ghi nhận vào bảng tai_khoan_quyen mà không cần thay đổi vai trò chính).
     """
+    ensure_in_scope(db, account, ma_nv)
     try:
         return permission_service.update_custom_permissions(db, ma_nv, data, actor=account)
     except PermissionError as err:

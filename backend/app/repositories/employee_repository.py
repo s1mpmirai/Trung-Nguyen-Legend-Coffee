@@ -6,6 +6,7 @@ from typing import Any, Optional
 from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
+from app.core.data_scope import DataScope, scope_condition
 from app.core.datetime_utils import get_vietnam_now
 from app.repositories.holiday_repository import get_holidays
 from app.utils.work_calendar import count_working_days, month_bounds
@@ -185,6 +186,7 @@ def get_employee_list(
     ngay_vao_den: str | None = None,
     sort_by: str = "ma_nv",
     sort_order: str = "asc",
+    scope: DataScope | None = None,
 ) -> dict:
     page = max(1, page or 1)
     page_size = max(1, min(200, page_size or 50))
@@ -192,6 +194,11 @@ def get_employee_list(
 
     conditions = []
     params: dict = {}
+
+    if scope is not None:
+        scope_sql, scope_params = scope.sql("nv")
+        conditions.append(scope_sql)
+        params.update(scope_params)
 
     if q and q.strip():
         search_term = f"%{q.strip()}%"
@@ -612,11 +619,14 @@ def cancel_profile_update_request(db: Session, ma_yc: int, ma_nv: str | None = N
     return get_profile_request_by_id(db, ma_yc)
 
 
-def get_profile_requests_for_manager(db: Session, trang_thai: str | None = None) -> list[dict]:
-    where_clause = ""
-    params = {}
+def get_profile_requests_for_manager(
+    db: Session, trang_thai: str | None = None, scope: DataScope | None = None
+) -> list[dict]:
+    """Yêu cầu sửa hồ sơ của nhân sự thuộc phạm vi quản lý (scope None = toàn công ty)."""
+    scope_sql, params = scope_condition(scope)
+    where_clause = "WHERE 1 = 1" + scope_sql
     if trang_thai:
-        where_clause = "WHERE yc.trang_thai = :trang_thai"
+        where_clause += " AND yc.trang_thai = :trang_thai"
         params["trang_thai"] = trang_thai
 
     query = f"""
