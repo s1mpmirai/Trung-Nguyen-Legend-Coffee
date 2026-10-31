@@ -68,6 +68,9 @@ const ADVANCED_FIELDS = ["gioi_tinh", "hinh_thuc_lam_viec", "loai_hd", "luong_tu
 
 const inputClass =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition";
+// Dropdown lọc nhanh: không dùng w-full để 3 ô nằm chung một hàng, chia đều chiều ngang còn lại
+const selectClass =
+  "flex-1 basis-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition cursor-pointer";
 
 const formatDate = (val) => {
   if (!val) return "—";
@@ -211,38 +214,41 @@ export default function AdminEmployeesTab() {
       </div>
 
       {/* ── THANH TÌM KIẾM & LỌC NHANH ── */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <form
-            className="flex items-center gap-2 flex-1 min-w-[280px]"
-            onSubmit={(e) => {
-              e.preventDefault();
-              applyFilters(draft);
-            }}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-3">
+        {/* Hàng 1: ô tìm kiếm */}
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            applyFilters(draft);
+          }}
+        >
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Tìm theo Mã NV, Họ tên, Email, SĐT, CCCD..."
+              value={draft.q}
+              onChange={(e) => setDraft({ ...draft, q: e.target.value })}
+              className={`${inputClass} pl-10`}
+            />
+          </div>
+          <button
+            type="submit"
+            className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
           >
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Tìm theo Mã NV, Họ tên, Email, SĐT, CCCD..."
-                value={draft.q}
-                onChange={(e) => setDraft({ ...draft, q: e.target.value })}
-                className={`${inputClass} pl-10`}
-              />
-            </div>
-            <button
-              type="submit"
-              className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
-            >
-              <Search size={13} />
-              <span>Tìm kiếm</span>
-            </button>
-          </form>
+            <Search size={13} />
+            <span>Tìm kiếm</span>
+          </button>
+        </form>
 
+        {/* Hàng 2: 3 bộ lọc nhanh + Tìm kiếm nâng cao + Đặt lại trên cùng một hàng */}
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={draft.ma_pb}
             onChange={(e) => handleQuickFilter("ma_pb", e.target.value)}
-            className={`${inputClass} w-auto min-w-[170px] cursor-pointer`}
+            className={`${selectClass} min-w-[170px]`}
+            aria-label="Lọc theo phòng ban"
           >
             <option value="">Tất cả phòng ban</option>
             {departments.map((pb) => (
@@ -255,7 +261,8 @@ export default function AdminEmployeesTab() {
           <select
             value={draft.ma_cv}
             onChange={(e) => handleQuickFilter("ma_cv", e.target.value)}
-            className={`${inputClass} w-auto min-w-[150px] cursor-pointer`}
+            className={`${selectClass} min-w-[150px]`}
+            aria-label="Lọc theo chức vụ"
           >
             <option value="">Tất cả chức vụ</option>
             {positions.map((cv) => (
@@ -268,7 +275,8 @@ export default function AdminEmployeesTab() {
           <select
             value={draft.trang_thai}
             onChange={(e) => handleQuickFilter("trang_thai", e.target.value)}
-            className={`${inputClass} w-auto min-w-[150px] cursor-pointer`}
+            className={`${selectClass} min-w-[150px]`}
+            aria-label="Lọc theo trạng thái"
           >
             <option value="">Tất cả trạng thái</option>
             {STATUS_OPTIONS.map((s) => (
@@ -281,7 +289,8 @@ export default function AdminEmployeesTab() {
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition cursor-pointer ${
+            aria-expanded={showAdvanced}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition cursor-pointer shrink-0 whitespace-nowrap ${
               showAdvanced || advancedCount > 0
                 ? "bg-sky-50 text-sky-700 border-sky-300"
                 : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
@@ -293,7 +302,7 @@ export default function AdminEmployeesTab() {
 
           {activeFilterCount > 0 && (
             <span
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 shrink-0 whitespace-nowrap"
               aria-live="polite"
             >
               <Filter size={11} aria-hidden="true" />
@@ -305,7 +314,7 @@ export default function AdminEmployeesTab() {
             type="button"
             onClick={handleReset}
             disabled={activeFilterCount === 0 && sort.by === "ma_nv" && sort.order === "asc"}
-            className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
             title="Xóa toàn bộ điều kiện tìm kiếm và sắp xếp"
           >
             <RotateCcw size={13} aria-hidden="true" />

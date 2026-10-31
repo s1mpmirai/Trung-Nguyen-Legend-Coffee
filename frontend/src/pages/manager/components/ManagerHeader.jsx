@@ -1,18 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { ShieldCheck, Briefcase, Smartphone, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import logoImg from "../../../assets/logo/Logo Trung Nguyên_black.png";
 import { getEmployeeProfile } from "../../../services/employeeService";
+import EmployeeLoginButton from "../../../components/common/EmployeeLoginButton";
 
-const portalButton =
-  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all";
-
-export default function ManagerHeader({
-  userSession,
-  onLogout,
-  collapsed = false,
-  onSwitchToAdmin,
-  onSwitchToEmployee,
-}) {
+/**
+ * ManagerHeader – thanh trên cùng của Cổng Quản lý.
+ * Cổng Quản lý và Cổng Quản trị khác cấp nên không có nút chuyển ngang; chỉ có nút mở trang đăng nhập Cổng Nhân viên.
+ */
+export default function ManagerHeader({ userSession, onLogout, collapsed = false, onOpenEmployeeLogin }) {
   // Hiển thị đúng họ tên / chức vụ của tài khoản đang đăng nhập
   const maNv = userSession?.ma_nv || localStorage.getItem("user_ma_nv");
   const [profile, setProfile] = useState(null);
@@ -45,37 +41,7 @@ export default function ManagerHeader({
           <span className="truncate">TRỤ SỞ CHÍNH TRUNG NGUYÊN LEGEND</span>
         </div>
 
-        {/* Bộ chuyển cổng đồng bộ */}
-        <nav aria-label="Chuyển cổng làm việc" className="flex items-center gap-1 p-1 rounded-xl bg-slate-100/80 border border-slate-200/70">
-          {onSwitchToAdmin && (
-            <button
-              type="button"
-              onClick={onSwitchToAdmin}
-              className={`${portalButton} text-slate-600 hover:text-slate-900 hover:bg-white/70 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500`}
-              title="Chuyển sang Cổng Quản Trị Viên (Admin)"
-            >
-              <ShieldCheck size={13} aria-hidden="true" />
-              Cổng Quản trị
-            </button>
-          )}
-
-          <span className={`${portalButton} bg-white text-sky-700 shadow-xs`} aria-current="page">
-            <Briefcase size={13} aria-hidden="true" />
-            Cổng Quản lý
-          </span>
-
-          {onSwitchToEmployee && (
-            <button
-              type="button"
-              onClick={onSwitchToEmployee}
-              className={`${portalButton} text-slate-600 hover:text-slate-900 hover:bg-white/70 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500`}
-              title="Chuyển sang Cổng Nhân viên (chấm công, đơn từ, phiếu lương của bạn)"
-            >
-              <Smartphone size={13} aria-hidden="true" />
-              Cổng Nhân viên
-            </button>
-          )}
-        </nav>
+        {onOpenEmployeeLogin && <EmployeeLoginButton onClick={onOpenEmployeeLogin} />}
       </div>
 
       {/* User Actions & Avatar Profile */}

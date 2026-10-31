@@ -822,7 +822,7 @@ export default function PayrollManagement({ onNavigateTab }) {
       {selectedPayslip && (
         <div
           onClick={() => setSelectedPayslip(null)}
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4 cursor-pointer animate-fade-in"
         >
           <div
             role="dialog"

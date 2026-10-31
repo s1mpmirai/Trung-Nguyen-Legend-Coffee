@@ -1448,7 +1448,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
       {/* ──────────────── MODAL XÁC NHẬN: CHO THÔI VIỆC / XÓA NHÂN SỰ ──────────────── */}
       {deactivateModalEmp && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 animate-in fade-in duration-200"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) closeDeactivateModal();
           }}
@@ -1457,7 +1457,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
             role="dialog"
             aria-modal="true"
             aria-labelledby="deactivate-dialog-title"
-            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]"
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] animate-scale-up"
           >
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">

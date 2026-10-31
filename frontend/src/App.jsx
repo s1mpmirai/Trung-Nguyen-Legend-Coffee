@@ -350,11 +350,9 @@ function App() {
     );
   }
 
-  const canAdmin = canAccessAdminPortal(session.role, session.permissions);
-  const canManager = canAccessManagerPortal(session.role, session.permissions);
-  const switchToAdmin = canAdmin ? () => navigateClean("admin") : undefined;
-  const switchToManager = canManager ? () => navigateClean("manager") : undefined;
-  const switchToEmployee = () => navigateClean("attendance");
+  // Cổng Quản trị và Cổng Quản lý khác cấp: không chuyển ngang giữa hai cổng,
+  // chỉ có nút mở trang đăng nhập Cổng Nhân viên (Back sẽ quay lại cổng đang dùng).
+  const openEmployeeLogin = () => navigateClean("login");
 
   // 2. Cổng Quản trị (/admin/<tab>) – resolveRoute đã kiểm tra quyền
   if (isAdminRoute(resolvedRoute)) {
@@ -365,8 +363,7 @@ function App() {
           userSession={session}
           routeTab={resolvedRoute.split("/")[1] || ""}
           onLogout={handleLogout}
-          onSwitchToManager={switchToManager}
-          onSwitchToEmployee={switchToEmployee}
+          onOpenEmployeeLogin={openEmployeeLogin}
         />
       </>
     );
@@ -380,8 +377,7 @@ function App() {
         <ManagerDashboard
           userSession={session}
           onLogout={handleLogout}
-          onSwitchToEmployee={switchToEmployee}
-          onSwitchToAdmin={switchToAdmin}
+          onOpenEmployeeLogin={openEmployeeLogin}
         />
       </>
     );

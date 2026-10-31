@@ -9,18 +9,17 @@ import {
   Loader2,
   ArrowLeft,
   ArrowRight,
+  Briefcase,
 } from 'lucide-react';
 import logoImg from '../../assets/logo/Logo Trung Nguyên_black.png';
 import { loginManagePortal } from '../../services/adminService';
+import DemoAccountButtons from '../../components/common/DemoAccountButtons';
 
-// Tài khoản mẫu chỉ hiển thị khi chạy môi trường phát triển (npm run dev)
-const DEV_SAMPLE_ACCOUNTS = import.meta.env.DEV
-  ? [
-      { id: 'NV01', label: 'Admin', title: 'Quản trị viên hệ thống' },
-      { id: 'NV02', label: 'QL', title: 'Quản lý' },
-      { id: 'NV09', label: 'TN', title: 'Trưởng nhóm' },
-    ]
-  : [];
+// Tài khoản demo đăng nhập nhanh (mật khẩu theo dữ liệu mẫu)
+const DEMO_ACCOUNTS = [
+  { id: 'NV01', password: '1', label: 'Admin', icon: ShieldCheck },
+  { id: 'NV02', password: '1', label: 'Quản lý', icon: Briefcase },
+];
 
 /**
  * AdminManagerLogin – Cổng đăng nhập dành cho Quản trị viên, Quản lý, Trưởng nhóm
@@ -35,16 +34,16 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const login = async (rawId, rawPassword) => {
+    if (isLoading) return;
     setErrorMessage('');
 
-    if (!employeeId.trim()) {
+    if (!rawId.trim()) {
       setErrorMessage('Vui lòng nhập mã tài khoản.');
       return;
     }
 
-    if (!password.trim()) {
+    if (!rawPassword.trim()) {
       setErrorMessage('Vui lòng nhập mật khẩu.');
       return;
     }
@@ -52,8 +51,8 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
     setIsLoading(true);
 
     try {
-      const cleanId = employeeId.trim().toUpperCase().replace('-', '');
-      const data = await loginManagePortal(cleanId, password);
+      const cleanId = rawId.trim().toUpperCase().replace('-', '');
+      const data = await loginManagePortal(cleanId, rawPassword);
 
       setIsLoading(false);
       onLoginSuccess?.({
@@ -70,6 +69,18 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
           'Thông tin đăng nhập không hợp lệ hoặc tài khoản không có quyền vào Cổng Điều hành.'
       );
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    login(employeeId, password);
+  };
+
+  // Đăng nhập nhanh: điền sẵn tài khoản demo rồi đăng nhập luôn
+  const handleDemoLogin = (id, demoPassword) => {
+    setEmployeeId(id);
+    setPassword(demoPassword);
+    login(id, demoPassword);
   };
 
   return (
@@ -159,24 +170,6 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
             </div>
           </div>
 
-          {/* Tài khoản mẫu: chỉ hiển thị ở môi trường phát triển */}
-          {DEV_SAMPLE_ACCOUNTS.length > 0 && (
-            <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="text-[10px] text-slate-400 font-medium mr-1">Tài khoản mẫu (DEV):</span>
-              {DEV_SAMPLE_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => setEmployeeId(acc.id)}
-                  className="px-2 py-0.5 bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-700 rounded-lg font-semibold text-[11px] transition-colors shadow-xs cursor-pointer"
-                  title={acc.title}
-                >
-                  {acc.id} ({acc.label})
-                </button>
-              ))}
-            </div>
-          )}
-
           {/* Nút bấm Submit Đăng nhập Desktop */}
           <button
             type="submit"
@@ -197,6 +190,11 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
             )}
           </button>
         </form>
+
+        {/* Đăng nhập nhanh: Admin (NV01) và Quản lý (NV02) */}
+        <div className="mt-5">
+          <DemoAccountButtons accounts={DEMO_ACCOUNTS} onSelect={handleDemoLogin} disabled={isLoading} />
+        </div>
 
         {/* Chuyển hướng sang Cổng nhân viên */}
         <div className="mt-5 text-center">

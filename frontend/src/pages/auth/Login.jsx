@@ -2,8 +2,12 @@ import React, { useState } from 'react';
 import { User, Lock, Eye, EyeOff, Loader2, Info } from 'lucide-react';
 import apiClient from '../../services/apiClient';
 import { getApiErrorMessage } from '../employee/utils/format';
+import DemoAccountButtons from '../../components/common/DemoAccountButtons';
 // Import logo từ thư mục local trong src/assets/logo/ (logo trắng trên nền nâu)
 import logoImg from '../../assets/logo/logo.png';
+
+// Tài khoản demo đăng nhập nhanh (mật khẩu theo dữ liệu mẫu)
+const DEMO_ACCOUNTS = [{ id: 'NV10', password: '1', label: 'Nhân viên', icon: User }];
 
 // "Ghi nhớ đăng nhập" chỉ lưu MÃ NHÂN VIÊN trên thiết bị này – không bao giờ lưu mật khẩu
 const REMEMBER_KEY = 'tnl_remembered_ma_nv';
@@ -25,18 +29,17 @@ export default function Login({ onLoginSuccess }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const login = async (rawId, rawPassword) => {
     if (isLoading) return;
     setErrorMessage('');
     setInfoMessage('');
 
-    if (!employeeId.trim()) {
+    if (!rawId.trim()) {
       setErrorMessage('Vui lòng nhập Mã nhân viên');
       return;
     }
 
-    if (!password.trim()) {
+    if (!rawPassword.trim()) {
       setErrorMessage('Vui lòng nhập Mật khẩu');
       return;
     }
@@ -44,11 +47,11 @@ export default function Login({ onLoginSuccess }) {
     setIsLoading(true);
 
     try {
-      const cleanId = employeeId.trim().toUpperCase().replace('-', '');
+      const cleanId = rawId.trim().toUpperCase().replace('-', '');
 
       const data = await apiClient.post('/auth/employee-login', {
         ma_nv: cleanId,
-        mat_khau: password,
+        mat_khau: rawPassword,
       });
 
       const role = String(data.ma_vai_tro || 'NHAN_VIEN').toUpperCase();
@@ -94,6 +97,18 @@ export default function Login({ onLoginSuccess }) {
     }
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    login(employeeId, password);
+  };
+
+  // Đăng nhập nhanh: điền sẵn tài khoản demo rồi đăng nhập luôn
+  const handleDemoLogin = (id, demoPassword) => {
+    setEmployeeId(id);
+    setPassword(demoPassword);
+    login(id, demoPassword);
+  };
+
   return (
     <div className="flex-1 flex flex-col justify-between bg-white min-h-[780px]">
       {/* ───────────────── HEADER: Nâu cà phê Trung Nguyên + Sóng Wave ───────────────── */}
@@ -128,7 +143,7 @@ export default function Login({ onLoginSuccess }) {
       </div>
 
       {/* ───────────────── PHẦN FORM ───────────────── */}
-      <div className="relative bg-white px-6 pt-2 pb-6 flex-1 flex flex-col justify-between">
+      <div className="relative bg-white px-6 pt-8 pb-6 flex-1 flex flex-col justify-between">
 
         <div className="space-y-5">
           {/* Tiêu đề & mô tả */}
@@ -252,19 +267,9 @@ export default function Login({ onLoginSuccess }) {
               )}
             </button>
 
-            {/* Chuyển hướng sang Cổng Quản lý / Admin */}
-            <div className="mt-3 text-center">
-              <a
-                href="/login-manage"
-                onClick={(e) => {
-                  e.preventDefault();
-                  window.history.pushState(null, '', '/login-manage');
-                  window.dispatchEvent(new Event('app-route-change'));
-                }}
-                className="inline-flex items-center space-x-1.5 text-xs font-medium text-slate-500 hover:text-coffee-700 transition-colors py-2 px-3 rounded-lg hover:bg-coffee-50"
-              >
-                <span>Bạn là Quản lý / Admin? Đăng nhập Cổng Điều Hành →</span>
-              </a>
+            {/* Đăng nhập nhanh: Nhân viên (NV10) */}
+            <div className="pt-2">
+              <DemoAccountButtons accounts={DEMO_ACCOUNTS} onSelect={handleDemoLogin} disabled={isLoading} />
             </div>
           </form>
         </div>

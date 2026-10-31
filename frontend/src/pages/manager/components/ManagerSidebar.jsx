@@ -19,8 +19,6 @@ import { getManagerAccess } from "../managerUtils";
 export default function ManagerSidebar({
   activeTab = "dashboard",
   onTabChange,
-  onSwitchToEmployee,
-  onSwitchToAdmin,
   collapsed = false,
   onToggleCollapse,
   onClose,

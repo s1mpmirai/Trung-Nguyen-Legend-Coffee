@@ -18,7 +18,7 @@ import ProfileRequestsPanel from "./components/ProfileRequestsPanel";
 import { getManagerDashboardStats } from "../../services/managerService";
 import { getManagerAccess } from "./managerUtils";
 
-export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmployee, onSwitchToAdmin }) {
+export default function ManagerDashboard({ userSession, onLogout, onOpenEmployeeLogin }) {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
@@ -70,8 +70,6 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
       <ManagerSidebar
         activeTab={activeTab}
         onTabChange={navigateTab}
-        onSwitchToEmployee={onSwitchToEmployee}
-        onSwitchToAdmin={onSwitchToAdmin}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         onClose={() => setSidebarCollapsed(true)}
@@ -84,8 +82,7 @@ export default function ManagerDashboard({ userSession, onLogout, onSwitchToEmpl
         userSession={userSession}
         onLogout={onLogout}
         collapsed={sidebarCollapsed}
-        onSwitchToAdmin={onSwitchToAdmin}
-        onSwitchToEmployee={onSwitchToEmployee}
+        onOpenEmployeeLogin={onOpenEmployeeLogin}
       />
 
       {/* ───────────────── MAIN CONTENT AREA ───────────────── */}

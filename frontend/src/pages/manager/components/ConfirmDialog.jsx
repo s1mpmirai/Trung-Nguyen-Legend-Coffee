@@ -91,7 +91,7 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/50 animate-in fade-in duration-150"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) onCancel?.();
       }}

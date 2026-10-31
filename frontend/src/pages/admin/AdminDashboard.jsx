@@ -24,7 +24,7 @@ const readCollapsed = () => {
  * AdminDashboard – khung Cổng Quản trị. Tab đang mở nằm trên URL (/admin/<tab>)
  * nên tải lại trang hoặc mở liên kết trực tiếp vẫn giữ đúng tab.
  */
-export default function AdminDashboard({ userSession, routeTab = "", onLogout, onSwitchToManager, onSwitchToEmployee }) {
+export default function AdminDashboard({ userSession, routeTab = "", onLogout, onOpenEmployeeLogin }) {
   const allowedTabs = getAdminNavItems(userSession).map((item) => item.id);
   const activeTab = allowedTabs.includes(routeTab) ? routeTab : allowedTabs[0] || "overview";
 
@@ -86,8 +86,7 @@ export default function AdminDashboard({ userSession, routeTab = "", onLogout, o
         userSession={userSession}
         onLogout={onLogout}
         collapsed={sidebarCollapsed}
-        onSwitchToManager={onSwitchToManager}
-        onSwitchToEmployee={onSwitchToEmployee}
+        onOpenEmployeeLogin={onOpenEmployeeLogin}
       />
 
       <div className={`${sidebarCollapsed ? "pl-20" : "pl-64"} transition-all duration-300`}>

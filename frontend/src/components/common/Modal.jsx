@@ -31,7 +31,8 @@ export function useDialog({ open, onClose, panelRef, initialFocusRef, canClose =
         (panel && panel.querySelector("[data-autofocus]")) ||
         (panel && panel.querySelector(FOCUSABLE)) ||
         panel;
-      if (target && typeof target.focus === "function") target.focus();
+      // preventScroll: không để trình duyệt cuộn trang/khung khi focus lúc hộp thoại đang chạy hiệu ứng mở
+      if (target && typeof target.focus === "function") target.focus({ preventScroll: true });
     }, 0);
 
     const handleKeyDown = (e) => {
@@ -100,7 +101,7 @@ export default function Modal({
 
   return (
     <div
-      className={`fixed inset-0 ${zIndex} flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in`}
+      className={`fixed inset-0 ${zIndex} flex items-center justify-center bg-slate-900/40 p-4 overflow-y-auto animate-fade-in`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && closeOnBackdrop && canClose && onClose) onClose();
       }}
@@ -113,7 +114,7 @@ export default function Modal({
         aria-describedby={describedBy}
         aria-label={!titleId ? ariaLabel : undefined}
         tabIndex={-1}
-        className={`relative bg-white rounded-3xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto focus:outline-none ${panelClassName}`}
+        className={`relative bg-white rounded-3xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto focus:outline-none animate-scale-up ${panelClassName}`}
       >
         {title && (
           <h2 id={titleId} className="sr-only">

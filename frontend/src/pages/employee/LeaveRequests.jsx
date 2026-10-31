@@ -642,7 +642,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
       {selectedLeave && (
         <div
           onClick={() => setSelectedLeave(null)}
-          className="fixed inset-0 bg-coffee-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 bg-coffee-900/40 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
         >
           <div
             role="dialog"
@@ -742,7 +742,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
       {cancelTarget && (
         <div
           onClick={() => !isCancelling && setCancelTarget(null)}
-          className="fixed inset-0 bg-coffee-900/50 backdrop-blur-sm z-[55] flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 bg-coffee-900/50 z-[55] flex items-center justify-center p-4 animate-in fade-in duration-150"
         >
           <div
             role="alertdialog"
@@ -792,7 +792,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
       {showCreateModal && (
         <div
           onClick={closeCreateModal}
-          className="fixed inset-0 bg-coffee-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 bg-coffee-900/40 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
         >
           <div
             role="dialog"

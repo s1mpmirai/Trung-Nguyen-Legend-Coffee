@@ -78,7 +78,7 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fade-in"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 animate-fade-in"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !submitting) onCancel?.();
       }}

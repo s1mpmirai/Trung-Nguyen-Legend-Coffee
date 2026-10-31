@@ -391,16 +391,19 @@ export default function LeaveApprovals({ userSession }) {
     setCurrentPage(1);
   }, [activeFilter, searchQuery]);
 
-  const filtered = requests.filter((r) => {
-    const matchTab = activeFilter === "all" || r.status === activeFilter;
-    const q = (searchQuery || "").toLowerCase().trim();
-    const matchSearch =
-      !q ||
-      (r.name && r.name.toLowerCase().includes(q)) ||
-      (r.id && r.id.toLowerCase().includes(q)) ||
-      (r.dept && r.dept.toLowerCase().includes(q));
-    return matchTab && matchSearch;
-  });
+  const filtered = requests
+    .filter((r) => {
+      const matchTab = activeFilter === "all" || r.status === activeFilter;
+      const q = (searchQuery || "").toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        (r.name && r.name.toLowerCase().includes(q)) ||
+        (r.id && r.id.toLowerCase().includes(q)) ||
+        (r.dept && r.dept.toLowerCase().includes(q));
+      return matchTab && matchSearch;
+    })
+    // Đơn "Chờ duyệt" luôn nằm đầu danh sách; các đơn còn lại giữ nguyên thứ tự (sort ổn định)
+    .sort((a, b) => (b.status === "pending") - (a.status === "pending"));
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const validCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
@@ -503,7 +506,7 @@ export default function LeaveApprovals({ userSession }) {
       {toast && (
         <div
           role={toastType === "error" ? "alert" : "status"}
-          className={`p-3 border rounded-xl text-xs font-semibold flex items-center gap-2 animate-fadeIn ${
+          className={`p-3 border rounded-xl text-xs font-semibold flex items-center gap-2 animate-fade-in ${
             toastType === "error"
               ? "bg-rose-50 border-rose-200 text-rose-800"
               : "bg-emerald-50 border-emerald-200 text-emerald-800"
@@ -845,7 +848,7 @@ export default function LeaveApprovals({ userSession }) {
       {rejectModalData && (
         <div
           onClick={() => !isSubmitting && setRejectModalData(null)}
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fadeIn cursor-pointer"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 p-4 animate-fade-in cursor-pointer"
         >
           <div
             role="dialog"
@@ -988,7 +991,7 @@ export default function LeaveApprovals({ userSession }) {
       {selectedRequest && (
         <div
           onClick={() => setSelectedRequest(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fadeIn cursor-pointer"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 animate-fade-in cursor-pointer"
         >
           <div
             role="dialog"

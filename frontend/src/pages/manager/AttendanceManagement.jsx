@@ -1955,7 +1955,7 @@ export default function AttendanceManagement({ userSession, initialPeriod }) {
       {adjustModalData && (
         <div
           onClick={() => !isAdjusting && setAdjustModalData(null)}
-          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-50 bg-slate-900/40 flex items-center justify-center p-4 cursor-pointer animate-fade-in"
         >
           <div
             role="dialog"
@@ -2146,7 +2146,7 @@ export default function AttendanceManagement({ userSession, initialPeriod }) {
       {rejectModalData && (
         <div
           onClick={() => !isRejecting && setRejectModalData(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150 cursor-pointer"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 animate-in fade-in duration-150 cursor-pointer"
         >
           <div
             role="dialog"
@@ -2272,7 +2272,7 @@ export default function AttendanceManagement({ userSession, initialPeriod }) {
       {selectedEmployeeDetail && (
         <div
           onClick={() => setSelectedEmployeeDetail(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 overflow-y-auto cursor-pointer"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 overflow-y-auto cursor-pointer animate-fade-in"
         >
           <div
             role="dialog"

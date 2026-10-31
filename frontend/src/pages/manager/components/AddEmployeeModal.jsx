@@ -134,14 +134,14 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
   return (
     <div
       onClick={() => !isSaving && onClose()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn cursor-pointer"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 overflow-y-auto animate-fade-in cursor-pointer"
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-employee-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden my-6 cursor-default"
+        className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden my-6 cursor-default animate-scale-up"
       >
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
