@@ -14,6 +14,9 @@ import LeaveApprovals from "./LeaveApprovals";
 import AttendanceManagement from "./AttendanceManagement";
 import PayrollManagement from "./PayrollManagement";
 import RolePermissions from "./RolePermissions";
+import ContractManagement from "./ContractManagement";
+import DepartmentsPanel from "../shared/DepartmentsPanel";
+import PositionsPanel from "../shared/PositionsPanel";
 import ProfileRequestsPanel from "./components/ProfileRequestsPanel";
 import { getManagerDashboardStats } from "../../services/managerService";
 import { getManagerAccess } from "./managerUtils";
@@ -110,6 +113,11 @@ export default function ManagerDashboard({ userSession, onLogout, onOpenEmployee
             {activeTab === "payroll" && (
               <PayrollManagement userSession={userSession} onNavigateTab={navigateTab} />
             )}
+
+            {/* 4b. TAB: Hợp đồng lao động & Cơ cấu tổ chức (nghiệp vụ nhân sự, chuyển từ Cổng Quản trị) */}
+            {activeTab === "contracts" && <ContractManagement />}
+            {activeTab === "departments" && <DepartmentsPanel />}
+            {activeTab === "positions" && <PositionsPanel />}
 
             {/* 5. TAB: Cấp quyền sử dụng web & Bổ nhiệm chức danh */}
             {(activeTab === "permissions" || activeTab === "role-permissions") && (

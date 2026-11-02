@@ -9,6 +9,9 @@ import {
   ShieldCheck,
   ArrowLeftRight,
   FilePen,
+  Building2,
+  Briefcase,
+  FileText,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -82,6 +85,24 @@ export default function ManagerSidebar({
       label: "Bảng tính lương",
       icon: CreditCard,
       allowed: can("PAYROLL_MANAGE"),
+    },
+    {
+      id: "contracts",
+      label: "Hợp đồng lao động",
+      icon: FileText,
+      allowed: can("CONTRACT_MANAGE"),
+    },
+    {
+      id: "departments",
+      label: "Phòng ban",
+      icon: Building2,
+      allowed: can("ORG_MANAGE"),
+    },
+    {
+      id: "positions",
+      label: "Chức vụ & Thang lương",
+      icon: Briefcase,
+      allowed: can("ORG_MANAGE"),
     },
     {
       id: "permissions",

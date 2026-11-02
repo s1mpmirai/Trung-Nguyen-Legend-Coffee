@@ -28,13 +28,13 @@ import {
   deleteContract,
   restoreContract,
   getEmployeesList,
-} from "../../../services/adminService";
-import SortableHeader, { nextSort } from "../../../components/common/SortableHeader";
-import { SkeletonRows } from "../../../components/common/TableSkeleton";
-import EmptyState from "../../../components/common/EmptyState";
-import ErrorState from "../../../components/common/ErrorState";
-import ConfirmDialog from "../../../components/common/ConfirmDialog";
-import Modal from "../../../components/common/Modal";
+} from "../../services/adminService";
+import SortableHeader, { nextSort } from "../../components/common/SortableHeader";
+import { SkeletonRows } from "../../components/common/TableSkeleton";
+import EmptyState from "../../components/common/EmptyState";
+import ErrorState from "../../components/common/ErrorState";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import Modal from "../../components/common/Modal";
 import {
   TABLE_SCROLL,
   TABLE,
@@ -46,7 +46,7 @@ import {
   TD,
   STICKY_TH,
   STICKY_TD,
-} from "../../../components/common/tableStyles";
+} from "../../components/common/tableStyles";
 
 // Nhãn loại hợp đồng thống nhất trên toàn bộ màn hình (bộ lọc, bảng, biểu mẫu)
 const CONTRACT_TYPES = [
@@ -329,7 +329,8 @@ const toPayload = (form) => ({
   so_bhxh: form.so_bhxh.trim() || null,
 });
 
-export default function AdminContractsTab() {
+/** Hợp đồng lao động – nghiệp vụ nhân sự, chỉ ở Cổng Quản lý (quyền CONTRACT_MANAGE). */
+export default function ContractManagement() {
   const [contracts, setContracts] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [stats, setStats] = useState({ so_hieu_luc: 0, so_sap_het_han_30_ngay: 0, so_da_thanh_ly: 0 });

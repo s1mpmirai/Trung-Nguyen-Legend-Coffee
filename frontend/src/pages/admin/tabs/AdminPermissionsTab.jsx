@@ -76,7 +76,7 @@ const ROLE_HINTS = {
   NHAN_VIEN: "quyền cơ bản: đơn từ, phiếu lương của bản thân",
   TRUONG_NHOM: "duyệt đơn, chấm công và theo dõi nhóm",
   QUAN_LY: "quản lý nhân sự, chấm công, lương và báo cáo",
-  ADMIN: "toàn quyền hệ thống",
+  ADMIN: "quản trị tài khoản & phân quyền, chỉ xem dữ liệu nghiệp vụ",
 };
 const ROLE_COLORS = {
   NHAN_VIEN: { head: "text-slate-700", dot: "bg-emerald-100 text-emerald-700" },
@@ -337,7 +337,12 @@ export default function AdminPermissionsTab({ userSession }) {
             : {roleName(oldRole)} → <strong>{roleName(newRole)}</strong>
           </p>
           <p>Quyền mặc định mới: {ROLE_HINTS[newRole] || roleName(newRole)}. Áp dụng từ lần truy cập tiếp theo.</p>
-          {toAdmin && <p className="text-rose-700 font-semibold">Vai trò Quản trị viên có toàn quyền hệ thống. Chỉ cấp khi thật sự cần.</p>}
+          {toAdmin && (
+            <p className="text-rose-700 font-semibold">
+              Vai trò Quản trị viên quản lý tài khoản và phân quyền toàn hệ thống, đồng thời mất các quyền nghiệp vụ (duyệt đơn,
+              chấm công, lương…). Chỉ cấp cho nhân viên IT phụ trách hệ thống.
+            </p>
+          )}
           {!isUp && <p className="text-rose-700 font-semibold">Các quyền của vai trò cũ sẽ bị thu hồi.</p>}
         </div>
       ),
@@ -898,7 +903,7 @@ export default function AdminPermissionsTab({ userSession }) {
                       <div>{roleName(role)}</div>
                       <div className="text-[10px] font-semibold normal-case tracking-normal text-slate-400">
                         {role === "ADMIN"
-                          ? "Toàn quyền"
+                          ? `Cố định ${matrixMap.ADMIN?.length || 0} quyền hệ thống`
                           : `${(editMode ? draftMatrix[role] : matrixMap[role])?.length || 0}/${totalPermissions} quyền`}
                       </div>
                     </th>
@@ -936,16 +941,26 @@ export default function AdminPermissionsTab({ userSession }) {
                             </td>
                             <td className="py-3 px-4 font-mono text-[10px] text-slate-400 whitespace-nowrap">{perm.ma_quyen}</td>
                             {roleColumns.map((role) => {
+                              // Quản trị hệ thống: bộ quyền cố định, không có quyền nghiệp vụ (không chỉnh được)
                               if (role === "ADMIN") {
+                                const adminHas = (matrixMap.ADMIN || []).includes(perm.ma_quyen);
                                 return (
-                                  <td key={role} className="py-3 px-3 text-center bg-sky-50/40">
-                                    <span
-                                      className="inline-flex w-5 h-5 rounded-full bg-sky-600 text-white items-center justify-center shadow-2xs"
-                                      title="Quản trị viên luôn có toàn quyền"
-                                    >
-                                      <Check size={12} aria-hidden="true" />
-                                      <span className="sr-only">Có quyền</span>
-                                    </span>
+                                  <td
+                                    key={role}
+                                    className="py-3 px-3 text-center bg-sky-50/40"
+                                    title={adminHas ? "Quyền hệ thống cố định của Quản trị viên" : "Quản trị viên không làm nghiệp vụ nhân sự"}
+                                  >
+                                    {adminHas ? (
+                                      <span className="inline-flex w-5 h-5 rounded-full bg-sky-600 text-white items-center justify-center shadow-2xs">
+                                        <Check size={12} aria-hidden="true" />
+                                        <span className="sr-only">Có quyền</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-300 font-bold">
+                                        <X size={12} className="inline" aria-hidden="true" />
+                                        <span className="sr-only">Không có quyền</span>
+                                      </span>
+                                    )}
                                   </td>
                                 );
                               }

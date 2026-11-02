@@ -6,15 +6,16 @@ import {
   ShieldCheck,
   Building2,
   Briefcase,
-  FileText,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import logoImg from "../../assets/logo/Logo Trung Nguyên_black.png";
 import { isAdminRole } from "../../utils/navigation";
 
-// Menu Cổng Quản trị theo nhóm nghiệp vụ. Mỗi mục mở cho vai trò ADMIN hoặc tài khoản có quyền tương ứng;
-// mục không khai báo "permission" (Tổng quan) mở cho mọi người dùng được vào Cổng Quản trị.
+// Menu Cổng Quản trị. Theo yêu cầu đồ án, Admin (quản trị hệ thống) tách biệt với quản lý nhân sự:
+// - Tài khoản & Phân quyền: thêm, xóa, khóa tài khoản và phân quyền.
+// - Tra cứu dữ liệu: chỉ xem, tìm kiếm nâng cao, lọc, sắp xếp (không thêm / sửa / xóa nghiệp vụ).
+// Mục không khai báo "permission" mở cho mọi người dùng được vào Cổng Quản trị.
 export const ADMIN_NAV_SECTIONS = [
   {
     id: "general",
@@ -22,27 +23,20 @@ export const ADMIN_NAV_SECTIONS = [
     items: [{ id: "overview", label: "Tổng quan hệ thống", icon: LayoutDashboard }],
   },
   {
-    id: "org",
-    label: "Tổ chức",
-    items: [
-      { id: "departments", label: "Phòng ban", icon: Building2, permission: "ORG_MANAGE" },
-      { id: "positions", label: "Chức vụ & Thang lương", icon: Briefcase, permission: "ORG_MANAGE" },
-    ],
-  },
-  {
-    id: "hr",
-    label: "Nhân sự",
-    items: [
-      { id: "employees", label: "Danh bạ nhân sự", icon: Users, permission: "EMPLOYEE_VIEW" },
-      { id: "contracts", label: "Hợp đồng lao động", icon: FileText, permission: "CONTRACT_MANAGE" },
-    ],
-  },
-  {
     id: "access",
     label: "Tài khoản & Phân quyền",
     items: [
       { id: "accounts", label: "Tài khoản người dùng", icon: KeyRound, permission: "ACCOUNT_MANAGE" },
       { id: "permissions", label: "Phân quyền RBAC", icon: ShieldCheck, permission: "PERMISSION_ASSIGN" },
+    ],
+  },
+  {
+    id: "lookup",
+    label: "Tra cứu dữ liệu (chỉ xem)",
+    items: [
+      { id: "employees", label: "Danh bạ nhân sự", icon: Users },
+      { id: "departments", label: "Phòng ban", icon: Building2 },
+      { id: "positions", label: "Chức vụ & Thang lương", icon: Briefcase },
     ],
   },
 ];

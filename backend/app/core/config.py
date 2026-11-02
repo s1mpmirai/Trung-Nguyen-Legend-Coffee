@@ -51,6 +51,8 @@ class Settings:
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
     # Phòng Nhân sự quản lý hồ sơ, đơn từ, chấm công của toàn công ty; trưởng phòng khác chỉ quản lý phòng mình
     hr_department_code: str = os.getenv("HR_DEPARTMENT_CODE", "PB02").strip().upper()
+    # Ban Giám đốc: Quản lý thuộc phòng này (Tổng Giám đốc) điều hành toàn công ty
+    board_department_code: str = os.getenv("BOARD_DEPARTMENT_CODE", "PB01").strip().upper()
     # Frontend gọi API qua proxy cùng origin (Vite/nginx); chỉ mở CORS cho các origin dev đã biết
     cors_origins: list[str] = [
         origin.strip()

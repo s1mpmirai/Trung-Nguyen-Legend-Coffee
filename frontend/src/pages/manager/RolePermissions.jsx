@@ -135,7 +135,7 @@ const ROLE_RANK = { NHAN_VIEN: 0, TRUONG_NHOM: 1, QUAN_LY: 2, ADMIN: 3 };
 const ROLE_COLUMN_ORDER = ["NHAN_VIEN", "TRUONG_NHOM", "QUAN_LY", "ADMIN"];
 
 const ROLE_LABELS = {
-  ADMIN: "Quản trị viên tối cao",
+  ADMIN: "Quản trị hệ thống (IT)",
   QUAN_LY: "Quản lý / Trưởng phòng",
   TRUONG_NHOM: "Trưởng nhóm / Giám sát",
   NHAN_VIEN: "Nhân viên tiêu chuẩn",

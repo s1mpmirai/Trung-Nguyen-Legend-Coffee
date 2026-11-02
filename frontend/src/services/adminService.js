@@ -56,6 +56,11 @@ export async function updateAccount(ma_nv, accountData) {
 export async function updateAccountStatus(ma_nv, status) {
   return apiClient.put(`/accounts/${ma_nv}/status`, { trang_thai: status });
 }
+/** Xóa tài khoản đăng nhập (hồ sơ nhân sự giữ nguyên, có thể cấp lại tài khoản sau). */
+export async function deleteAccount(ma_nv) {
+  return apiClient.delete(`/accounts/${ma_nv}`);
+}
+
 export async function getEmployeesWithoutAccount() {
   return apiClient.get("/accounts/without_account");
 }

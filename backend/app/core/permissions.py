@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.data_scope import DataScope
+from app.core.roles import ADMIN_ROLE, ADMIN_SYSTEM_PERMISSIONS
 from app.core.security import decode_access_token, oauth2_scheme
 from app.db.session import get_db
 from app.repositories import auth_repository
@@ -14,7 +15,7 @@ from app.repositories.employee_repository import apply_due_terminations
 from app.repositories.permission_repository import get_employee_permissions
 
 # Phạm vi dữ liệu (xem data_scope):
-# - ADMIN và Quản lý thuộc Phòng Nhân sự: toàn công ty.
+# - ADMIN (chỉ xem danh bạ), Quản lý thuộc Phòng Nhân sự hoặc Ban Giám đốc: toàn công ty.
 # - Quản lý phòng ban khác: nhân sự trong phòng mình + cấp dưới trực tiếp.
 # - Còn lại (TRUONG_NHOM, nhân viên được cấp quyền riêng): chỉ cấp dưới trực tiếp (nhan_vien.ma_nql).
 
@@ -75,9 +76,12 @@ def get_current_account(
 
 
 def has_permission(account: dict[str, Any], *permission_codes: str) -> bool:
-    """ADMIN có toàn quyền; các vai trò khác cần ít nhất một trong các quyền được liệt kê."""
-    if account["ma_vai_tro"] == "ADMIN":
-        return True
+    """
+    Cần ít nhất một trong các quyền được liệt kê.
+    ADMIN (quản trị hệ thống) chỉ có các quyền hệ thống cố định, không có quyền nghiệp vụ.
+    """
+    if account["ma_vai_tro"] == ADMIN_ROLE:
+        return any(code in ADMIN_SYSTEM_PERMISSIONS for code in permission_codes)
     return any(code in account["permissions"] for code in permission_codes)
 
 
@@ -117,7 +121,7 @@ def data_scope(account: dict[str, Any], *company_wide_permissions: str) -> DataS
     if any(code in account["permissions"] for code in company_wide_permissions):
         return None
     if account["ma_vai_tro"] == "QUAN_LY":
-        if account.get("ma_pb") == settings.hr_department_code:
+        if account.get("ma_pb") in (settings.hr_department_code, settings.board_department_code):
             return None
         return DataScope(ma_nql=account["ma_nv"], ma_pb=account.get("ma_pb"))
     return DataScope(ma_nql=account["ma_nv"])

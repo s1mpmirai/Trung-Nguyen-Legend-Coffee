@@ -19,13 +19,13 @@ import {
   createDepartment,
   updateDepartment,
   deleteDepartment,
-} from "../../../services/adminService";
-import SortableHeader, { nextSort } from "../../../components/common/SortableHeader";
-import { SkeletonRows } from "../../../components/common/TableSkeleton";
-import EmptyState from "../../../components/common/EmptyState";
-import ErrorState from "../../../components/common/ErrorState";
-import ConfirmDialog from "../../../components/common/ConfirmDialog";
-import Modal from "../../../components/common/Modal";
+} from "../../services/adminService";
+import SortableHeader, { nextSort } from "../../components/common/SortableHeader";
+import { SkeletonRows } from "../../components/common/TableSkeleton";
+import EmptyState from "../../components/common/EmptyState";
+import ErrorState from "../../components/common/ErrorState";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import Modal from "../../components/common/Modal";
 import {
   TABLE_SCROLL,
   TABLE,
@@ -37,14 +37,19 @@ import {
   TD,
   STICKY_TH,
   STICKY_TD,
-} from "../../../components/common/tableStyles";
+} from "../../components/common/tableStyles";
 
 // Mã phòng ban do người dùng nhập (bỏ trống để hệ thống tự sinh mã kế tiếp)
 const CODE_PATTERN = /^[A-Z0-9_-]{2,10}$/;
 
 const EMPTY_FORM = { ma_pb: "", ten_pb: "", ma_truong_pb: "", sdt: "", mo_ta: "", trang_thai: 1 };
 
-export default function AdminDepartmentsTab() {
+/**
+ * Danh mục phòng ban dùng chung cho hai cổng:
+ * - Cổng Quản lý (người có ORG_MANAGE): thêm, sửa, xóa mềm, khôi phục.
+ * - Cổng Quản trị (readOnly): chỉ xem, tìm kiếm, sắp xếp – Admin không làm nghiệp vụ tổ chức.
+ */
+export default function DepartmentsPanel({ readOnly = false }) {
   const [departments, setDepartments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -248,9 +253,14 @@ export default function AdminDepartmentsTab() {
           <h1 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight uppercase">
             CƠ CẤU TỔ CHỨC PHÒNG BAN
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">Quản lý danh mục phòng ban, bổ nhiệm trưởng phòng và theo dõi số lượng nhân sự</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {readOnly
+              ? "Tra cứu danh mục phòng ban, trưởng phòng và số lượng nhân sự (chỉ xem)"
+              : "Quản lý danh mục phòng ban, bổ nhiệm trưởng phòng và theo dõi số lượng nhân sự"}
+          </p>
         </div>
 
+        {!readOnly && (
         <button
           type="button"
           onClick={handleOpenCreate}
@@ -259,6 +269,7 @@ export default function AdminDepartmentsTab() {
           <Plus size={15} aria-hidden="true" />
           <span>Thêm phòng ban mới</span>
         </button>
+        )}
       </div>
 
       {/* Tìm kiếm */}
@@ -334,7 +345,13 @@ export default function AdminDepartmentsTab() {
           <EmptyState
             icon={Building2}
             title={searchTerm ? "Không tìm thấy phòng ban phù hợp" : "Chưa có phòng ban nào"}
-            description={searchTerm ? `Không có phòng ban nào khớp với “${searchTerm}”.` : "Bấm “Thêm phòng ban mới” để tạo phòng ban đầu tiên."}
+            description={
+              searchTerm
+                ? `Không có phòng ban nào khớp với “${searchTerm}”.`
+                : readOnly
+                ? "Hệ thống chưa có phòng ban nào."
+                : "Bấm “Thêm phòng ban mới” để tạo phòng ban đầu tiên."
+            }
             hasFilters={Boolean(searchTerm)}
             onResetFilters={handleResetFilters}
           />
@@ -349,12 +366,12 @@ export default function AdminDepartmentsTab() {
                   <th scope="col" className={TH}>Điện thoại</th>
                   <SortableHeader className={TH} label="Số lượng NV" field="so_luong_nv" sort={sort} onSort={handleSort} />
                   <th scope="col" className={TH}>Mô tả nhiệm vụ</th>
-                  <th scope="col" className={`${TH} text-center`}>Thao tác</th>
+                  {!readOnly && <th scope="col" className={`${TH} text-center`}>Thao tác</th>}
                 </tr>
               </thead>
               <tbody className={TBODY}>
                 {isLoading ? (
-                  <SkeletonRows rows={6} columns={7} />
+                  <SkeletonRows rows={6} columns={readOnly ? 6 : 7} />
                 ) : (
                   filtered.map((pb) => {
                     const inactive = Number(pb.trang_thai) === 0;
@@ -396,6 +413,7 @@ export default function AdminDepartmentsTab() {
                           {pb.mo_ta || "—"}
                         </td>
 
+                        {!readOnly && (
                         <td className={`${TD} text-center whitespace-nowrap`}>
                           <div className="inline-flex items-center gap-1.5">
                             <button
@@ -432,6 +450,7 @@ export default function AdminDepartmentsTab() {
                             )}
                           </div>
                         </td>
+                        )}
                       </tr>
                     );
                   })

@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.datetime_utils import get_vietnam_now
+from app.core.roles import ADMIN_ROLE, ADMIN_SYSTEM_PERMISSIONS
 
 
 def get_all_permissions(db: Session) -> list[dict[str, Any]]:
@@ -42,6 +43,9 @@ def get_all_roles_with_permissions(db: Session) -> list[dict[str, Any]]:
     for m in mappings:
         r_id = m["ma_vai_tro"]
         role_perms_map.setdefault(r_id, []).append(m["ma_quyen"])
+
+    # Vai trò ADMIN cố định bộ quyền hệ thống (không phụ thuộc dữ liệu vai_tro_quyen)
+    role_perms_map[ADMIN_ROLE] = sorted(ADMIN_SYSTEM_PERMISSIONS)
 
     for role in roles:
         role["permissions"] = role_perms_map.get(role["ma_vai_tro"], [])
@@ -145,6 +149,10 @@ def get_employee_permissions(db: Session, ma_nv: str) -> Optional[dict[str, Any]
 
     # Quyền thực tế có hiệu lực = (Quyền vai trò + Quyền cấp riêng) - Quyền bị thu hồi
     effective_set = (set(role_perms) | set(custom_granted)) - set(custom_revoked)
+    # Quản trị hệ thống luôn đúng bộ quyền hệ thống cố định, không mang quyền nghiệp vụ
+    if ma_vai_tro == ADMIN_ROLE:
+        role_perms = sorted(ADMIN_SYSTEM_PERMISSIONS)
+        effective_set = set(ADMIN_SYSTEM_PERMISSIONS)
 
     return {
         "ma_nv": emp_dict["ma_nv"],

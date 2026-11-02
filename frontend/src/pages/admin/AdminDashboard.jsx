@@ -5,9 +5,8 @@ import AdminOverviewTab from "./tabs/AdminOverviewTab";
 import AdminEmployeesTab from "./tabs/AdminEmployeesTab";
 import AdminAccountsTab from "./tabs/AdminAccountsTab";
 import AdminPermissionsTab from "./tabs/AdminPermissionsTab";
-import AdminDepartmentsTab from "./tabs/AdminDepartmentsTab";
-import AdminPositionsTab from "./tabs/AdminPositionsTab";
-import AdminContractsTab from "./tabs/AdminContractsTab";
+import DepartmentsPanel from "../shared/DepartmentsPanel";
+import PositionsPanel from "../shared/PositionsPanel";
 import { navigateClean, replaceClean } from "../../utils/navigation";
 
 const COLLAPSE_KEY = "admin_sidebar_collapsed";
@@ -21,7 +20,8 @@ const readCollapsed = () => {
 };
 
 /**
- * AdminDashboard – khung Cổng Quản trị. Tab đang mở nằm trên URL (/admin/<tab>)
+ * AdminDashboard – khung Cổng Quản trị (quản trị hệ thống, tách biệt Cổng Quản lý nhân sự).
+ * Admin chỉ: thêm / xóa / khóa tài khoản, phân quyền; xem, tìm kiếm, lọc, sắp xếp dữ liệu. Tab đang mở nằm trên URL (/admin/<tab>)
  * nên tải lại trang hoặc mở liên kết trực tiếp vẫn giữ đúng tab.
  */
 export default function AdminDashboard({ userSession, routeTab = "", onLogout, onOpenEmployeeLogin }) {
@@ -61,12 +61,11 @@ export default function AdminDashboard({ userSession, routeTab = "", onLogout, o
         return <AdminAccountsTab userSession={userSession} />;
       case "permissions":
         return <AdminPermissionsTab userSession={userSession} />;
+      // Danh mục tổ chức: Admin chỉ xem / tìm kiếm / sắp xếp; thêm-sửa-xóa thuộc Cổng Quản lý
       case "departments":
-        return <AdminDepartmentsTab />;
+        return <DepartmentsPanel readOnly />;
       case "positions":
-        return <AdminPositionsTab />;
-      case "contracts":
-        return <AdminContractsTab />;
+        return <PositionsPanel readOnly />;
       default:
         return <AdminOverviewTab onNavigateTab={handleTabChange} allowedTabs={allowedTabs} />;
     }

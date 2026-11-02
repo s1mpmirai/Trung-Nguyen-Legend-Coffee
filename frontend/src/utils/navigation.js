@@ -65,10 +65,14 @@ const MANAGER_PORTAL_PERMISSIONS = [
 export const canAccessAdminPortal = (role, permissions = []) =>
   isAdminRole(role) || normalizePerms(permissions).includes("ACCOUNT_MANAGE");
 
-/** Cổng Quản lý: vai trò ADMIN / QUAN_LY / TRUONG_NHOM hoặc có quyền nghiệp vụ quản lý. */
+/**
+ * Cổng Quản lý: vai trò QUAN_LY / TRUONG_NHOM hoặc có quyền nghiệp vụ quản lý.
+ * ADMIN (quản trị hệ thống) KHÔNG vào Cổng Quản lý: giao diện Admin tách biệt với quản lý nhân sự.
+ */
 export const canAccessManagerPortal = (role, permissions = []) => {
   const r = normalizeRole(role);
-  if (r === "ADMIN" || r === "QUAN_LY" || r === "TRUONG_NHOM") return true;
+  if (r === "ADMIN") return false;
+  if (r === "QUAN_LY" || r === "TRUONG_NHOM") return true;
   return normalizePerms(permissions).some((p) => MANAGER_PORTAL_PERMISSIONS.includes(p));
 };
 

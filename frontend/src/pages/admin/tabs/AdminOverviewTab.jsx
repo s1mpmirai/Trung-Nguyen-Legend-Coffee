@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Users, KeyRound, Building2, FileText, ShieldCheck, LayoutDashboard, RefreshCw, Briefcase } from "lucide-react";
+import { Users, KeyRound, Building2, Lock, ShieldCheck, LayoutDashboard, RefreshCw, Briefcase } from "lucide-react";
 import { getAdminStats } from "../../../services/adminService";
 import ErrorState from "../../../components/common/ErrorState";
 import { getRoleLabel } from "../../../utils/navigation";
 
 const ROLE_DESCRIPTIONS = {
-  ADMIN: "Toàn quyền hệ thống",
+  ADMIN: "Quản trị hệ thống (IT)",
   QUAN_LY: "Quản lý nhân sự & lương",
   TRUONG_NHOM: "Giám sát nhóm",
   NHAN_VIEN: "Quyền cơ bản",
@@ -75,9 +75,8 @@ export default function AdminOverviewTab({ onNavigateTab, allowedTabs = [] }) {
     { tab: "accounts", icon: KeyRound, title: "Cấp tài khoản", note: `Chưa cấp: ${summary.nhan_su_chua_co_tai_khoan ?? 0}` },
     { tab: "permissions", icon: ShieldCheck, title: "Phân quyền RBAC", note: "Vai trò & quyền riêng" },
     { tab: "employees", icon: Users, title: "Danh bạ nhân sự", note: "Tìm kiếm nâng cao & sắp xếp" },
-    { tab: "contracts", icon: FileText, title: "Hợp đồng lao động", note: `Sắp hết hạn: ${summary.hop_dong_sap_het_han_30_ngay ?? 0}` },
-    { tab: "departments", icon: Building2, title: "Phòng ban", note: `${summary.tong_phong_ban ?? 0} phòng ban` },
-    { tab: "positions", icon: Briefcase, title: "Chức vụ & thang lương", note: `${summary.tong_chuc_vu ?? 0} chức vụ` },
+    { tab: "departments", icon: Building2, title: "Phòng ban", note: `${summary.tong_phong_ban ?? 0} phòng ban (chỉ xem)` },
+    { tab: "positions", icon: Briefcase, title: "Chức vụ & thang lương", note: `${summary.tong_chuc_vu ?? 0} chức vụ (chỉ xem)` },
   ].filter((s) => can(s.tab));
 
   return (
@@ -92,7 +91,9 @@ export default function AdminOverviewTab({ onNavigateTab, allowedTabs = [] }) {
           <h1 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight uppercase">
             TỔNG QUAN QUẢN TRỊ HỆ THỐNG
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">Số liệu tổng hợp về nhân sự, tài khoản, cơ cấu tổ chức và hợp đồng</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Quản trị tài khoản, phân quyền và tra cứu dữ liệu. Nghiệp vụ nhân sự thực hiện ở Cổng Quản lý.
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -155,10 +156,8 @@ export default function AdminOverviewTab({ onNavigateTab, allowedTabs = [] }) {
               <span className="text-sky-600 font-semibold">{summary.tong_chuc_vu ?? 0} chức vụ</span>
             </MetricCard>
 
-            <MetricCard title="Hợp đồng lao động" icon={FileText} value={summary.tong_hop_dong ?? 0} onClick={go("contracts")}>
-              <span className="text-emerald-600 font-semibold">{summary.hop_dong_hieu_luc ?? 0} hiệu lực</span>
-              <span className="text-slate-300" aria-hidden="true">•</span>
-              <span className="text-amber-600 font-medium">{summary.hop_dong_sap_het_han_30_ngay ?? 0} sắp hết hạn</span>
+            <MetricCard title="Tài khoản bị khóa" icon={Lock} value={summary.tai_khoan_khoa ?? 0} onClick={go("accounts")}>
+              <span className="text-slate-600 font-medium">trên tổng {summary.tong_tai_khoan ?? 0} tài khoản</span>
             </MetricCard>
           </div>
 

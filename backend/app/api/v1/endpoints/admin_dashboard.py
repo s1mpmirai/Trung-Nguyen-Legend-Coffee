@@ -14,7 +14,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 @router.get("/stats", response_model=AdminDashboardStatsResponse, summary="Thống kê tổng quan hệ thống Admin")
 def get_admin_dashboard_stats_endpoint(
     db: DbSession,
-    account: Annotated[dict, Depends(require_permission("ACCOUNT_MANAGE", "PERMISSION_ASSIGN", "ORG_MANAGE", "CONTRACT_MANAGE"))],
+    account: Annotated[dict, Depends(require_permission("ACCOUNT_MANAGE", "PERMISSION_ASSIGN"))],
 ):
-    """Lấy dữ liệu thống kê tổng thể toàn hệ thống (Nhân sự, Phòng ban, Tài khoản, Kho hàng, Hợp đồng) phục vụ Dashboard Admin."""
+    """Thống kê tổng quan cho Cổng Quản trị (tài khoản, phân quyền, quy mô nhân sự - tổ chức)."""
     return admin_dashboard_repository.get_admin_dashboard_stats(db)

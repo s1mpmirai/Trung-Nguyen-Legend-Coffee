@@ -9,7 +9,8 @@ from app.repositories.permission_repository import get_employee_permissions
 from app.schemas.auth_schemas import account_create
 from app.utils.auto_gen import define_pass
 
-PROTECTED_ADMIN = "NV01"
+# Tài khoản Quản trị hệ thống gốc (nhân viên IT), không phải Tổng Giám đốc
+PROTECTED_ADMIN = "NV21"
 VALID_ROLES = {"ADMIN", "QUAN_LY", "TRUONG_NHOM", "NHAN_VIEN"}
 VALID_ACCOUNT_STATUSES = {"HOAT_DONG", "KHOA"}
 MIN_PASSWORD_LENGTH = 6
@@ -33,7 +34,7 @@ def _check_can_manage(actor: dict, target_ma_nv: str, target_role: str | None) -
     if target_ma_nv == actor["ma_nv"]:
         raise PermissionError("Không thể tự thay đổi tài khoản của chính mình tại màn hình quản trị.")
     if target_ma_nv == PROTECTED_ADMIN:
-        raise PermissionError("Tài khoản Quản trị viên tối cao (NV01) được bảo vệ, không thể chỉnh sửa!")
+        raise PermissionError(f"Tài khoản Quản trị hệ thống gốc ({PROTECTED_ADMIN}) được bảo vệ, không thể chỉnh sửa hay xóa!")
     if actor["ma_vai_tro"] != "ADMIN" and target_role == "ADMIN":
         raise PermissionError("Chỉ Admin mới được thao tác trên tài khoản có vai trò ADMIN.")
 
@@ -193,6 +194,29 @@ def change_account_status(db: Session, ma_nv: str, trang_thai: str, actor: dict)
     db.commit()
     db.refresh(account)
     return account
+
+
+def delete_account(db: Session, ma_nv: str, actor: dict) -> dict:
+    """Xóa tài khoản đăng nhập của nhân sự; hồ sơ nhân sự giữ nguyên và có thể cấp lại tài khoản sau."""
+    clean_id = _clean(ma_nv)
+    account = account_repository.get_by_ma_nv(db, clean_id)
+    if not account:
+        raise ValueError(f"Không tìm thấy tài khoản của nhân viên {clean_id}")
+    _check_can_manage(actor, clean_id, account.ma_vai_tro)
+    if (
+        account.ma_vai_tro == "ADMIN"
+        and account.trang_thai == "HOAT_DONG"
+        and account_repository.count_active_admins(db) <= 1
+    ):
+        raise PermissionError("Không thể xóa tài khoản Quản trị hệ thống cuối cùng đang hoạt động.")
+
+    try:
+        account_repository.delete(db, account)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"ma_nv": clean_id, "message": f"Đã xóa tài khoản của nhân viên {clean_id}"}
 
 
 def change_password(db: Session, ma_nv: str, old_pass: str, new_pass: str):

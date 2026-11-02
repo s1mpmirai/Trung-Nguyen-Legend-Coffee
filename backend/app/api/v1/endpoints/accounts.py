@@ -76,6 +76,20 @@ def update_status_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
 
 
+@router.delete("/{ma_nv}", summary="Xóa tài khoản đăng nhập (giữ nguyên hồ sơ nhân sự)")
+def delete_account_endpoint(
+    ma_nv: str,
+    db: DbSession,
+    account: AccountManager,
+):
+    try:
+        return account_service.delete_account(db, ma_nv, actor=account)
+    except PermissionError as err:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err)) from err
+
+
 @router.post("/change-password")
 def change_password_endpoint(
     data: change_password_request,

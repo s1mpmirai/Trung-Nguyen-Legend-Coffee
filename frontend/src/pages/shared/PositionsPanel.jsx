@@ -21,13 +21,13 @@ import {
   updatePosition,
   deletePosition,
   createSalaryScale,
-} from "../../../services/adminService";
-import SortableHeader, { nextSort } from "../../../components/common/SortableHeader";
-import { SkeletonRows } from "../../../components/common/TableSkeleton";
-import EmptyState from "../../../components/common/EmptyState";
-import ErrorState from "../../../components/common/ErrorState";
-import ConfirmDialog from "../../../components/common/ConfirmDialog";
-import Modal from "../../../components/common/Modal";
+} from "../../services/adminService";
+import SortableHeader, { nextSort } from "../../components/common/SortableHeader";
+import { SkeletonRows } from "../../components/common/TableSkeleton";
+import EmptyState from "../../components/common/EmptyState";
+import ErrorState from "../../components/common/ErrorState";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import Modal from "../../components/common/Modal";
 import {
   TABLE_SCROLL,
   TABLE,
@@ -39,7 +39,7 @@ import {
   TD,
   STICKY_TH,
   STICKY_TD,
-} from "../../../components/common/tableStyles";
+} from "../../components/common/tableStyles";
 
 const CODE_PATTERN = /^[A-Z0-9_-]{2,10}$/;
 
@@ -55,7 +55,12 @@ const CAP_BAC_LABELS = {
 
 const formatMoney = (val) => `${Number(val || 0).toLocaleString("vi-VN")} đ`;
 
-export default function AdminPositionsTab() {
+/**
+ * Danh mục chức vụ & thang bảng lương dùng chung cho hai cổng:
+ * - Cổng Quản lý (người có ORG_MANAGE): thêm, sửa, xóa mềm chức vụ, thêm bậc lương.
+ * - Cổng Quản trị (readOnly): chỉ xem, tìm kiếm, sắp xếp và xem thang lương.
+ */
+export default function PositionsPanel({ readOnly = false }) {
   const [positions, setPositions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -308,9 +313,14 @@ export default function AdminPositionsTab() {
           <h1 className="font-['Plus_Jakarta_Sans',sans-serif] font-bold text-2xl text-slate-900 tracking-tight uppercase">
             CHỨC VỤ & THANG BẢNG LƯƠNG
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">Cấu hình cấp bậc chức danh, phụ cấp chức vụ và hệ số thang bảng lương</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {readOnly
+              ? "Tra cứu cấp bậc chức danh, phụ cấp chức vụ và thang bảng lương (chỉ xem)"
+              : "Cấu hình cấp bậc chức danh, phụ cấp chức vụ và hệ số thang bảng lương"}
+          </p>
         </div>
 
+        {!readOnly && (
         <button
           type="button"
           onClick={handleOpenCreate}
@@ -319,6 +329,7 @@ export default function AdminPositionsTab() {
           <Plus size={15} aria-hidden="true" />
           <span>Thêm chức vụ mới</span>
         </button>
+        )}
       </div>
 
       {/* Tìm kiếm */}
@@ -393,7 +404,13 @@ export default function AdminPositionsTab() {
           <EmptyState
             icon={Briefcase}
             title={searchTerm ? "Không tìm thấy chức vụ phù hợp" : "Chưa có chức vụ nào"}
-            description={searchTerm ? `Không có chức vụ nào khớp với “${searchTerm}”.` : "Bấm “Thêm chức vụ mới” để tạo chức vụ đầu tiên."}
+            description={
+              searchTerm
+                ? `Không có chức vụ nào khớp với “${searchTerm}”.`
+                : readOnly
+                ? "Hệ thống chưa có chức vụ nào."
+                : "Bấm “Thêm chức vụ mới” để tạo chức vụ đầu tiên."
+            }
             hasFilters={Boolean(searchTerm)}
             onResetFilters={handleResetFilters}
           />
@@ -408,12 +425,12 @@ export default function AdminPositionsTab() {
                   <SortableHeader className={TH} label="Phụ cấp chức vụ" field="phu_cap_chuc_vu" sort={sort} onSort={handleSort} />
                   <SortableHeader className={TH} label="Số nhân sự" field="so_luong_nv" sort={sort} onSort={handleSort} />
                   <th scope="col" className={TH}>Thang bậc lương</th>
-                  <th scope="col" className={`${TH} text-center`}>Thao tác</th>
+                  {!readOnly && <th scope="col" className={`${TH} text-center`}>Thao tác</th>}
                 </tr>
               </thead>
               <tbody className={TBODY}>
                 {isLoading ? (
-                  <SkeletonRows rows={6} columns={7} />
+                  <SkeletonRows rows={6} columns={readOnly ? 6 : 7} />
                 ) : (
                   filtered.map((cv) => {
                     const inactive = Number(cv.trang_thai) === 0;
@@ -456,6 +473,7 @@ export default function AdminPositionsTab() {
                           </button>
                         </td>
 
+                        {!readOnly && (
                         <td className={`${TD} text-center whitespace-nowrap`}>
                           <div className="inline-flex items-center gap-1.5">
                             <button
@@ -492,6 +510,7 @@ export default function AdminPositionsTab() {
                             )}
                           </div>
                         </td>
+                        )}
                       </tr>
                     );
                   })
@@ -709,6 +728,7 @@ export default function AdminPositionsTab() {
               </div>
             </div>
 
+            {!readOnly && (
             <form onSubmit={handleAddScaleSubmit} className="pt-3 border-t border-slate-100 space-y-3 text-xs" noValidate>
               <span className="text-xs font-bold text-slate-800">Thêm bậc lương mới:</span>
 
@@ -802,6 +822,7 @@ export default function AdminPositionsTab() {
                 </button>
               </div>
             </form>
+            )}
           </div>
         )}
       </Modal>

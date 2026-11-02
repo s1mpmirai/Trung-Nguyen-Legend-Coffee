@@ -80,7 +80,13 @@ def update_custom_permissions(
 ) -> dict[str, Any]:
     """Cấp hoặc thu hồi quyền tùy chỉnh cho nhân viên."""
     clean_id = ma_nv.strip().upper().replace("-", "")
-    _check_can_change(db, actor, clean_id)
+    target = _check_can_change(db, actor, clean_id)
+
+    if target["ma_vai_tro"] == "ADMIN":
+        raise ValueError(
+            "Tài khoản Quản trị hệ thống có bộ quyền cố định (tài khoản, phân quyền, xem danh bạ), "
+            "không cấp thêm quyền nghiệp vụ."
+        )
 
     items = [p.model_dump() for p in data.permissions]
     if actor["ma_vai_tro"] != "ADMIN" and any(p["ma_quyen"] in ADMIN_ONLY_PERMISSIONS for p in items):
@@ -93,13 +99,13 @@ def update_role_permissions(
 ) -> dict[str, Any]:
     """
     [Chỉ Admin] Chỉnh ma trận vai trò x quyền: thay toàn bộ quyền mặc định của một vai trò.
-    Vai trò ADMIN luôn có toàn quyền nên không chỉnh được.
+    Vai trò ADMIN có bộ quyền hệ thống cố định nên không chỉnh được.
     """
     if actor["ma_vai_tro"] != "ADMIN":
         raise PermissionError("Chỉ Admin mới được chỉnh ma trận phân quyền theo vai trò.")
     ma_vai_tro = ma_vai_tro.strip().upper()
     if ma_vai_tro == "ADMIN":
-        raise ValueError("Vai trò ADMIN luôn có toàn bộ quyền, không thể chỉnh.")
+        raise ValueError("Vai trò ADMIN có bộ quyền hệ thống cố định, không thể chỉnh.")
     roles = {r["ma_vai_tro"] for r in permission_repository.get_all_roles_with_permissions(db)}
     if ma_vai_tro not in roles:
         raise ValueError(f"Vai trò không tồn tại: {ma_vai_tro}")

@@ -10,7 +10,7 @@ import pytest
 
 from app.core.config import settings
 from app.core.data_scope import DataScope, scope_condition
-from app.core.permissions import MANAGE_PORTAL_PERMISSIONS, data_scope
+from app.core.permissions import MANAGE_PORTAL_PERMISSIONS, data_scope, has_permission
 from app.services import payroll_service
 from app.services.permission_service import ADMIN_ONLY_PERMISSIONS
 
@@ -26,6 +26,19 @@ def _account(role, ma_nv="NV50", ma_pb="PB06", permissions=()):
 def test_admin_va_quan_ly_phong_nhan_su_xem_toan_cong_ty():
     assert data_scope(_account("ADMIN", ma_pb="PB01")) is None
     assert data_scope(_account("QUAN_LY", ma_pb=HR)) is None
+
+
+def test_ban_giam_doc_xem_toan_cong_ty():
+    assert data_scope(_account("QUAN_LY", ma_nv="NV01", ma_pb=settings.board_department_code)) is None
+
+
+def test_admin_chi_co_quyen_he_thong_khong_co_quyen_nghiep_vu():
+    # Admin (quản trị hệ thống) tách biệt với quản lý nhân sự, kể cả khi dữ liệu quyền ghi nhầm
+    admin = _account("ADMIN", ma_nv="NV21", permissions={"PAYROLL_MANAGE", "ORG_MANAGE"})
+    for code in ("ACCOUNT_MANAGE", "PERMISSION_ASSIGN", "EMPLOYEE_VIEW"):
+        assert has_permission(admin, code)
+    for code in ("PAYROLL_MANAGE", "LEAVE_APPROVE", "ATTENDANCE_MANAGE", "ORG_MANAGE", "CONTRACT_MANAGE", "EMPLOYEE_DELETE"):
+        assert not has_permission(admin, code)
 
 
 def test_quan_ly_phong_khac_chi_xem_phong_minh_va_cap_duoi():

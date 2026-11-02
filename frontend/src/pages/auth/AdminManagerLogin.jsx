@@ -17,7 +17,7 @@ import DemoAccountButtons from '../../components/common/DemoAccountButtons';
 
 // Tài khoản demo đăng nhập nhanh (mật khẩu theo dữ liệu mẫu)
 const DEMO_ACCOUNTS = [
-  { id: 'NV01', password: '1', label: 'Admin', icon: ShieldCheck },
+  { id: 'NV21', password: '1', label: 'Admin (IT)', icon: ShieldCheck },
   { id: 'NV02', password: '1', label: 'Quản lý', icon: Briefcase },
 ];
 
@@ -191,7 +191,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
           </button>
         </form>
 
-        {/* Đăng nhập nhanh: Admin (NV01) và Quản lý (NV02) */}
+        {/* Đăng nhập nhanh: Admin hệ thống (NV21 – nhân viên IT) và Quản lý (NV02) */}
         <div className="mt-5">
           <DemoAccountButtons accounts={DEMO_ACCOUNTS} onSelect={handleDemoLogin} disabled={isLoading} />
         </div>
