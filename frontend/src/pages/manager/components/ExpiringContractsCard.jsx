@@ -87,12 +87,14 @@ export default function ExpiringContractsCard({ contracts, error, onNavigateTab 
 
       <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 mt-4">
         <span>Cảnh báo trước 60 ngày</span>
-        <button
-          onClick={() => onNavigateTab && onNavigateTab("employees")}
-          className="text-sky-600 font-semibold hover:underline cursor-pointer"
-        >
-          Xem hồ sơ nhân sự
-        </button>
+        {onNavigateTab && (
+          <button
+            onClick={() => onNavigateTab("employees")}
+            className="text-sky-600 font-semibold hover:underline cursor-pointer"
+          >
+            Xem hồ sơ nhân sự
+          </button>
+        )}
       </div>
     </div>
   );

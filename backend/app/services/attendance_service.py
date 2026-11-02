@@ -859,8 +859,8 @@ def toggle_monthly_attendance_lock(
         so_bang_luong_da_duyet = repo.count_finalized_payroll(db, thang, nam)
         if so_bang_luong_da_duyet:
             raise ValueError(
-                f"Không thể mở khóa: tháng {thang}/{nam} đã có {so_bang_luong_da_duyet} bảng lương được duyệt/chi trả. "
-                "Hãy mở lại các bảng lương về trạng thái Nháp trước."
+                f"Không thể mở khóa: tháng {thang}/{nam} đã có {so_bang_luong_da_duyet} bảng lương đã gửi duyệt / được duyệt / chi trả. "
+                "Hãy để Ban Giám đốc trả các bảng lương về Nháp trước."
             )
     return repo.set_monthly_attendance_lock(db, thang, nam, is_locked, nguoi_chot, ghi_chu)
 

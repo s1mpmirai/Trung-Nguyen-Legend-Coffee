@@ -31,13 +31,6 @@ def update_status(db: Session, ma_nv: str, trang_thai: str) -> TaiKhoan | None:
         db.flush()
     return account
 
-def delete(db: Session, account: TaiKhoan) -> None:
-    """Xóa tài khoản đăng nhập (quyền cấp riêng tai_khoan_quyen tự xóa theo ON DELETE CASCADE).
-    Hồ sơ nhân viên và lịch sử công / lương / đơn từ vẫn giữ nguyên vì gắn với nhan_vien."""
-    db.delete(account)
-    db.flush()
-
-
 def count_active_admins(db: Session) -> int:
     return db.query(TaiKhoan).filter(TaiKhoan.ma_vai_tro == "ADMIN", TaiKhoan.trang_thai == "HOAT_DONG").count()
 

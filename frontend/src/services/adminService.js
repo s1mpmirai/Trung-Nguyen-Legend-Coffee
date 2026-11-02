@@ -56,11 +56,6 @@ export async function updateAccount(ma_nv, accountData) {
 export async function updateAccountStatus(ma_nv, status) {
   return apiClient.put(`/accounts/${ma_nv}/status`, { trang_thai: status });
 }
-/** Xóa tài khoản đăng nhập (hồ sơ nhân sự giữ nguyên, có thể cấp lại tài khoản sau). */
-export async function deleteAccount(ma_nv) {
-  return apiClient.delete(`/accounts/${ma_nv}`);
-}
-
 export async function getEmployeesWithoutAccount() {
   return apiClient.get("/accounts/without_account");
 }
@@ -168,10 +163,11 @@ export async function updateContract(ma_hd, contractData) {
 }
 
 export async function liquidateContract(ma_hd, data = {}) {
-  // Backend nhận ngày thanh lý qua query string (?ngay_ket_thuc=YYYY-MM-DD), không đọc body
-  // (API không có trường lý do thanh lý).
   return apiClient.put(`/contracts/${ma_hd}/liquidate`, null, {
-    params: { ngay_ket_thuc: data.ngay_ket_thuc || undefined },
+    params: {
+      ngay_ket_thuc: data.ngay_ket_thuc || undefined,
+      cho_thoi_viec: data.cho_thoi_viec ? true : undefined,
+    },
   });
 }
 

@@ -65,7 +65,7 @@ class payroll_calculate_request(BaseModel):
 
 class payroll_status_update(BaseModel):
     """Cập nhật trạng thái duyệt/chi trả bảng lương."""
-    trang_thai: str = Field(..., description="Trạng thái: NHAP, DA_DUYET, DA_TRA")
+    trang_thai: str = Field(..., description="Trạng thái: NHAP, CHO_DUYET, DA_DUYET, DA_TRA")
 
 
 class payroll_summary_item(BaseModel):
@@ -73,6 +73,7 @@ class payroll_summary_item(BaseModel):
     ma_bl: int
     ma_nv: str
     ho_ten: Optional[str] = None
+    ma_pb: Optional[str] = None
     ten_pb: Optional[str] = None
     ten_cv: Optional[str] = None
     luong_co_ban: Optional[float] = 0
@@ -94,6 +95,9 @@ class payroll_summary_item(BaseModel):
     trang_thai: str = "NHAP"
     ghi_chu: Optional[str] = None
     tai_khoan_nhan_luong: Optional[str] = None
+    nguoi_gui: Optional[str] = None
+    ten_nguoi_gui: Optional[str] = None
+    ngay_gui: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -130,3 +134,19 @@ class payroll_year_summary_response(BaseModel):
         from_attributes = True
 
 
+
+
+class payroll_pending_period(BaseModel):
+    """Một kỳ lương đang chờ người duyệt hiện tại duyệt."""
+    thang: int
+    nam: int
+    so_bang_luong: int = 0
+    nguoi_gui: Optional[str] = None
+    ten_nguoi_gui: Optional[str] = None
+    ngay_gui: Optional[datetime] = None
+
+
+class payroll_pending_approval_response(BaseModel):
+    """Bảng lương Kế toán đã gửi, đang chờ duyệt."""
+    tong_bang_luong: int = 0
+    ky_luong: List[payroll_pending_period] = Field(default_factory=list)

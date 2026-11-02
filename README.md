@@ -24,6 +24,8 @@ Lần chạy đầu, MariaDB tự chạy lần lượt các file trong `database
 docker exec -i trungnguyen_hrm_lite sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"' < database/migrations/04_kiem_toan_bao_mat_nghiep_vu.sql
 docker exec -i trungnguyen_hrm_lite sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"' < database/migrations/05_pham_vi_phan_quyen.sql
 docker exec -i trungnguyen_hrm_lite sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"' < database/migrations/06_tach_quan_tri_he_thong.sql
+docker exec -i trungnguyen_hrm_lite sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"' < database/migrations/07_vai_tro_theo_phong_ban.sql
+docker exec -i trungnguyen_hrm_lite sh -c 'mariadb -uroot -p"$MYSQL_ROOT_PASSWORD"' < database/migrations/08_gui_duyet_bang_luong.sql
 ```
 
 Muốn nạp lại toàn bộ dữ liệu mẫu đã chỉnh sửa (xóa sạch dữ liệu hiện có): sao lưu trước (mục 3), rồi `docker compose down -v && docker compose up -d --build`.
@@ -35,11 +37,10 @@ Mật khẩu dữ liệu mẫu là `1` (chỉ dùng để demo; tài khoản do 
 | Mã NV | Vai trò | Cổng đăng nhập |
 | --- | --- | --- |
 | NV21 | ADMIN (nhân viên Phòng IT, quản trị hệ thống) | `/login-manage` → Cổng Admin |
-| NV01 | QUAN_LY (Tổng Giám đốc) + quyền riêng `PAYROLL_MANAGE`, `ORG_MANAGE`, `CONTRACT_MANAGE` | `/login-manage` → Cổng Quản lý (toàn công ty, duyệt lương) |
-| NV02, NV08 | QUAN_LY (Phòng Nhân sự) + quyền riêng `ATTENDANCE_LOCK`, `ORG_MANAGE`, `CONTRACT_MANAGE` | `/login-manage` → Cổng Quản lý (toàn công ty, chốt công, hợp đồng, phòng ban, chức vụ) |
-| NV03 | QUAN_LY (Phòng Kế toán) + quyền riêng `PAYROLL_MANAGE` | `/login-manage` → Cổng Quản lý (phòng mình + tính lương toàn công ty) |
-| NV04, NV05, NV06, NV07 | QUAN_LY (trưởng phòng khác) | `/login-manage` → Cổng Quản lý (chỉ phòng mình) |
-| NV09 | TRUONG_NHOM | `/login-manage` → Cổng Quản lý (chỉ nhân sự cấp dưới trực tiếp) |
+| NV01 | BAN_GIAM_DOC (Tổng Giám đốc) | `/login-manage` → Cổng Quản lý (toàn công ty, báo cáo, duyệt đơn, duyệt bảng lương) |
+| NV02, NV08 | NHAN_SU (Phòng Nhân sự) | `/login-manage` → Cổng Quản lý (hồ sơ, hợp đồng, phòng ban, chức vụ & thang lương, chấm công / chốt công, duyệt đơn) |
+| NV03, NV11 | KE_TOAN (Phòng Kế toán); NV03 thêm quyền riêng `PAYROLL_APPROVE` chỉ để duyệt lương Ban Giám đốc | `/login-manage` → Cổng Quản lý (tính lương, xác nhận chi trả, không duyệt lương). NV11 tính lương rồi bấm "Gửi duyệt", NV01 duyệt hoặc trả về; bảng lương của NV01 do NV03 duyệt |
+| NV04, NV05, NV06, NV09 | NHAN_VIEN (trước là trưởng phòng / trưởng nhóm) | `/login` → Cổng Nhân viên |
 | NV10 | NHAN_VIEN | `/login` → Cổng Nhân viên |
 | NV14 | NHAN_VIEN + quyền riêng `ACCOUNT_MANAGE` | `/login-manage` → Cổng Admin (chỉ mục Tài khoản) |
 
@@ -85,9 +86,9 @@ Quyền hiệu lực = quyền của vai trò ∪ quyền cấp riêng − quy�
 Cổng Admin chỉ dành cho ADMIN hoặc tài khoản có `ACCOUNT_MANAGE`, và **tách biệt với Cổng Quản lý** (yêu cầu đồ án mục II.2):
 
 - **ADMIN = quản trị hệ thống (nhân viên IT), không phải giám đốc.** Vai trò ADMIN cố định 3 quyền `ACCOUNT_MANAGE`, `PERMISSION_ASSIGN`, `EMPLOYEE_VIEW` (chặn cứng ở backend, `app/core/roles.py`), không vào được Cổng Quản lý và không có quyền nghiệp vụ (duyệt đơn, chấm công, lương, hợp đồng, tổ chức).
-- Cổng Admin: thêm / xóa / khóa tài khoản, phân quyền (vai trò, quyền riêng, ma trận vai trò × quyền); xem, tìm kiếm nâng cao, lọc, sắp xếp danh bạ nhân sự, phòng ban, chức vụ (chỉ xem).
+- Cổng Admin: cấp / khóa / mở khóa tài khoản, phân quyền (vai trò, quyền riêng, ma trận vai trò × quyền); xem, tìm kiếm nâng cao, lọc, sắp xếp danh bạ nhân sự, phòng ban, chức vụ (chỉ xem).
 - Hợp đồng lao động, thêm/sửa/xóa phòng ban, chức vụ & thang lương nằm ở Cổng Quản lý (quyền `CONTRACT_MANAGE`, `ORG_MANAGE`).
-- Xóa tài khoản chỉ xóa thông tin đăng nhập; hồ sơ nhân sự và lịch sử công / lương / đơn từ giữ nguyên. Không xóa được tài khoản của chính mình, tài khoản quản trị gốc `NV21` hay ADMIN hoạt động cuối cùng.
+- Không xóa tài khoản: muốn ngừng cho đăng nhập thì khóa tài khoản (mở khóa lại được). Không khóa được tài khoản của chính mình, tài khoản quản trị gốc `NV21` hay ADMIN hoạt động cuối cùng.
 
 **Phạm vi dữ liệu** (áp dụng cho danh sách và hồ sơ nhân sự, đơn từ, chấm công, báo cáo, phân quyền):
 

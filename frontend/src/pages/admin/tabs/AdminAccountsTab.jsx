@@ -27,14 +27,12 @@ import {
   RotateCcw,
   Wand2,
   Users,
-  Trash2,
 } from "lucide-react";
 import {
   getAccountsList,
   createAccount,
   updateAccount,
   updateAccountStatus,
-  deleteAccount,
   getEmployeesWithoutAccountDetails,
 } from "../../../services/adminService";
 import SortableHeader, { nextSort } from "../../../components/common/SortableHeader";
@@ -61,12 +59,13 @@ import { getRoleLabel, isAdminRole } from "../../../utils/navigation";
 // "ADMIN" chỉ hiện với người đang đăng nhập là Quản trị viên (máy chủ trả 403 nếu không phải).
 const ROLE_OPTIONS = [
   { value: "NHAN_VIEN", label: "Nhân viên", hint: "Quyền hạn tiêu chuẩn" },
-  { value: "TRUONG_NHOM", label: "Trưởng nhóm", hint: "Duyệt đơn và theo dõi nhóm" },
-  { value: "QUAN_LY", label: "Quản lý", hint: "Quản lý nhân sự, chấm công, lương" },
+  { value: "BAN_GIAM_DOC", label: "Ban Giám đốc", hint: "Xem toàn công ty, duyệt đơn, duyệt lương" },
+  { value: "NHAN_SU", label: "Phòng Nhân sự", hint: "Hồ sơ, hợp đồng, tổ chức, chấm công" },
+  { value: "KE_TOAN", label: "Phòng Kế toán", hint: "Tính lương, xác nhận chi trả" },
   { value: "ADMIN", label: "Quản trị viên (ADMIN)", hint: "Quản trị tài khoản & phân quyền, không làm nghiệp vụ", adminOnly: true },
 ];
 
-// Tài khoản Quản trị hệ thống gốc (khớp PROTECTED_ADMIN ở backend): không sửa, khóa hay xóa được
+// Tài khoản Quản trị hệ thống gốc (khớp PROTECTED_ADMIN ở backend): không sửa hay khóa được
 const ROOT_ADMIN_MA_NV = "NV21";
 
 const STATUS_LABELS = { HOAT_DONG: "Đang hoạt động", KHOA: "Đã khóa" };
@@ -75,8 +74,9 @@ const MIN_PASSWORD = 6;
 
 const roleBadges = {
   ADMIN: "bg-rose-50 text-rose-800 border-rose-200 font-bold",
-  QUAN_LY: "bg-sky-50 text-sky-800 border-sky-300 font-semibold",
-  TRUONG_NHOM: "bg-purple-50 text-purple-800 border-purple-300 font-semibold",
+  BAN_GIAM_DOC: "bg-sky-50 text-sky-800 border-sky-300 font-semibold",
+  NHAN_SU: "bg-purple-50 text-purple-800 border-purple-300 font-semibold",
+  KE_TOAN: "bg-amber-50 text-amber-800 border-amber-300 font-semibold",
   NHAN_VIEN: "bg-slate-100 text-slate-700 border-slate-200",
 };
 
@@ -329,7 +329,7 @@ export default function AdminAccountsTab({ userSession }) {
         message: (
           <>
             Tài khoản của <strong>{currentUnassignedEmp?.ho_ten} ({createForm.ma_nv})</strong> sẽ có{" "}
-            <strong>quyền quản trị hệ thống</strong> (cấp / xóa / khóa tài khoản, phân quyền) và không có quyền nghiệp vụ nhân sự.
+            <strong>quyền quản trị hệ thống</strong> (cấp / khóa tài khoản, phân quyền) và không có quyền nghiệp vụ nhân sự.
             Chỉ cấp cho nhân viên IT phụ trách hệ thống.
           </>
         ),
@@ -479,30 +479,6 @@ export default function AdminAccountsTab({ userSession }) {
         setConfirm(null);
         showToast(`Đã ${locking ? "khóa" : "mở khóa"} tài khoản ${acc.ma_nv}.`);
         fetchAccounts();
-      },
-    });
-  };
-
-  // ────────────────── XÓA TÀI KHOẢN ──────────────────
-  const requestDelete = (acc) => {
-    setConfirm({
-      title: "Xóa tài khoản?",
-      message: (
-        <>
-          Tài khoản đăng nhập của <strong>{acc.ho_ten} ({acc.ma_nv})</strong> sẽ bị xóa vĩnh viễn cùng các quyền cấp riêng.
-          Hồ sơ nhân sự, chấm công, lương và đơn từ vẫn được giữ nguyên; có thể cấp lại tài khoản mới sau.
-        </>
-      ),
-      confirmLabel: "Xóa tài khoản",
-      variant: "danger",
-      icon: Trash2,
-      onConfirm: async () => {
-        await deleteAccount(acc.ma_nv);
-        setConfirm(null);
-        showToast(`Đã xóa tài khoản ${acc.ma_nv}.`);
-        // Trang hiện tại có thể trống sau khi xóa phần tử cuối
-        if (accounts.length === 1 && page > 1) setPage((p) => p - 1);
-        else fetchAccounts();
       },
     });
   };
@@ -762,7 +738,7 @@ export default function AdminAccountsTab({ userSession }) {
                                 className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-md border border-slate-200 select-none"
                                 title={
                                   isRootAdmin
-                                    ? "Tài khoản Quản trị hệ thống gốc, không thể chỉnh sửa, khóa hay xóa"
+                                    ? "Tài khoản Quản trị hệ thống gốc, không thể chỉnh sửa hay khóa"
                                     : "Chỉ Quản trị viên mới được chỉnh sửa tài khoản Quản trị viên"
                                 }
                               >
@@ -794,16 +770,6 @@ export default function AdminAccountsTab({ userSession }) {
                                 >
                                   {isLocked ? <Unlock size={13} aria-hidden="true" /> : <Lock size={13} aria-hidden="true" />}
                                   <span>{isLocked ? "Mở khóa" : "Khóa"}</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => requestDelete(acc)}
-                                  className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                  title="Xóa tài khoản (giữ nguyên hồ sơ nhân sự)"
-                                  aria-label={`Xóa tài khoản ${acc.ma_nv}`}
-                                >
-                                  <Trash2 size={15} />
                                 </button>
                               </>
                             )}

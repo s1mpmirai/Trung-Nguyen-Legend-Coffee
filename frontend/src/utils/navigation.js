@@ -32,10 +32,14 @@ export const getCleanRoute = () => {
 
 export const ROLE_LABELS = {
   ADMIN: "Quản trị viên hệ thống",
-  QUAN_LY: "Quản lý",
-  TRUONG_NHOM: "Trưởng nhóm",
+  BAN_GIAM_DOC: "Ban Giám đốc",
+  NHAN_SU: "Phòng Nhân sự",
+  KE_TOAN: "Phòng Kế toán",
   NHAN_VIEN: "Nhân viên",
 };
+
+/** Vai trò nghiệp vụ theo phòng ban, dùng Cổng Quản lý (khớp BUSINESS_ROLES ở backend/app/core/roles.py) */
+export const BUSINESS_ROLES = ["BAN_GIAM_DOC", "NHAN_SU", "KE_TOAN"];
 
 export const getRoleLabel = (role) => {
   const key = String(role || "").toUpperCase();
@@ -57,6 +61,7 @@ const MANAGER_PORTAL_PERMISSIONS = [
   "ATTENDANCE_MANAGE",
   "ATTENDANCE_LOCK",
   "PAYROLL_MANAGE",
+  "PAYROLL_APPROVE",
   "REPORT_VIEW",
   "PERMISSION_ASSIGN",
 ];
@@ -66,13 +71,13 @@ export const canAccessAdminPortal = (role, permissions = []) =>
   isAdminRole(role) || normalizePerms(permissions).includes("ACCOUNT_MANAGE");
 
 /**
- * Cổng Quản lý: vai trò QUAN_LY / TRUONG_NHOM hoặc có quyền nghiệp vụ quản lý.
+ * Cổng Quản lý: vai trò Ban Giám đốc / Nhân sự / Kế toán hoặc có quyền nghiệp vụ quản lý.
  * ADMIN (quản trị hệ thống) KHÔNG vào Cổng Quản lý: giao diện Admin tách biệt với quản lý nhân sự.
  */
 export const canAccessManagerPortal = (role, permissions = []) => {
   const r = normalizeRole(role);
   if (r === "ADMIN") return false;
-  if (r === "QUAN_LY" || r === "TRUONG_NHOM") return true;
+  if (BUSINESS_ROLES.includes(r)) return true;
   return normalizePerms(permissions).some((p) => MANAGER_PORTAL_PERMISSIONS.includes(p));
 };
 

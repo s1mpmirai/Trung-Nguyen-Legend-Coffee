@@ -14,11 +14,15 @@ export const ADMIN_ONLY_PERMISSIONS = [
   "ORG_MANAGE",
   "CONTRACT_MANAGE",
   "PAYROLL_MANAGE",
+  "PAYROLL_APPROVE",
   "ATTENDANCE_LOCK",
 ];
 
-/** Vai trò Quản lý được phép bổ nhiệm (ADMIN / QUAN_LY chỉ ADMIN mới bổ nhiệm được) */
-export const ROLES_ASSIGNABLE_BY_MANAGER = ["NHAN_VIEN", "TRUONG_NHOM"];
+/** Mã phòng Ban Giám đốc (khớp BOARD_DEPARTMENT_CODE ở backend): người được cấp riêng quyền duyệt lương chỉ duyệt lương phòng này */
+export const BOARD_DEPARTMENT_CODE = "PB01";
+
+/** Vai trò người không phải Admin được phép gán (vai trò phòng ban và ADMIN chỉ Admin mới gán được) */
+export const ROLES_ASSIGNABLE_BY_MANAGER = ["NHAN_VIEN"];
 
 const readStoredPermissions = () => {
   try {
@@ -29,17 +33,38 @@ const readStoredPermissions = () => {
   }
 };
 
+/**
+ * Quyền cần có (ít nhất một) để mở từng mục của Cổng Quản lý; khớp kiểm tra quyền ở backend.
+ * Mục không có quyền thì ẩn khỏi menu và không mở được (kể cả qua nút / liên kết trong trang).
+ */
+export const MANAGER_TAB_PERMISSIONS = {
+  employees: ["EMPLOYEE_VIEW"],
+  reports: ["REPORT_VIEW"],
+  "profile-requests": ["EMPLOYEE_UPDATE"],
+  leaves: ["LEAVE_APPROVE"],
+  attendance: ["ATTENDANCE_MANAGE"],
+  payroll: ["PAYROLL_MANAGE", "PAYROLL_APPROVE"],
+  contracts: ["CONTRACT_MANAGE"],
+  departments: ["ORG_MANAGE"],
+  positions: ["ORG_MANAGE"],
+  permissions: ["PERMISSION_ASSIGN"],
+  "role-permissions": ["PERMISSION_ASSIGN"],
+};
+
 export function getManagerAccess(userSession) {
   const role = String(userSession?.role || localStorage.getItem("user_role") || "").toUpperCase();
   const permissions = Array.isArray(userSession?.permissions) ? userSession.permissions : readStoredPermissions();
   const maNv = userSession?.ma_nv || localStorage.getItem("user_ma_nv") || localStorage.getItem("ma_nv") || "";
   const isAdmin = role === "ADMIN";
+  const can = (perm) => isAdmin || permissions.includes(perm);
   return {
     role,
     permissions,
     maNv,
     isAdmin,
-    can: (perm) => isAdmin || permissions.includes(perm),
+    can,
+    /** Mở được mục (tab) của Cổng Quản lý hay không; "dashboard" luôn mở được */
+    canOpen: (tab) => tab === "dashboard" || (MANAGER_TAB_PERMISSIONS[tab] || []).some(can),
   };
 }
 

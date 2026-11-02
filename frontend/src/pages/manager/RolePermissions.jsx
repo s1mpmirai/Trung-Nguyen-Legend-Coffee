@@ -22,6 +22,7 @@ import {
   FileBarChart2,
   UserX,
   Wallet,
+  BadgeCheck,
 } from "lucide-react";
 import apiClient from "../../services/apiClient";
 import {
@@ -48,7 +49,7 @@ const PERMISSION_META = [
     icon: Clock,
     color: "amber",
     desc: "Theo dõi bảng công hàng ngày, sửa giờ vào/ra và phê duyệt công (chốt công tháng là quyền riêng).",
-    defaultFor: ["QUAN_LY", "TRUONG_NHOM"],
+    defaultFor: ["NHAN_SU"],
   },
   {
     ma_quyen: "LEAVE_APPROVE",
@@ -57,16 +58,25 @@ const PERMISSION_META = [
     icon: ClipboardCheck,
     color: "emerald",
     desc: "Ký duyệt hoặc từ chối các đơn xin nghỉ phép, đơn xin thôi việc của nhân viên trong đội ngũ.",
-    defaultFor: ["QUAN_LY", "TRUONG_NHOM"],
+    defaultFor: ["BAN_GIAM_DOC", "NHAN_SU"],
   },
   {
     ma_quyen: "PAYROLL_MANAGE",
-    label: "Tính toán & Phê duyệt Bảng lương",
+    label: "Tính lương & Xác nhận chi trả",
     group: "Lương bổng & Đãi ngộ",
     icon: CreditCard,
     color: "purple",
-    desc: "Xem tổng quỹ lương, tính toán thưởng phạt, kiểm tra phiếu lương và phê duyệt chi trả lương tháng.",
-    defaultFor: ["QUAN_LY"],
+    desc: "Tính bảng lương tháng từ bảng công đã chốt, kiểm tra phiếu lương và xác nhận đã chi trả. Không duyệt lương.",
+    defaultFor: ["KE_TOAN"],
+  },
+  {
+    ma_quyen: "PAYROLL_APPROVE",
+    label: "Duyệt Bảng lương",
+    group: "Lương bổng & Đãi ngộ",
+    icon: BadgeCheck,
+    color: "purple",
+    desc: "Duyệt bảng lương tháng do Kế toán lập hoặc trả về Nháp để tính lại. Không tính lương.",
+    defaultFor: ["BAN_GIAM_DOC"],
   },
   {
     ma_quyen: "EMPLOYEE_VIEW",
@@ -75,7 +85,7 @@ const PERMISSION_META = [
     icon: Users,
     color: "sky",
     desc: "Tra cứu danh bạ nhân sự, lý lịch công tác, hợp đồng lao động và thông tin liên lạc.",
-    defaultFor: ["QUAN_LY", "TRUONG_NHOM"],
+    defaultFor: ["BAN_GIAM_DOC", "NHAN_SU", "KE_TOAN"],
   },
   {
     ma_quyen: "EMPLOYEE_CREATE",
@@ -84,7 +94,7 @@ const PERMISSION_META = [
     icon: UserCheck,
     color: "indigo",
     desc: "Tiếp nhận và tạo mới hồ sơ nhân sự, đăng ký chức vụ và phòng ban trực thuộc.",
-    defaultFor: ["QUAN_LY"],
+    defaultFor: ["NHAN_SU"],
   },
   {
     ma_quyen: "EMPLOYEE_UPDATE",
@@ -93,7 +103,7 @@ const PERMISSION_META = [
     icon: Shield,
     color: "blue",
     desc: "Phê duyệt các yêu cầu thay đổi thông tin cá nhân và cập nhật chức danh cho nhân viên.",
-    defaultFor: ["QUAN_LY"],
+    defaultFor: ["NHAN_SU"],
   },
   {
     ma_quyen: "EMPLOYEE_DELETE",
@@ -131,13 +141,14 @@ const PERMISSION_META = [
 const PERMISSION_META_MAP = Object.fromEntries(PERMISSION_META.map((p) => [p.ma_quyen, p]));
 
 // Thứ bậc vai trò để phân biệt thăng chức / hạ vai trò khi thông báo
-const ROLE_RANK = { NHAN_VIEN: 0, TRUONG_NHOM: 1, QUAN_LY: 2, ADMIN: 3 };
-const ROLE_COLUMN_ORDER = ["NHAN_VIEN", "TRUONG_NHOM", "QUAN_LY", "ADMIN"];
+const ROLE_RANK = { NHAN_VIEN: 0, KE_TOAN: 1, NHAN_SU: 1, BAN_GIAM_DOC: 2, ADMIN: 3 };
+const ROLE_COLUMN_ORDER = ["NHAN_VIEN", "KE_TOAN", "NHAN_SU", "BAN_GIAM_DOC", "ADMIN"];
 
 const ROLE_LABELS = {
   ADMIN: "Quản trị hệ thống (IT)",
-  QUAN_LY: "Quản lý / Trưởng phòng",
-  TRUONG_NHOM: "Trưởng nhóm / Giám sát",
+  BAN_GIAM_DOC: "Ban Giám đốc",
+  NHAN_SU: "Phòng Nhân sự",
+  KE_TOAN: "Phòng Kế toán",
   NHAN_VIEN: "Nhân viên tiêu chuẩn",
 };
 
@@ -172,7 +183,7 @@ export default function RolePermissions({ userSession }) {
   const [isSavingPerms, setIsSavingPerms] = useState(false);
 
   // Bổ nhiệm vai trò
-  const [promoteRole, setPromoteRole] = useState("TRUONG_NHOM");
+  const [promoteRole, setPromoteRole] = useState("NHAN_VIEN");
   const [isPromoting, setIsPromoting] = useState(false);
   const [roleConfirmOpen, setRoleConfirmOpen] = useState(false);
   const [roleError, setRoleError] = useState("");
@@ -219,7 +230,7 @@ export default function RolePermissions({ userSession }) {
     try {
       const data = await getEmployeePermissions(maNv);
       setEmpDetail(data);
-      setPromoteRole(data.ma_vai_tro === "TRUONG_NHOM" ? "NHAN_VIEN" : "TRUONG_NHOM");
+      setPromoteRole(data.ma_vai_tro || "NHAN_VIEN");
 
       // Trạng thái bật / tắt của từng quyền = quyền hiệu lực hiện tại của nhân sự
       const initialPerms = {};
@@ -286,14 +297,15 @@ export default function RolePermissions({ userSession }) {
     ? ""
     : empDetail.ma_nv === access.maNv
     ? "Bạn không thể tự thay đổi vai trò hoặc quyền của chính mình."
-    : !actorIsAdmin && (targetRole === "ADMIN" || targetRole === "QUAN_LY")
-    ? "Chỉ Admin mới được thay đổi vai trò / quyền của tài khoản Quản lý hoặc Admin."
+    : !actorIsAdmin && targetRole && !ROLES_ASSIGNABLE_BY_MANAGER.includes(targetRole)
+    ? "Chỉ Admin mới được thay đổi vai trò / quyền của tài khoản Ban Giám đốc, Nhân sự, Kế toán hoặc Admin."
     : "";
 
   const roleOptions = [
     { value: "NHAN_VIEN", label: "NHÂN VIÊN" },
-    { value: "TRUONG_NHOM", label: "TRƯỞNG NHÓM" },
-    { value: "QUAN_LY", label: "QUẢN LÝ" },
+    { value: "KE_TOAN", label: "PHÒNG KẾ TOÁN" },
+    { value: "NHAN_SU", label: "PHÒNG NHÂN SỰ" },
+    { value: "BAN_GIAM_DOC", label: "BAN GIÁM ĐỐC" },
   ].filter((opt) => actorIsAdmin || ROLES_ASSIGNABLE_BY_MANAGER.includes(opt.value));
 
   // Toggle switch quyền
@@ -370,7 +382,7 @@ export default function RolePermissions({ userSession }) {
       await loadEmployeeDetail(selectedMaNv);
       await loadEmployees();
     } catch (err) {
-      // 403: Quản lý không được bổ nhiệm ADMIN / QUAN_LY hoặc sửa tài khoản Quản lý
+      // 403: người không phải Admin không được gán vai trò phòng ban / ADMIN hoặc sửa các tài khoản đó
       setRoleError(getApiErrorMessage(err, "Đổi vai trò thất bại"));
     } finally {
       setIsPromoting(false);

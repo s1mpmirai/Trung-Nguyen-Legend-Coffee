@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 
 // Ngăn xếp các hộp thoại đang mở: phím Esc chỉ đóng hộp thoại trên cùng
 const dialogStack = [];
@@ -99,9 +100,9 @@ export default function Modal({
 
   const titleId = labelledBy || (title ? `${autoId}-title` : undefined);
 
-  return (
+  return createPortal(
     <div
-      className={`fixed inset-0 ${zIndex} flex items-center justify-center bg-slate-900/40 p-4 overflow-y-auto animate-fade-in`}
+      className={`fixed inset-0 ${zIndex || "z-[100]"} flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && closeOnBackdrop && canClose && onClose) onClose();
       }}
@@ -123,6 +124,7 @@ export default function Modal({
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

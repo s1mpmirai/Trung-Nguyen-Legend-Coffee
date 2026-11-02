@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import ManagerSidebar from "./components/ManagerSidebar";
 import ManagerHeader from "./components/ManagerHeader";
@@ -19,6 +19,7 @@ import DepartmentsPanel from "../shared/DepartmentsPanel";
 import PositionsPanel from "../shared/PositionsPanel";
 import ProfileRequestsPanel from "./components/ProfileRequestsPanel";
 import { getManagerDashboardStats } from "../../services/managerService";
+import { getPendingPayrollApprovals } from "../../services/payrollService";
 import { getManagerAccess } from "./managerUtils";
 
 export default function ManagerDashboard({ userSession, onLogout, onOpenEmployeeLogin }) {
@@ -28,23 +29,58 @@ export default function ManagerDashboard({ userSession, onLogout, onOpenEmployee
   const [loadError, setLoadError] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingProfileCount, setPendingProfileCount] = useState(0);
+  // Số bảng lương Kế toán đã gửi, đang chờ người đăng nhập duyệt (chỉ người có quyền duyệt lương)
+  const [pendingPayrollCount, setPendingPayrollCount] = useState(0);
+  const access = getManagerAccess(userSession);
+  const canApprovePayroll = access.can("PAYROLL_APPROVE");
+  // Số liệu Tổng quan được xem theo quyền (khớp quyền của API backend tương ứng)
+  const canViewPayroll = access.can("PAYROLL_MANAGE") || canApprovePayroll;
+  const dashboardAccess = {
+    employees: access.can("EMPLOYEE_VIEW"),
+    attendance: access.can("ATTENDANCE_MANAGE") || canViewPayroll,
+    leaves: access.can("LEAVE_APPROVE"),
+    profileRequests: access.can("EMPLOYEE_UPDATE"),
+    payroll: canViewPayroll,
+    reports: access.can("REPORT_VIEW"),
+  };
+  const hasAnyDashboardData = Object.values(dashboardAccess).some(Boolean);
+
+  const refreshPendingPayroll = useCallback(() => {
+    if (!canApprovePayroll) return;
+    getPendingPayrollApprovals()
+      .then((res) => setPendingPayrollCount(Number(res?.tong_bang_luong) || 0))
+      .catch(() => {});
+  }, [canApprovePayroll]);
+
+  useEffect(() => {
+    refreshPendingPayroll();
+  }, [activeTab, refreshPendingPayroll]);
   // Kỳ công cần mở khi chuyển từ Bảng lương sang Chấm công (vd: để chốt công tháng của bảng lương)
   const [attendancePeriod, setAttendancePeriod] = useState(null);
 
+  // Chỉ chuyển sang mục mà tài khoản có quyền (nút / liên kết trong trang cũng đi qua hàm này)
   const navigateTab = (tab, options) => {
+    if (!access.canOpen(tab)) return;
     setAttendancePeriod(tab === "attendance" ? options?.period || null : null);
     setActiveTab(tab);
   };
+  // Mục đang mở nhưng không có quyền (vd: vừa bị thu hồi quyền) thì quay về Tổng quan
+  const visibleTab = access.canOpen(activeTab) ? activeTab : "dashboard";
 
   useEffect(() => {
-    if (activeTab !== "dashboard") return undefined;
+    if (visibleTab !== "dashboard") return undefined;
     let isMounted = true;
     const loadStats = async () => {
       setIsLoading(true);
       setLoadError("");
       try {
         const data = await getManagerDashboardStats({
-          canViewPayroll: getManagerAccess(userSession).can("PAYROLL_MANAGE"),
+          canViewPayroll: dashboardAccess.payroll,
+          canViewEmployees: dashboardAccess.employees,
+          canViewAttendance: dashboardAccess.attendance,
+          canViewLeaves: dashboardAccess.leaves,
+          canViewReports: dashboardAccess.reports,
+          canViewProfileRequests: dashboardAccess.profileRequests,
         });
         if (isMounted) {
           setDashboardData(data);
@@ -63,7 +99,7 @@ export default function ManagerDashboard({ userSession, onLogout, onOpenEmployee
     return () => {
       isMounted = false;
     };
-  }, [activeTab, userSession]);
+  }, [visibleTab, userSession]);
 
   const errors = dashboardData?.errors || {};
 
@@ -71,13 +107,14 @@ export default function ManagerDashboard({ userSession, onLogout, onOpenEmployee
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 antialiased selection:bg-sky-100 selection:text-sky-900">
       {/* ───────────────── LEFT SIDEBAR ───────────────── */}
       <ManagerSidebar
-        activeTab={activeTab}
+        activeTab={visibleTab}
         onTabChange={navigateTab}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
         onClose={() => setSidebarCollapsed(true)}
         userSession={userSession}
         pendingProfileCount={pendingProfileCount}
+        pendingPayrollCount={pendingPayrollCount}
       />
 
       {/* ───────────────── TOP HEADER BAR ───────────────── */}
@@ -93,39 +130,43 @@ export default function ManagerDashboard({ userSession, onLogout, onOpenEmployee
         <main className="pt-16 pb-14 min-h-screen">
           <div className="max-w-[1480px] mx-auto px-8 py-8 flex flex-col gap-6">
             {/* 1. TAB: Quản lý & Báo cáo nhân sự (Hợp nhất) */}
-            {activeTab === "employees" && <EmployeeManagement initialTab="list" userSession={userSession} />}
-            {activeTab === "reports" && <EmployeeManagement initialTab="reports" userSession={userSession} />}
+            {visibleTab === "employees" && <EmployeeManagement initialTab="list" userSession={userSession} />}
+            {visibleTab === "reports" && <EmployeeManagement initialTab="reports" userSession={userSession} />}
 
             {/* 1b. TAB: Duyệt yêu cầu sửa hồ sơ của nhân viên */}
-            {activeTab === "profile-requests" && (
+            {visibleTab === "profile-requests" && (
               <ProfileRequestsPanel userSession={userSession} onPendingCountChange={setPendingProfileCount} />
             )}
 
             {/* 2. TAB: Duyệt đơn từ */}
-            {activeTab === "leaves" && <LeaveApprovals userSession={userSession} />}
+            {visibleTab === "leaves" && <LeaveApprovals userSession={userSession} />}
 
             {/* 3. TAB: Chấm công & Ca làm */}
-            {activeTab === "attendance" && (
+            {visibleTab === "attendance" && (
               <AttendanceManagement userSession={userSession} initialPeriod={attendancePeriod} />
             )}
 
             {/* 4. TAB: Bảng tính lương */}
-            {activeTab === "payroll" && (
-              <PayrollManagement userSession={userSession} onNavigateTab={navigateTab} />
+            {visibleTab === "payroll" && (
+              <PayrollManagement
+                userSession={userSession}
+                onNavigateTab={navigateTab}
+                onPendingApprovalsChange={refreshPendingPayroll}
+              />
             )}
 
             {/* 4b. TAB: Hợp đồng lao động & Cơ cấu tổ chức (nghiệp vụ nhân sự, chuyển từ Cổng Quản trị) */}
-            {activeTab === "contracts" && <ContractManagement />}
-            {activeTab === "departments" && <DepartmentsPanel />}
-            {activeTab === "positions" && <PositionsPanel />}
+            {visibleTab === "contracts" && <ContractManagement />}
+            {visibleTab === "departments" && <DepartmentsPanel />}
+            {visibleTab === "positions" && <PositionsPanel />}
 
             {/* 5. TAB: Cấp quyền sử dụng web & Bổ nhiệm chức danh */}
-            {(activeTab === "permissions" || activeTab === "role-permissions") && (
+            {(visibleTab === "permissions" || visibleTab === "role-permissions") && (
               <RolePermissions userSession={userSession} />
             )}
 
             {/* 6. TAB: Tổng quan (Default) */}
-            {activeTab === "dashboard" && (
+            {visibleTab === "dashboard" && (
               <>
                 {/* Header Tiêu đề trang */}
                 <div className="flex flex-col gap-1">
@@ -153,40 +194,58 @@ export default function ManagerDashboard({ userSession, onLogout, onOpenEmployee
                 ) : (
                   <>
                     {/* 1. KHỐI 4 THẺ CHỈ SỐ CỐT LÕI (Real-time Metric Cards) */}
+                    {!hasAnyDashboardData && (
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 text-xs">
+                        Tài khoản của bạn chưa được cấp quyền xem số liệu tổng quan nào.
+                      </div>
+                    )}
+
                     <StatMetricCards
                       stats={dashboardData?.summary}
                       errors={errors}
-                      onNavigateTab={setActiveTab}
+                      onNavigateTab={navigateTab}
+                      visible={dashboardAccess}
                     />
 
-                    {/* 2. KHỐI 3 CỘT VẬN HÀNH: Cơ cấu phòng ban, Xu hướng chấm công 7 ngày, Hợp đồng sắp hết hạn */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      {/* Cơ cấu theo phòng ban */}
-                      <DepartmentStructureCard
-                        departments={dashboardData?.departments}
-                        error={errors.employees}
-                      />
+                    {/* 2. KHỐI VẬN HÀNH: Cơ cấu phòng ban, Xu hướng chấm công 7 ngày, Hợp đồng sắp hết hạn (theo quyền) */}
+                    {(dashboardAccess.employees || dashboardAccess.attendance || dashboardAccess.reports) && (
+                      <div
+                        className={`grid grid-cols-1 gap-6 ${
+                          ["lg:grid-cols-1", "lg:grid-cols-1", "lg:grid-cols-2", "lg:grid-cols-3"][
+                            [dashboardAccess.employees, dashboardAccess.attendance, dashboardAccess.reports].filter(Boolean)
+                              .length
+                          ]
+                        }`}
+                      >
+                        {/* Cơ cấu theo phòng ban */}
+                        {dashboardAccess.employees && (
+                          <DepartmentStructureCard departments={dashboardData?.departments} error={errors.employees} />
+                        )}
 
-                      {/* Xu hướng chấm công 7 ngày (Line Chart) */}
-                      <AttendanceTrendCard
-                        attendanceData={dashboardData?.attendance7Days}
-                        error={errors.trend}
-                      />
+                        {/* Xu hướng chấm công 7 ngày (Line Chart) */}
+                        {dashboardAccess.attendance && (
+                          <AttendanceTrendCard attendanceData={dashboardData?.attendance7Days} error={errors.trend} />
+                        )}
 
-                      {/* Hợp đồng lao động sắp hết hạn */}
-                      <ExpiringContractsCard
-                        contracts={dashboardData?.expiringContracts}
-                        error={errors.statistics}
-                        onNavigateTab={setActiveTab}
-                      />
-                    </div>
+                        {/* Hợp đồng lao động sắp hết hạn */}
+                        {dashboardAccess.reports && (
+                          <ExpiringContractsCard
+                            contracts={dashboardData?.expiringContracts}
+                            error={errors.statistics}
+                            onNavigateTab={access.canOpen("employees") ? navigateTab : undefined}
+                          />
+                        )}
+                      </div>
+                    )}
 
                     {/* 3. BÁO CÁO THỐNG KÊ NHÂN SỰ: Trình độ, Thâm niên, Mức lương (cần quyền REPORT_VIEW) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      <EducationChartCard educationData={dashboardData?.education} error={errors.statistics} />
-                      <TenureStatsCard tenureData={dashboardData?.tenure} error={errors.statistics} />
-                      <PayrollDepartmentCard payrollData={dashboardData?.salaryByDept} error={errors.statistics} />
-                    </div>
+                    {dashboardAccess.reports && (
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <EducationChartCard educationData={dashboardData?.education} error={errors.statistics} />
+                        <TenureStatsCard tenureData={dashboardData?.tenure} error={errors.statistics} />
+                        <PayrollDepartmentCard payrollData={dashboardData?.salaryByDept} error={errors.statistics} />
+                      </div>
+                    )}
                   </>
                 )}
               </>

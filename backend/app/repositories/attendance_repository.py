@@ -630,7 +630,7 @@ def get_monthly_attendance_lock(db: Session, thang: int, nam: int) -> dict[str, 
 
 
 def count_finalized_payroll(db: Session, thang: int, nam: int) -> int:
-    """Số bảng lương của tháng đã duyệt hoặc đã chi trả."""
+    """Số bảng lương của tháng đã gửi duyệt, đã duyệt hoặc đã chi trả."""
     return int(db.execute(
         text("SELECT COUNT(*) FROM bang_luong WHERE thang = :thang AND nam = :nam AND trang_thai <> 'NHAP'"),
         {"thang": thang, "nam": nam},

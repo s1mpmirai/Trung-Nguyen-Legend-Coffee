@@ -31,7 +31,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
     phone: "",
     birthDate: "1995-06-15",
     gender: "Nam",
-    maPb: "PB05",
+    maPb: "PB02",
     maCv: "CV01",
     startDate: todayStr,
     contractType: "THU_VIEC",

@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 import app.repositories.auth_repository as account_repository
 from app.core.datetime_utils import get_vietnam_now
+from app.core.roles import VALID_ROLES
 from app.core.security import create_access_token, hash_password, verify_password
 from app.repositories.employee_repository import apply_due_terminations
 from app.repositories.employee_repository import get_by_ma_nv as employee_get_by_ma_nv
@@ -11,7 +12,6 @@ from app.utils.auto_gen import define_pass
 
 # Tài khoản Quản trị hệ thống gốc (nhân viên IT), không phải Tổng Giám đốc
 PROTECTED_ADMIN = "NV21"
-VALID_ROLES = {"ADMIN", "QUAN_LY", "TRUONG_NHOM", "NHAN_VIEN"}
 VALID_ACCOUNT_STATUSES = {"HOAT_DONG", "KHOA"}
 MIN_PASSWORD_LENGTH = 6
 
@@ -189,34 +189,18 @@ def change_account_status(db: Session, ma_nv: str, trang_thai: str, actor: dict)
     if not account:
         raise ValueError(f"Không tìm thấy tài khoản của nhân viên {clean_id}")
     _check_can_manage(actor, clean_id, account.ma_vai_tro)
+    if (
+        trang_thai == "KHOA"
+        and account.ma_vai_tro == "ADMIN"
+        and account.trang_thai == "HOAT_DONG"
+        and account_repository.count_active_admins(db) <= 1
+    ):
+        raise PermissionError("Không thể khóa tài khoản Quản trị hệ thống cuối cùng đang hoạt động.")
 
     account_repository.update_status(db, clean_id, trang_thai)
     db.commit()
     db.refresh(account)
     return account
-
-
-def delete_account(db: Session, ma_nv: str, actor: dict) -> dict:
-    """Xóa tài khoản đăng nhập của nhân sự; hồ sơ nhân sự giữ nguyên và có thể cấp lại tài khoản sau."""
-    clean_id = _clean(ma_nv)
-    account = account_repository.get_by_ma_nv(db, clean_id)
-    if not account:
-        raise ValueError(f"Không tìm thấy tài khoản của nhân viên {clean_id}")
-    _check_can_manage(actor, clean_id, account.ma_vai_tro)
-    if (
-        account.ma_vai_tro == "ADMIN"
-        and account.trang_thai == "HOAT_DONG"
-        and account_repository.count_active_admins(db) <= 1
-    ):
-        raise PermissionError("Không thể xóa tài khoản Quản trị hệ thống cuối cùng đang hoạt động.")
-
-    try:
-        account_repository.delete(db, account)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    return {"ma_nv": clean_id, "message": f"Đã xóa tài khoản của nhân viên {clean_id}"}
 
 
 def change_password(db: Session, ma_nv: str, old_pass: str, new_pass: str):

@@ -3,7 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.datetime_utils import get_vietnam_now
-from app.core.roles import ADMIN_ROLE, ADMIN_SYSTEM_PERMISSIONS
+from app.core.roles import ADMIN_ROLE, ADMIN_SYSTEM_PERMISSIONS, ROLE_DISPLAY_ORDER, STAFF_ROLE
 
 
 def get_all_permissions(db: Session) -> list[dict[str, Any]]:
@@ -22,16 +22,12 @@ def get_all_roles_with_permissions(db: Session) -> list[dict[str, Any]]:
     roles_query = text("""
         SELECT ma_vai_tro, ten_vai_tro, mo_ta, he_thong
         FROM vai_tro
-        ORDER BY 
-            CASE ma_vai_tro 
-                WHEN 'ADMIN' THEN 1 
-                WHEN 'QUAN_LY' THEN 2 
-                WHEN 'TRUONG_NHOM' THEN 3 
-                WHEN 'NHAN_VIEN' THEN 4 
-                ELSE 5 
-            END ASC
     """)
-    roles = [dict(r) for r in db.execute(roles_query).mappings().all()]
+    rank = {code: idx for idx, code in enumerate(ROLE_DISPLAY_ORDER)}
+    roles = sorted(
+        (dict(r) for r in db.execute(roles_query).mappings().all()),
+        key=lambda r: (rank.get(r["ma_vai_tro"], len(rank)), r["ma_vai_tro"]),
+    )
 
     mapping_query = text("""
         SELECT ma_vai_tro, ma_quyen
@@ -57,45 +53,36 @@ def get_all_roles_with_permissions(db: Session) -> list[dict[str, Any]]:
 def get_role_matrix(db: Session) -> dict[str, Any]:
     """
     Trả về ma trận phân quyền hệ thống và so sánh quyền hạn:
-    Nhân viên (NHAN_VIEN) có quyền gì, và khi lên Trưởng nhóm (TRUONG_NHOM) quyền thay đổi ra sao.
+    Nhân viên (NHAN_VIEN) có quyền gì, và mỗi vai trò phòng ban được bổ sung thêm quyền nào.
     """
     permissions = get_all_permissions(db)
     roles = get_all_roles_with_permissions(db)
 
     matrix: dict[str, list[str]] = {r["ma_vai_tro"]: r["permissions"] for r in roles}
+    staff_perms = set(matrix.get(STAFF_ROLE, []))
 
-    staff_perms = set(matrix.get("NHAN_VIEN", []))
-    leader_perms = set(matrix.get("TRUONG_NHOM", []))
-    manager_perms = set(matrix.get("QUAN_LY", []))
-
-    added_for_leader = list(leader_perms - staff_perms)
-    added_for_manager = list(manager_perms - leader_perms)
-
-    comparison = {
+    comparison: dict[str, Any] = {
         "vai_tro_nhan_vien": {
-            "ma_vai_tro": "NHAN_VIEN",
+            "ma_vai_tro": STAFF_ROLE,
             "ten_vai_tro": "Nhân viên",
             "so_quyen": len(staff_perms),
-            "quyen_co_ban": list(staff_perms),
+            "quyen_co_ban": sorted(staff_perms),
             "mo_ta": "Chỉ có các quyền cá nhân: Xem đơn, Nộp đơn từ cá nhân, Xem phiếu lương cá nhân.",
         },
-        "vai_tro_truong_nhom": {
-            "ma_vai_tro": "TRUONG_NHOM",
-            "ten_vai_tro": "Trưởng nhóm / Tổ trưởng",
-            "so_quyen": len(leader_perms),
-            "quyen_hien_tai": list(leader_perms),
-            "quyen_duoc_bo_sung_khi_len_chuc": added_for_leader,
-            "mo_ta": "Khi nhân viên lên Trưởng nhóm, được bổ sung thêm các quyền quản lý đội nhóm: Xem nhân sự (EMPLOYEE_VIEW), Duyệt đơn nghỉ nhóm (LEAVE_APPROVE), Quản lý chấm công nhóm (ATTENDANCE_MANAGE).",
-        },
-        "vai_tro_quan_ly": {
-            "ma_vai_tro": "QUAN_LY",
-            "ten_vai_tro": "Quản lý / Trưởng phòng",
-            "so_quyen": len(manager_perms),
-            "quyen_hien_tai": list(manager_perms),
-            "quyen_duoc_bo_sung_khi_len_quan_ly": added_for_manager,
-            "mo_ta": "Cấp quản trị phòng ban/chi nhánh: Thêm/sửa nhân sự, duyệt đơn, quản lý chấm công, tính và duyệt lương.",
-        },
     }
+    for role in roles:
+        code = role["ma_vai_tro"]
+        if code == STAFF_ROLE:
+            continue
+        role_perms = set(matrix.get(code, []))
+        comparison[f"vai_tro_{code.lower()}"] = {
+            "ma_vai_tro": code,
+            "ten_vai_tro": role.get("ten_vai_tro"),
+            "so_quyen": len(role_perms),
+            "quyen_hien_tai": sorted(role_perms),
+            "quyen_bo_sung_so_voi_nhan_vien": sorted(role_perms - staff_perms),
+            "mo_ta": role.get("mo_ta"),
+        }
 
     return {
         "roles": roles,
@@ -203,20 +190,6 @@ def assign_role_to_employee(
         """),
         {"ma_vai_tro": ma_vai_tro, "now": now_vn, "ma_nv": ma_nv},
     )
-
-    # Thăng lên Trưởng nhóm: đồng bộ chức vụ Tổ trưởng / Trưởng nhóm (CV03) nếu chức vụ hiện tại thấp hơn
-    if ma_vai_tro == "TRUONG_NHOM":
-        db.execute(
-            text("""
-                UPDATE nhan_vien nv
-                JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
-                SET nv.ma_cv = 'CV03',
-                    nv.ma_bac = (SELECT ma_bac FROM bac_luong WHERE ma_cv = 'CV03' ORDER BY bac LIMIT 1),
-                    nv.ngay_cap_nhat = :now
-                WHERE nv.ma_nv = :ma_nv AND cv.cap_bac < 2
-            """),
-            {"now": now_vn, "ma_nv": ma_nv},
-        )
 
     db.commit()
     return get_employee_permissions(db, ma_nv)

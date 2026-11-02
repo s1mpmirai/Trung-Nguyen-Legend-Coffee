@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.permissions import MANAGE_PORTAL_PERMISSIONS, CurrentAccount
+from app.core.roles import ADMIN_ROLE, BUSINESS_ROLES
 from app.db.session import get_db
 from app.schemas.auth_schemas import (
     first_time_password_request,
@@ -53,7 +54,7 @@ def management_login(
             detail="Tài khoản Nhân viên vui lòng đăng nhập tại Cổng Nhân Viên (/login)"
         )
 
-    if role not in {"ADMIN", "QUAN_LY", "TRUONG_NHOM"} and not has_mgmt_perm:
+    if role != ADMIN_ROLE and role not in BUSINESS_ROLES and not has_mgmt_perm:
         raise HTTPException(status_code=403, detail="Tài khoản không có quyền Quản lý hoặc Quản trị chức năng")
 
     return user

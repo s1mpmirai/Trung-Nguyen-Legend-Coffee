@@ -22,7 +22,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 def _only_official(account: dict) -> bool:
     """Người không có quyền quản lý lương chỉ thấy bảng lương đã duyệt / đã chi trả (không thấy bản nháp)."""
-    return not has_permission(account, "PAYROLL_MANAGE")
+    return not has_permission(account, "PAYROLL_MANAGE", "PAYROLL_APPROVE")
 
 
 @router.get(
@@ -38,7 +38,7 @@ def get_payroll_month(
     db: DbSession = None,
 ):
     """Lấy chi tiết bảng lương 1 tháng của nhân viên để xem hoặc in phiếu lương (Trả về null với 200 OK nếu chưa có dữ liệu)."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE")
+    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE", "PAYROLL_APPROVE")
     return get_employee_payroll_month(db, clean_id, thang, nam, _only_official(account))
 
 
@@ -54,7 +54,7 @@ def get_payroll_year(
     db: DbSession = None,
 ):
     """Lấy tổng hợp bảng lương cả năm của nhân viên để xem hoặc in bảng năm (Trả về null với 200 OK nếu chưa có dữ liệu)."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE")
+    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE", "PAYROLL_APPROVE")
     return get_employee_payroll_year(db, clean_id, nam, _only_official(account))
 
 
@@ -65,7 +65,7 @@ def get_payroll_months_list(
     db: DbSession = None,
 ):
     """Lấy danh sách các tháng/năm đã có bảng lương của nhân viên."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE")
+    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE", "PAYROLL_APPROVE")
     return get_employee_payroll_history(db, clean_id, _only_official(account))
 
 

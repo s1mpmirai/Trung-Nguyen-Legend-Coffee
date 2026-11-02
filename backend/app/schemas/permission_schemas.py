@@ -15,7 +15,7 @@ class PermissionItem(BaseModel):
 
 class RoleItem(BaseModel):
     """Thông tin một vai trò hệ thống kèm danh sách quyền được cấp."""
-    ma_vai_tro: str = Field(..., description="Mã vai trò (ADMIN, QUAN_LY, TRUONG_NHOM, NHAN_VIEN)")
+    ma_vai_tro: str = Field(..., description="Mã vai trò (ADMIN, BAN_GIAM_DOC, NHAN_SU, KE_TOAN, NHAN_VIEN)")
     ten_vai_tro: str = Field(..., description="Tên vai trò")
     mo_ta: Optional[str] = Field(None, description="Mô tả vai trò")
     he_thong: bool = Field(False, description="Vai trò hệ thống mặc định")
@@ -26,13 +26,13 @@ class RoleItem(BaseModel):
 
 
 class RoleMatrixResponse(BaseModel):
-    """Ma trận phân quyền hệ thống (Vai trò x Quyền) và so sánh thăng chức."""
+    """Ma trận phân quyền hệ thống (Vai trò x Quyền) và quyền bổ sung của từng vai trò so với Nhân viên."""
     roles: list[RoleItem]
     permissions: list[PermissionItem]
     matrix: dict[str, list[str]] = Field(..., description="Ánh xạ {ma_vai_tro: [ma_quyen, ...]}")
     comparison_staff_vs_leader: dict[str, Any] = Field(
         ...,
-        description="So sánh quyền: Nhân viên (NHAN_VIEN) có quyền gì, và khi lên Trưởng nhóm (TRUONG_NHOM) quyền thay đổi ra sao",
+        description="So sánh quyền: Nhân viên (NHAN_VIEN) có quyền gì, và mỗi vai trò phòng ban được bổ sung thêm quyền nào",
     )
 
 
@@ -57,7 +57,7 @@ class EmployeePermissionsResponse(BaseModel):
 
 class AssignRoleRequest(BaseModel):
     """Yêu cầu gán hoặc thăng chức vai trò cho nhân sự."""
-    ma_vai_tro: str = Field(..., description="Mã vai trò mới: ADMIN, QUAN_LY, TRUONG_NHOM, NHAN_VIEN")
+    ma_vai_tro: str = Field(..., description="Mã vai trò mới: ADMIN, BAN_GIAM_DOC, NHAN_SU, KE_TOAN, NHAN_VIEN")
     ghi_chu: Optional[str] = Field(None, description="Lý do thay đổi vai trò / thăng chức")
 
 

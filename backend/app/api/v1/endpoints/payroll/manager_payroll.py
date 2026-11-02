@@ -4,22 +4,59 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_permission
+from app.core.roles import BOARD_ROLE
 from app.db.session import get_db
 from app.schemas.payroll_schemas import (
     payroll_calculate_request,
     payroll_company_summary_response,
+    payroll_pending_approval_response,
     payroll_status_update,
 )
 from app.services.payroll_service import (
     calculate_payroll_month,
     change_payroll_status,
     get_company_payroll_summary,
+    get_pending_approvals,
+    submit_payroll_month,
 )
 
-# Toàn bộ API tính / duyệt lương yêu cầu quyền PAYROLL_MANAGE
-router = APIRouter(dependencies=[Depends(require_permission("PAYROLL_MANAGE"))])
+# Xem bảng lương toàn công ty: người tính lương (PAYROLL_MANAGE) hoặc người duyệt lương (PAYROLL_APPROVE).
+# Tính lương / gửi duyệt chỉ PAYROLL_MANAGE; từng bước chuyển trạng thái kiểm tra quyền riêng
+# (payroll_service.PAYROLL_STATUS_PERMISSION).
+router = APIRouter(dependencies=[Depends(require_permission("PAYROLL_MANAGE", "PAYROLL_APPROVE"))])
 DbSession = Annotated[Session, Depends(get_db)]
-PayrollManager = Annotated[dict, Depends(require_permission("PAYROLL_MANAGE"))]
+PayrollCalculator = Annotated[dict, Depends(require_permission("PAYROLL_MANAGE"))]
+PayrollActor = Annotated[dict, Depends(require_permission("PAYROLL_MANAGE", "PAYROLL_APPROVE"))]
+PayrollApprover = Annotated[dict, Depends(require_permission("PAYROLL_APPROVE"))]
+
+
+@router.post(
+    "/submit",
+    summary="[Kế toán] Gửi bảng lương tháng sang Ban Giám đốc duyệt",
+)
+def submit_payroll_endpoint(
+    data: payroll_calculate_request,
+    account: PayrollCalculator,
+    db: DbSession = None,
+):
+    """Chuyển toàn bộ bảng lương Nháp của tháng sang Chờ duyệt; sau khi gửi không tính lại được cho đến khi bị trả về."""
+    try:
+        return submit_payroll_month(db, data.thang, data.nam, nguoi_gui=account["ma_nv"])
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
+
+
+@router.get(
+    "/pending-approval",
+    response_model=payroll_pending_approval_response,
+    summary="[Ban Giám đốc] Bảng lương Kế toán đã gửi đang chờ duyệt",
+)
+def get_pending_approval_endpoint(
+    account: PayrollApprover,
+    db: DbSession = None,
+):
+    """Dùng cho thông báo / huy hiệu ở Cổng Quản lý: số bảng lương chờ người đang đăng nhập duyệt, theo kỳ."""
+    return get_pending_approvals(db, account["ma_nv"], chi_duyet_ban_giam_doc=account["ma_vai_tro"] != BOARD_ROLE)
 
 
 @router.post(
@@ -28,7 +65,7 @@ PayrollManager = Annotated[dict, Depends(require_permission("PAYROLL_MANAGE"))]
 )
 def calculate_payroll_endpoint(
     data: payroll_calculate_request,
-    account: PayrollManager,
+    account: PayrollCalculator,
     db: DbSession = None,
 ):
     """
@@ -70,12 +107,22 @@ def get_company_payroll_endpoint(
 def update_payroll_status_endpoint(
     ma_bl: int,
     data: payroll_status_update,
-    account: PayrollManager,
+    account: PayrollActor,
     db: DbSession = None,
 ):
-    """Duyệt bảng lương (NHAP -> DA_DUYET -> DA_TRA). Người lập không tự duyệt; không ai duyệt/chi trả lương của chính mình."""
+    """
+    Gửi duyệt, xác nhận chi trả (PAYROLL_MANAGE – Kế toán); duyệt, trả về Kế toán (PAYROLL_APPROVE – Ban Giám đốc).
+    Người lập không tự duyệt; không ai duyệt/chi trả lương của chính mình.
+    """
     try:
-        return change_payroll_status(db, ma_bl, data.trang_thai, nguoi_thuc_hien=account["ma_nv"])
+        return change_payroll_status(
+            db,
+            ma_bl,
+            data.trang_thai,
+            nguoi_thuc_hien=account["ma_nv"],
+            chi_duyet_ban_giam_doc=account["ma_vai_tro"] != BOARD_ROLE,
+            quyen=set(account["permissions"]),
+        )
     except PermissionError as err:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(err)) from err
     except LookupError as err:

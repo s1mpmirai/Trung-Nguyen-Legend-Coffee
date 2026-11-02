@@ -102,11 +102,25 @@ def liquidate_contract_endpoint(
     account: ContractManager,
     ma_hd: str,
     ngay_ket_thuc: Optional[date] = Query(None, description="Ngày kết thúc thanh lý (mặc định hôm nay)"),
+    cho_thoi_viec: bool = Query(False, description="Đồng thời cho nhân sự thôi việc (chuyển sang DA_NGHI_VIEC và khóa tài khoản)"),
     db: DbSession = None,
 ):
     """Thanh lý / kết thúc hợp đồng lao động của nhân viên."""
     try:
-        return contract_repository.liquidate_contract(db, ma_hd, ngay_ket_thuc=ngay_ket_thuc)
+        res = contract_repository.liquidate_contract(db, ma_hd, ngay_ket_thuc=ngay_ket_thuc)
+        if cho_thoi_viec and res and res.get("ma_nv"):
+            from app.services.employee_service import deactivate_employee
+            from app.core.datetime_utils import get_vietnam_now
+            try:
+                deactivate_employee(
+                    db=db,
+                    ma_nv=res["ma_nv"],
+                    ly_do=f"Thanh lý hợp đồng {ma_hd}",
+                    ngay_hieu_luc=ngay_ket_thuc or get_vietnam_now().date(),
+                )
+            except Exception:
+                pass
+        return res
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:

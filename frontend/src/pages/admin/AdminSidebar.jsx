@@ -5,7 +5,6 @@ import {
   KeyRound,
   ShieldCheck,
   Building2,
-  Briefcase,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -36,7 +35,6 @@ export const ADMIN_NAV_SECTIONS = [
     items: [
       { id: "employees", label: "Danh bạ nhân sự", icon: Users },
       { id: "departments", label: "Phòng ban", icon: Building2 },
-      { id: "positions", label: "Chức vụ & Thang lương", icon: Briefcase },
     ],
   },
 ];

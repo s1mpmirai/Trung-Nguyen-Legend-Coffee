@@ -5,9 +5,8 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.data_scope import DataScope
-from app.core.roles import ADMIN_ROLE, ADMIN_SYSTEM_PERMISSIONS
+from app.core.roles import ADMIN_ROLE, ADMIN_SYSTEM_PERMISSIONS, BUSINESS_ROLES
 from app.core.security import decode_access_token, oauth2_scheme
 from app.db.session import get_db
 from app.repositories import auth_repository
@@ -15,9 +14,8 @@ from app.repositories.employee_repository import apply_due_terminations
 from app.repositories.permission_repository import get_employee_permissions
 
 # Phạm vi dữ liệu (xem data_scope):
-# - ADMIN (chỉ xem danh bạ), Quản lý thuộc Phòng Nhân sự hoặc Ban Giám đốc: toàn công ty.
-# - Quản lý phòng ban khác: nhân sự trong phòng mình + cấp dưới trực tiếp.
-# - Còn lại (TRUONG_NHOM, nhân viên được cấp quyền riêng): chỉ cấp dưới trực tiếp (nhan_vien.ma_nql).
+# - ADMIN (chỉ xem danh bạ), Ban Giám đốc, Phòng Nhân sự, Phòng Kế toán: toàn công ty.
+# - Nhân viên được cấp quyền riêng: chỉ cấp dưới trực tiếp (nhan_vien.ma_nql).
 
 # Có ít nhất một quyền này thì được vào cổng điều hành (/login-manage).
 # Giữ khớp với MANAGER_PORTAL_PERMISSIONS + ACCOUNT_MANAGE ở frontend/src/utils/navigation.js.
@@ -30,6 +28,7 @@ MANAGE_PORTAL_PERMISSIONS = (
     "ATTENDANCE_MANAGE",
     "ATTENDANCE_LOCK",
     "PAYROLL_MANAGE",
+    "PAYROLL_APPROVE",
     "REPORT_VIEW",
     "PERMISSION_ASSIGN",
     "ACCOUNT_MANAGE",
@@ -85,6 +84,19 @@ def has_permission(account: dict[str, Any], *permission_codes: str) -> bool:
     return any(code in account["permissions"] for code in permission_codes)
 
 
+def can_view_salary(account: dict[str, Any]) -> bool:
+    """
+    Quản trị hệ thống (ADMIN) và tài khoản chỉ có quyền tài khoản / phân quyền (dùng Cổng Quản trị)
+    không được xem dữ liệu lương: lương hợp đồng, thang bậc lương, phụ cấp chức vụ.
+    """
+    if account["ma_vai_tro"] == ADMIN_ROLE:
+        return False
+    perms = account["permissions"]
+    if "EMPLOYEE_VIEW" not in perms and ({"ACCOUNT_MANAGE", "PERMISSION_ASSIGN"} & set(perms)):
+        return False
+    return True
+
+
 def require_permission(*permission_codes: str) -> Callable[..., dict[str, Any]]:
     """Dependency chặn API nếu tài khoản không có quyền tương ứng (vd: require_permission("LEAVE_APPROVE"))."""
 
@@ -116,14 +128,10 @@ def data_scope(account: dict[str, Any], *company_wide_permissions: str) -> DataS
     company_wide_permissions: quyền mà bản chất là việc toàn công ty với API đang gọi
     (vd: CONTRACT_MANAGE khi xem danh sách nhân sự để ký hợp đồng).
     """
-    if account["ma_vai_tro"] == "ADMIN":
+    if account["ma_vai_tro"] == ADMIN_ROLE or account["ma_vai_tro"] in BUSINESS_ROLES:
         return None
     if any(code in account["permissions"] for code in company_wide_permissions):
         return None
-    if account["ma_vai_tro"] == "QUAN_LY":
-        if account.get("ma_pb") in (settings.hr_department_code, settings.board_department_code):
-            return None
-        return DataScope(ma_nql=account["ma_nv"], ma_pb=account.get("ma_pb"))
     return DataScope(ma_nql=account["ma_nv"])
 
 

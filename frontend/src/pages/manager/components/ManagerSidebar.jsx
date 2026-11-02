@@ -27,6 +27,7 @@ export default function ManagerSidebar({
   onClose,
   userSession,
   pendingProfileCount = 0,
+  pendingPayrollCount = 0,
 }) {
   const sidebarRef = useRef(null);
 
@@ -51,7 +52,7 @@ export default function ManagerSidebar({
   }, [collapsed, onToggleCollapse, onClose]);
 
   // Menu hiển thị theo quyền thực tế của tài khoản (khớp với kiểm tra quyền ở backend)
-  const { can } = getManagerAccess(userSession);
+  const { canOpen } = getManagerAccess(userSession);
 
   const allNavItems = [
     { id: "dashboard", label: "Tổng quan", icon: LayoutDashboard },
@@ -59,56 +60,57 @@ export default function ManagerSidebar({
       id: "employees",
       label: "Quản lý nhân sự",
       icon: Users,
-      allowed: can("EMPLOYEE_VIEW"),
+      allowed: canOpen("employees"),
     },
     {
       id: "profile-requests",
       label: "Duyệt sửa hồ sơ",
       icon: FilePen,
-      allowed: can("EMPLOYEE_UPDATE"),
+      allowed: canOpen("profile-requests"),
       badge: pendingProfileCount,
     },
     {
       id: "leaves",
       label: "Duyệt đơn",
       icon: ClipboardCheck,
-      allowed: can("LEAVE_APPROVE"),
+      allowed: canOpen("leaves"),
     },
     {
       id: "attendance",
       label: "Chấm công & Ca làm",
       icon: Clock,
-      allowed: can("ATTENDANCE_MANAGE"),
+      allowed: canOpen("attendance"),
     },
     {
       id: "payroll",
       label: "Bảng tính lương",
       icon: CreditCard,
-      allowed: can("PAYROLL_MANAGE"),
+      allowed: canOpen("payroll"),
+      badge: pendingPayrollCount,
     },
     {
       id: "contracts",
       label: "Hợp đồng lao động",
       icon: FileText,
-      allowed: can("CONTRACT_MANAGE"),
+      allowed: canOpen("contracts"),
     },
     {
       id: "departments",
       label: "Phòng ban",
       icon: Building2,
-      allowed: can("ORG_MANAGE"),
+      allowed: canOpen("departments"),
     },
     {
       id: "positions",
       label: "Chức vụ & Thang lương",
       icon: Briefcase,
-      allowed: can("ORG_MANAGE"),
+      allowed: canOpen("positions"),
     },
     {
       id: "permissions",
       label: "Cấp quyền sử dụng web",
       icon: ShieldCheck,
-      allowed: can("PERMISSION_ASSIGN"),
+      allowed: canOpen("permissions"),
     },
   ];
 

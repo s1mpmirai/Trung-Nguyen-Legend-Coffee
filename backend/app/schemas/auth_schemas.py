@@ -49,7 +49,7 @@ class employee_without_account_response(BaseModel):
 
 class account_admin_update(BaseModel):
     mat_khau_moi: str | None = Field(None, description="Mật khẩu mới nếu muốn đổi (bỏ trống nếu giữ nguyên)")
-    ma_vai_tro: str | None = Field(None, description="Vai trò mới (ADMIN, QUAN_LY, TRUONG_NHOM, NHAN_VIEN)")
+    ma_vai_tro: str | None = Field(None, description="Vai trò mới (ADMIN, BAN_GIAM_DOC, NHAN_SU, KE_TOAN, NHAN_VIEN)")
     trang_thai: str | None = Field(None, description="Trạng thái tài khoản (HOAT_DONG, KHOA)")
 
 

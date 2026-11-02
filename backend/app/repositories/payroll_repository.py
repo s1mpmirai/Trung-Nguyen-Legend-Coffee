@@ -57,12 +57,13 @@ def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
     query = """
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
-            nv.ho_ten, pb.ten_pb, cv.ten_cv,
+            nv.ho_ten, nv.ma_pb, pb.ten_pb, cv.ten_cv,
             bl.luong_co_ban, bl.he_so_luong, bl.so_cong_chuan,
             bl.so_cong_thuc_te,
             bl.luong_theo_cong, bl.so_gio_tang_ca, bl.tien_tang_ca, bl.tong_phu_cap, bl.tien_thuong,
             bl.luong_gross, bl.bhxh, bl.bhyt, bl.bhtn, bl.thue_tncn, bl.tong_khau_tru,
             bl.luong_net, bl.trang_thai, bl.ghi_chu,
+            bl.nguoi_gui, ng.ho_ten AS ten_nguoi_gui, bl.ngay_gui,
             (
                 SELECT CONCAT_WS(' • ', h.ngan_hang, h.so_tai_khoan)
                 FROM hop_dong_lao_dong h
@@ -74,6 +75,7 @@ def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
         JOIN nhan_vien nv ON bl.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
+        LEFT JOIN nhan_vien ng ON ng.ma_nv = bl.nguoi_gui
         WHERE bl.thang = :thang AND bl.nam = :nam
         ORDER BY nv.ma_nv ASC
     """
@@ -82,16 +84,24 @@ def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
 
 
 def get_payroll_status_info(db: Session, ma_bl: int) -> dict | None:
-    """Trạng thái, chủ dòng lương và người lập (phục vụ kiểm tra tách nhiệm vụ khi duyệt)."""
+    """Trạng thái, chủ dòng lương (kèm phòng ban) và người lập (phục vụ kiểm tra tách nhiệm vụ khi duyệt)."""
     row = db.execute(
-        text("SELECT trang_thai, ma_nv, nguoi_lap, nguoi_duyet FROM bang_luong WHERE ma_bl = :ma_bl"),
+        text("""
+            SELECT bl.trang_thai, bl.ma_nv, bl.nguoi_lap, bl.nguoi_duyet, nv.ma_pb
+            FROM bang_luong bl
+            LEFT JOIN nhan_vien nv ON nv.ma_nv = bl.ma_nv
+            WHERE bl.ma_bl = :ma_bl
+        """),
         {"ma_bl": ma_bl},
     ).mappings().first()
     return dict(row) if row else None
 
 
 def update_payroll_status(db: Session, ma_bl: int, trang_thai: str, nguoi_duyet: str | None = None) -> dict | None:
-    """Cập nhật trạng thái duyệt/chi trả; ghi người duyệt khi duyệt, xóa khi mở lại về Nháp."""
+    """
+    Cập nhật trạng thái gửi duyệt / duyệt / chi trả; ghi người duyệt khi duyệt, ghi người gửi khi gửi duyệt.
+    Trả về Nháp thì xóa người duyệt và thông tin gửi duyệt (Kế toán phải gửi lại).
+    """
     query = """
         UPDATE bang_luong
         SET trang_thai = :trang_thai,
@@ -99,6 +109,16 @@ def update_payroll_status(db: Session, ma_bl: int, trang_thai: str, nguoi_duyet:
                 WHEN :trang_thai = 'DA_DUYET' THEN :nguoi_duyet
                 WHEN :trang_thai = 'NHAP' THEN NULL
                 ELSE nguoi_duyet
+            END,
+            nguoi_gui = CASE
+                WHEN :trang_thai = 'CHO_DUYET' THEN :nguoi_duyet
+                WHEN :trang_thai = 'NHAP' THEN NULL
+                ELSE nguoi_gui
+            END,
+            ngay_gui = CASE
+                WHEN :trang_thai = 'CHO_DUYET' THEN NOW()
+                WHEN :trang_thai = 'NHAP' THEN NULL
+                ELSE ngay_gui
             END,
             ngay_cap_nhat = NOW()
         WHERE ma_bl = :ma_bl
@@ -108,6 +128,49 @@ def update_payroll_status(db: Session, ma_bl: int, trang_thai: str, nguoi_duyet:
     if result.rowcount == 0:
         return None
     return {"ma_bl": ma_bl, "trang_thai": trang_thai}
+
+
+def submit_month_for_approval(db: Session, thang: int, nam: int, nguoi_gui: str) -> int:
+    """Chuyển toàn bộ bảng lương Nháp của tháng sang Chờ duyệt; trả về số bảng lương đã gửi."""
+    result = db.execute(
+        text("""
+            UPDATE bang_luong
+            SET trang_thai = 'CHO_DUYET', nguoi_gui = :nguoi_gui, ngay_gui = NOW(), ngay_cap_nhat = NOW()
+            WHERE thang = :thang AND nam = :nam AND trang_thai = 'NHAP'
+        """),
+        {"thang": thang, "nam": nam, "nguoi_gui": nguoi_gui},
+    )
+    db.commit()
+    return int(result.rowcount or 0)
+
+
+def get_pending_approval_periods(
+    db: Session, nguoi_duyet: str, chi_ma_pb: str | None = None
+) -> list[dict]:
+    """
+    Các kỳ lương đang chờ người này duyệt: bỏ qua lương của chính họ và bảng lương họ lập;
+    chi_ma_pb: người được cấp riêng quyền duyệt chỉ thấy bảng lương của phòng này (Ban Giám đốc).
+    """
+    dept_filter = "AND nv.ma_pb = :ma_pb" if chi_ma_pb else ""
+    rows = db.execute(
+        text(f"""
+            SELECT bl.thang, bl.nam, COUNT(*) AS so_bang_luong,
+                   MAX(bl.ngay_gui) AS ngay_gui,
+                   MAX(bl.nguoi_gui) AS nguoi_gui,
+                   MAX(ng.ho_ten) AS ten_nguoi_gui
+            FROM bang_luong bl
+            JOIN nhan_vien nv ON nv.ma_nv = bl.ma_nv
+            LEFT JOIN nhan_vien ng ON ng.ma_nv = bl.nguoi_gui
+            WHERE bl.trang_thai = 'CHO_DUYET'
+              AND bl.ma_nv <> :nguoi_duyet
+              AND (bl.nguoi_lap IS NULL OR bl.nguoi_lap <> :nguoi_duyet)
+              {dept_filter}
+            GROUP BY bl.nam, bl.thang
+            ORDER BY bl.nam DESC, bl.thang DESC
+        """),
+        {"nguoi_duyet": nguoi_duyet, "ma_pb": chi_ma_pb},
+    ).mappings().all()
+    return [dict(r) for r in rows]
 
 
 def get_payroll_inputs(db: Session, start, end) -> list[dict]:

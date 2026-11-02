@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, Info, Loader2, X } from "lucide-react";
 
 /**
@@ -89,9 +90,9 @@ export default function ConfirmDialog({
   const toneStyle = TONES[tone] || TONES.primary;
   const Icon = IconOverride || toneStyle.Icon;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/50 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !busy) onCancel?.();
       }}
@@ -101,9 +102,9 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
-        className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
+        className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
       >
-        <div className="px-6 pt-5 pb-4 flex items-start gap-3">
+        <div className="px-6 pt-5 pb-4 flex items-start gap-3 shrink-0">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${toneStyle.iconWrap}`}>
             <Icon className="w-5 h-5" />
           </div>
@@ -128,19 +129,19 @@ export default function ConfirmDialog({
           </button>
         </div>
 
-        {children && <div className="px-6 pb-4 text-xs">{children}</div>}
+        {children && <div className="px-6 pb-4 text-xs overflow-y-auto flex-1 min-h-0">{children}</div>}
 
         {error && (
           <div
             role="alert"
-            className="mx-6 mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2"
+            className="mx-6 mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2 shrink-0"
           >
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0">
           <button
             ref={cancelRef}
             type="button"
@@ -161,6 +162,7 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

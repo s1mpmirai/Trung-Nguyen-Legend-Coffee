@@ -32,7 +32,7 @@ def get_roles_endpoint(
     account: PermissionViewer,
 ):
     """
-    Lấy danh mục các vai trò trong hệ thống (ADMIN, QUAN_LY, TRUONG_NHOM, NHAN_VIEN)
+    Lấy danh mục các vai trò trong hệ thống (ADMIN, BAN_GIAM_DOC, NHAN_SU, KE_TOAN, NHAN_VIEN)
     kèm danh sách các quyền chức năng mặc định của từng vai trò.
     """
     return permission_service.get_all_roles(db)
@@ -63,7 +63,7 @@ def get_role_matrix_endpoint(
     """
     Lấy toàn bộ Ma trận phân quyền (Vai trò x Quyền) phục vụ trực tiếp cho giao diện RolePermissions:
     - Hiển thị chi tiết một Nhân viên (NHAN_VIEN) có quyền gì.
-    - So sánh khi nhân viên được thăng chức lên Trưởng nhóm (TRUONG_NHOM) thì quyền thay đổi ra sao
+    - So sánh mỗi vai trò phòng ban (Ban Giám đốc, Nhân sự, Kế toán) được bổ sung quyền gì so với Nhân viên
       (được bổ sung thêm quyền xem nhân sự, duyệt đơn nghỉ và quản lý chấm công nhóm).
     """
     return permission_service.get_role_matrix(db)
@@ -106,7 +106,7 @@ def assign_role_endpoint(
 ):
     """
     Cấp hoặc thay đổi vai trò hệ thống cho nhân viên:
-    - Ví dụ: Thăng chức nhân viên từ 'NHAN_VIEN' lên 'TRUONG_NHOM' hoặc 'QUAN_LY'.
+    - Ví dụ: chuyển nhân viên sang làm nghiệp vụ Phòng Nhân sự ('NHAN_VIEN' -> 'NHAN_SU').
     - Hệ thống tự động kích hoạt quyền tương ứng của vai trò mới và đồng bộ tài khoản đăng nhập.
     """
     ensure_in_scope(db, account, ma_nv)

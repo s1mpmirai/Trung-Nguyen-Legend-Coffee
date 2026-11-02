@@ -57,14 +57,12 @@ const EMPTY_FILTERS = {
   gioi_tinh: "",
   hinh_thuc_lam_viec: "",
   loai_hd: "",
-  luong_tu: "",
-  luong_den: "",
   ngay_vao_tu: "",
   ngay_vao_den: "",
 };
 
 // Các trường thuộc panel "Tìm kiếm nâng cao" (dùng để đếm số điều kiện đang áp dụng)
-const ADVANCED_FIELDS = ["gioi_tinh", "hinh_thuc_lam_viec", "loai_hd", "luong_tu", "luong_den", "ngay_vao_tu", "ngay_vao_den"];
+const ADVANCED_FIELDS = ["gioi_tinh", "hinh_thuc_lam_viec", "loai_hd", "ngay_vao_tu", "ngay_vao_den"];
 
 const inputClass =
   "w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition";
@@ -78,11 +76,10 @@ const formatDate = (val) => {
   return d && m && y ? `${d}/${m}/${y}` : String(val);
 };
 
-const formatVND = (val) => (val || val === 0 ? `${Number(val).toLocaleString("vi-VN")} đ` : "—");
 
 /**
  * AdminEmployeesTab – Danh bạ nhân sự (chỉ đọc) cho Admin:
- * tìm kiếm theo từ khóa, tìm kiếm nâng cao (khoảng lương, khoảng ngày vào làm, giới tính, loại HĐ...),
+ * tìm kiếm theo từ khóa, tìm kiếm nâng cao (khoảng ngày vào làm, giới tính, loại HĐ...),
  * lọc theo phòng ban / chức vụ / trạng thái và sắp xếp theo cột. Toàn bộ xử lý phía server
  * qua GET /employees/get_employee_list.
  */
@@ -144,11 +141,7 @@ export default function AdminEmployeesTab() {
   }, [fetchEmployees]);
 
   const validate = (values) => {
-    const { luong_tu, luong_den, ngay_vao_tu, ngay_vao_den } = values;
-    if (luong_tu !== "" && Number(luong_tu) < 0) return "Mức lương không được âm.";
-    if (luong_tu !== "" && luong_den !== "" && Number(luong_tu) > Number(luong_den)) {
-      return "Mức lương 'từ' phải nhỏ hơn hoặc bằng mức lương 'đến'.";
-    }
+    const { ngay_vao_tu, ngay_vao_den } = values;
     if (ngay_vao_tu && ngay_vao_den && ngay_vao_tu > ngay_vao_den) {
       return "Ngày vào làm 'từ' phải trước hoặc bằng ngày 'đến'.";
     }
@@ -376,31 +369,6 @@ export default function AdminEmployeesTab() {
               </select>
             </label>
 
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-slate-500">Lương cơ bản (VNĐ)</span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="500000"
-                  placeholder="Từ"
-                  value={draft.luong_tu}
-                  onChange={(e) => setDraft({ ...draft, luong_tu: e.target.value })}
-                  className={inputClass}
-                />
-                <span className="text-slate-400 text-xs">–</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="500000"
-                  placeholder="Đến"
-                  value={draft.luong_den}
-                  onChange={(e) => setDraft({ ...draft, luong_den: e.target.value })}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
             <div className="flex flex-col gap-1 lg:col-span-2">
               <span className="text-[11px] font-semibold text-slate-500">Ngày vào làm</span>
               <div className="flex items-center gap-2">
@@ -468,13 +436,12 @@ export default function AdminEmployeesTab() {
                   <th scope="col" className={TH}>Liên hệ</th>
                   <SortableHeader className={TH} label="Ngày vào làm" field="ngay_vao_lam" sort={sort} onSort={handleSort} />
                   <th scope="col" className={TH}>Loại HĐ</th>
-                  <SortableHeader className={`${TH} text-right`} align="right" label="Lương cơ bản" field="luong_co_ban" sort={sort} onSort={handleSort} />
                   <SortableHeader className={TH} label="Trạng thái" field="trang_thai" sort={sort} onSort={handleSort} />
                 </tr>
               </thead>
               <tbody className={TBODY}>
                 {isLoading ? (
-                  <SkeletonRows rows={8} columns={9} />
+                  <SkeletonRows rows={8} columns={8} />
                 ) : employees.map((emp) => {
                   const status = statusInfo(emp.trang_thai);
                   return (
@@ -502,7 +469,6 @@ export default function AdminEmployeesTab() {
                       </td>
                       <td className={`${TD} text-slate-700 whitespace-nowrap`}>{formatDate(emp.ngay_vao_lam)}</td>
                       <td className={`${TD} text-slate-700 whitespace-nowrap`}>{contractLabel(emp.loai_hd)}</td>
-                      <td className={`${TD} text-right font-semibold text-slate-900 whitespace-nowrap`}>{formatVND(emp.muc_luong)}</td>
                       <td className={`${TD} whitespace-nowrap`}>
                         <span
                           className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${

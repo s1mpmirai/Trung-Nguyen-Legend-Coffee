@@ -157,7 +157,23 @@ export async function calculatePayroll(thang, nam) {
 }
 
 /**
- * Cập nhật trạng thái duyệt / chi trả bảng lương (NHAP -> DA_DUYET -> DA_TRA)
+ * [Kế toán] Gửi toàn bộ bảng lương Nháp của tháng sang Ban Giám đốc duyệt
+ * POST /api/v1/payroll/submit
+ */
+export async function submitPayrollForApproval(thang, nam) {
+  return apiClient.post("/payroll/submit", { thang, nam });
+}
+
+/**
+ * [Ban Giám đốc] Các kỳ lương Kế toán đã gửi, đang chờ người đăng nhập duyệt
+ * GET /api/v1/payroll/pending-approval
+ */
+export async function getPendingPayrollApprovals() {
+  return apiClient.get("/payroll/pending-approval");
+}
+
+/**
+ * Cập nhật trạng thái bảng lương (NHAP -> CHO_DUYET -> DA_DUYET -> DA_TRA; CHO_DUYET / DA_DUYET -> NHAP)
  * PUT /api/v1/payroll/{ma_bl}/status
  */
 export async function updatePayrollStatus(ma_bl, trang_thai) {

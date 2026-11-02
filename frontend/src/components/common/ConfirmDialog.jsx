@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, ShieldAlert, HelpCircle, Loader2, AlertCircle } from "lucide-react";
 import { useDialog } from "./Modal";
 
@@ -76,9 +77,9 @@ export default function ConfirmDialog({
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4 animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !submitting) onCancel?.();
       }}
@@ -89,9 +90,9 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={message ? descId : undefined}
-        className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-scale-up"
+        className="bg-white rounded-2xl max-w-md w-full max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col p-6 shadow-2xl border border-slate-200 animate-scale-up"
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 shrink-0">
           <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${style.iconWrap}`}>
             <Icon className="w-5 h-5" aria-hidden="true" />
           </div>
@@ -107,19 +108,19 @@ export default function ConfirmDialog({
           </div>
         </div>
 
-        {children && <div className="mt-4 text-xs">{children}</div>}
+        {children && <div className="mt-4 text-xs overflow-y-auto flex-1 min-h-0">{children}</div>}
 
         {error && (
           <div
             role="alert"
-            className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-start gap-2"
+            className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-start gap-2 shrink-0"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="flex justify-end gap-2.5 mt-6">
+        <div className="flex justify-end gap-2.5 mt-6 shrink-0">
           <button
             ref={cancelRef}
             type="button"
@@ -141,6 +142,7 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

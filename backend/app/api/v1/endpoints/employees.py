@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.permissions import (
     CurrentAccount,
+    can_view_salary,
     data_scope,
     ensure_in_scope,
     ensure_self_or_managed,
@@ -120,7 +121,13 @@ def get_employee_list(
     sort_by: Optional[str] = Query("ma_nv", description="Trường sắp xếp: ma_nv, ho_ten, ngay_vao_lam, luong_co_ban, ten_pb, ten_cv, trang_thai"),
     sort_order: Optional[str] = Query("asc", description="Thứ tự sắp xếp: asc hoặc desc"),
 ):
-    return employee_list(
+    # Admin (quản trị hệ thống) chỉ tra cứu danh bạ: không lọc, sắp xếp hay xem theo mức lương
+    show_salary = can_view_salary(account)
+    if not show_salary:
+        luong_tu = luong_den = None
+        if sort_by in ("luong_co_ban", "muc_luong"):
+            sort_by = "ma_nv"
+    result = employee_list(
         db=db,
         page=page,
         page_size=page_size,
@@ -139,6 +146,10 @@ def get_employee_list(
         sort_order=sort_order,
         scope=data_scope(account, *LIST_COMPANY_WIDE_PERMISSIONS),
     )
+    if not show_salary:
+        for item in result.get("items", []):
+            item["muc_luong"] = None
+    return result
 
 @router.get("/profile/{ma_nv}", response_model=employee_detail_response)
 def get_profile(

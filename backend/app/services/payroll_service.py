@@ -1,5 +1,7 @@
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+
 from app.repositories import payroll_repository
 from app.repositories.attendance_repository import get_monthly_attendance_lock
 from app.repositories.holiday_repository import get_holidays
@@ -36,7 +38,26 @@ NGUONG_KHAU_TRU_THU_VIEC = 2_000_000
 NGUONG_NGAY_KHONG_DONG_BH = 14
 
 # NHAP -> DA_DUYET -> DA_TRA; được mở lại (DA_DUYET -> NHAP) trước khi chi trả, đã chi trả thì khóa hẳn
-PAYROLL_STATUS_FLOW = {"NHAP": {"DA_DUYET"}, "DA_DUYET": {"DA_TRA", "NHAP"}, "DA_TRA": set()}
+PAYROLL_STATUS_FLOW = {
+    "NHAP": {"CHO_DUYET"},
+    "CHO_DUYET": {"DA_DUYET", "NHAP"},
+    "DA_DUYET": {"DA_TRA", "NHAP"},
+    "DA_TRA": set(),
+}
+
+# Tách nhiệm vụ theo từng bước (trạng thái hiện tại, trạng thái mới):
+# Kế toán (PAYROLL_MANAGE) gửi duyệt và xác nhận chi trả; Ban Giám đốc (PAYROLL_APPROVE) duyệt hoặc trả về.
+PAYROLL_STATUS_PERMISSION = {
+    ("NHAP", "CHO_DUYET"): "PAYROLL_MANAGE",
+    ("CHO_DUYET", "DA_DUYET"): "PAYROLL_APPROVE",
+    ("CHO_DUYET", "NHAP"): "PAYROLL_APPROVE",
+    ("DA_DUYET", "NHAP"): "PAYROLL_APPROVE",
+    ("DA_DUYET", "DA_TRA"): "PAYROLL_MANAGE",
+}
+PERMISSION_DENIED_MESSAGES = {
+    "PAYROLL_APPROVE": "Chỉ Ban Giám đốc (quyền duyệt lương) mới được duyệt hoặc trả bảng lương về Kế toán.",
+    "PAYROLL_MANAGE": "Chỉ Kế toán (quyền tính lương) mới được gửi duyệt hoặc xác nhận chi trả lương.",
+}
 
 
 def get_employee_payroll_month(
@@ -161,7 +182,7 @@ def calculate_payroll_month(db: Session, thang: int, nam: int, nguoi_lap: str | 
         for emp in payroll_repository.get_payroll_inputs(db, start, end):
             old = existing.get(emp["ma_nv"])
             if old and old["trang_thai"] != "NHAP":
-                # Không ghi đè bảng lương đã duyệt / đã chi trả
+                # Không ghi đè bảng lương đã gửi duyệt / đã duyệt / đã chi trả
                 bo_qua_da_duyet.append(emp["ma_nv"])
                 continue
             line = compute_payroll_line(
@@ -179,13 +200,34 @@ def calculate_payroll_month(db: Session, thang: int, nam: int, nguoi_lap: str | 
 
     message = f"Đã tính bảng lương tháng {thang}/{nam} cho {so_da_tinh} nhân sự (công chuẩn {so_cong_chuan} ngày)."
     if bo_qua_da_duyet:
-        message += f" Giữ nguyên {len(bo_qua_da_duyet)} bảng lương đã duyệt/đã trả."
+        message += f" Giữ nguyên {len(bo_qua_da_duyet)} bảng lương đã gửi duyệt / đã duyệt / đã trả."
     return {
         "message": message,
         "tong_nhan_vien_tinh_luong": so_da_tinh,
         "so_cong_chuan": so_cong_chuan,
         "bo_qua_da_duyet": bo_qua_da_duyet,
     }
+
+
+def submit_payroll_month(db: Session, thang: int, nam: int, nguoi_gui: str) -> dict:
+    """[Kế toán] Gửi toàn bộ bảng lương Nháp của tháng sang Ban Giám đốc duyệt (khóa không tính lại được)."""
+    if not get_monthly_attendance_lock(db, thang, nam).get("is_locked"):
+        raise ValueError(f"Bảng chấm công tháng {thang}/{nam} chưa được chốt, chưa thể gửi duyệt bảng lương.")
+    so_bang_luong = payroll_repository.submit_month_for_approval(db, thang, nam, nguoi_gui)
+    if so_bang_luong == 0:
+        raise ValueError(f"Tháng {thang}/{nam} không có bảng lương Nháp nào để gửi duyệt.")
+    return {
+        "message": f"Đã gửi {so_bang_luong} bảng lương tháng {thang}/{nam} sang Ban Giám đốc duyệt.",
+        "so_bang_luong": so_bang_luong,
+    }
+
+
+def get_pending_approvals(db: Session, nguoi_duyet: str, chi_duyet_ban_giam_doc: bool = False) -> dict:
+    """[Ban Giám đốc] Các kỳ lương Kế toán đã gửi, đang chờ người này duyệt."""
+    ky_luong = payroll_repository.get_pending_approval_periods(
+        db, nguoi_duyet, settings.board_department_code if chi_duyet_ban_giam_doc else None
+    )
+    return {"tong_bang_luong": sum(k["so_bang_luong"] for k in ky_luong), "ky_luong": ky_luong}
 
 
 def get_company_payroll_summary(db: Session, thang: int, nam: int) -> dict:
@@ -201,10 +243,21 @@ def get_company_payroll_summary(db: Session, thang: int, nam: int) -> dict:
     }
 
 
-def change_payroll_status(db: Session, ma_bl: int, trang_thai: str, nguoi_thuc_hien: str | None = None) -> dict:
+def change_payroll_status(
+    db: Session,
+    ma_bl: int,
+    trang_thai: str,
+    nguoi_thuc_hien: str | None = None,
+    chi_duyet_ban_giam_doc: bool = False,
+    quyen: set[str] | None = None,
+) -> dict:
     """
-    [Quản lý] Duyệt / mở lại / chi trả lương theo quy trình NHAP <-> DA_DUYET -> DA_TRA.
+    [Quản lý] Gửi duyệt / duyệt / trả về / chi trả lương theo quy trình
+    NHAP -> CHO_DUYET -> DA_DUYET -> DA_TRA (CHO_DUYET, DA_DUYET được trả về NHAP).
+    quyen: quyền thực tế của người thao tác (None = bỏ qua kiểm tra quyền, dùng trong kiểm thử).
     Tách nhiệm vụ: người lập bảng lương không tự duyệt; không ai duyệt hay chi trả dòng lương của chính mình.
+    chi_duyet_ban_giam_doc: người được cấp riêng quyền duyệt (không thuộc Ban Giám đốc, vd Kế toán trưởng)
+    chỉ duyệt / mở lại bảng lương của thành viên Ban Giám đốc.
     """
     row = payroll_repository.get_payroll_status_info(db, ma_bl)
     if row is None:
@@ -212,8 +265,17 @@ def change_payroll_status(db: Session, ma_bl: int, trang_thai: str, nguoi_thuc_h
     current = row["trang_thai"]
     if trang_thai not in PAYROLL_STATUS_FLOW.get(current, set()):
         raise ValueError(f"Không thể chuyển bảng lương từ trạng thái {current} sang {trang_thai}")
+    required = PAYROLL_STATUS_PERMISSION[(current, trang_thai)]
+    if quyen is not None and required not in quyen:
+        raise PermissionError(PERMISSION_DENIED_MESSAGES[required])
+    if (
+        chi_duyet_ban_giam_doc
+        and required == "PAYROLL_APPROVE"
+        and row.get("ma_pb") != settings.board_department_code
+    ):
+        raise PermissionError("Bạn chỉ được duyệt bảng lương của Ban Giám đốc. Bảng lương nhân sự khác do Ban Giám đốc duyệt.")
     if nguoi_thuc_hien and trang_thai in ("DA_DUYET", "DA_TRA") and row["ma_nv"] == nguoi_thuc_hien:
         raise PermissionError("Bạn không thể duyệt hoặc chi trả bảng lương của chính mình.")
     if nguoi_thuc_hien and trang_thai == "DA_DUYET" and row.get("nguoi_lap") == nguoi_thuc_hien:
-        raise PermissionError("Người lập bảng lương không được tự duyệt. Cần một người có quyền tính lương khác duyệt.")
+        raise PermissionError("Người lập bảng lương không được tự duyệt. Cần một người có quyền duyệt lương khác duyệt.")
     return payroll_repository.update_payroll_status(db, ma_bl, trang_thai, nguoi_duyet=nguoi_thuc_hien)

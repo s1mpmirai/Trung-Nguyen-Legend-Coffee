@@ -1,6 +1,7 @@
 from typing import Any
 from sqlalchemy.orm import Session
 
+from app.core.roles import ADMIN_ROLE, STAFF_ROLE, VALID_ROLES
 from app.repositories import permission_repository
 from app.repositories.employee_repository import get_by_ma_nv
 from app.schemas.permission_schemas import (
@@ -38,15 +39,17 @@ def get_employee_permissions(db: Session, ma_nv: str) -> dict[str, Any]:
     return perms
 
 
-# Người không phải ADMIN chỉ được cấp các vai trò / quyền nghiệp vụ trong phạm vi của mình.
-# Quyền quản trị và quyền có tác dụng toàn công ty (tính lương, chốt công) chỉ Admin cấp.
-ROLES_ASSIGNABLE_BY_MANAGER = {"NHAN_VIEN", "TRUONG_NHOM"}
+# Người không phải ADMIN (được cấp riêng PERMISSION_ASSIGN) chỉ được thao tác trên tài khoản Nhân viên.
+# Vai trò phòng ban (Ban Giám đốc, Nhân sự, Kế toán), quyền quản trị và quyền có tác dụng toàn công ty
+# (tính lương, chốt công) chỉ Admin cấp.
+ROLES_ASSIGNABLE_BY_MANAGER = {STAFF_ROLE}
 ADMIN_ONLY_PERMISSIONS = {
     "ACCOUNT_MANAGE",
     "PERMISSION_ASSIGN",
     "ORG_MANAGE",
     "CONTRACT_MANAGE",
     "PAYROLL_MANAGE",
+    "PAYROLL_APPROVE",
     "ATTENDANCE_LOCK",
 }
 
@@ -57,19 +60,21 @@ def _check_can_change(db: Session, actor: dict[str, Any], clean_id: str) -> dict
     target = permission_repository.get_employee_permissions(db, clean_id)
     if not target:
         raise ValueError(f"Không tìm thấy nhân viên có mã {clean_id}")
-    if actor["ma_vai_tro"] != "ADMIN" and target["ma_vai_tro"] in ("ADMIN", "QUAN_LY"):
-        raise PermissionError("Chỉ Admin mới được thay đổi quyền của tài khoản Quản lý / Admin.")
+    if actor["ma_vai_tro"] != ADMIN_ROLE and target["ma_vai_tro"] not in ROLES_ASSIGNABLE_BY_MANAGER:
+        raise PermissionError("Chỉ Admin mới được thay đổi quyền của tài khoản Ban Giám đốc / Nhân sự / Kế toán / Admin.")
     return target
 
 
 def assign_role_to_employee(db: Session, ma_nv: str, data: AssignRoleRequest, actor: dict[str, Any]) -> dict[str, Any]:
-    """Cấp / thay đổi vai trò cho nhân viên (vd: thăng chức lên Trưởng nhóm)."""
+    """Cấp / thay đổi vai trò cho nhân viên (vd: chuyển sang làm nghiệp vụ Phòng Nhân sự)."""
     clean_id = ma_nv.strip().upper().replace("-", "")
     _check_can_change(db, actor, clean_id)
 
     target_role = data.ma_vai_tro.strip().upper()
-    if actor["ma_vai_tro"] != "ADMIN" and target_role not in ROLES_ASSIGNABLE_BY_MANAGER:
-        raise PermissionError("Quản lý chỉ được cấp vai trò Nhân viên hoặc Trưởng nhóm.")
+    if target_role not in VALID_ROLES:
+        raise ValueError(f"Vai trò không hợp lệ: {target_role}")
+    if actor["ma_vai_tro"] != ADMIN_ROLE and target_role not in ROLES_ASSIGNABLE_BY_MANAGER:
+        raise PermissionError("Chỉ Admin mới được cấp vai trò phòng ban (Ban Giám đốc, Nhân sự, Kế toán) hoặc Admin.")
     return permission_repository.assign_role_to_employee(
         db=db, ma_nv=clean_id, ma_vai_tro=target_role, ghi_chu=data.ghi_chu
     )

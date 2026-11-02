@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Users, KeyRound, Building2, Lock, ShieldCheck, LayoutDashboard, RefreshCw, Briefcase } from "lucide-react";
+import { Users, KeyRound, Building2, Lock, ShieldCheck, LayoutDashboard, RefreshCw } from "lucide-react";
 import { getAdminStats } from "../../../services/adminService";
 import ErrorState from "../../../components/common/ErrorState";
 import { getRoleLabel } from "../../../utils/navigation";
 
 const ROLE_DESCRIPTIONS = {
   ADMIN: "Quản trị hệ thống (IT)",
-  QUAN_LY: "Quản lý nhân sự & lương",
-  TRUONG_NHOM: "Giám sát nhóm",
+  BAN_GIAM_DOC: "Điều hành, duyệt lương",
+  NHAN_SU: "Nhân sự, hợp đồng, chấm công",
+  KE_TOAN: "Tính lương, chi trả",
   NHAN_VIEN: "Quyền cơ bản",
 };
 
@@ -76,7 +77,6 @@ export default function AdminOverviewTab({ onNavigateTab, allowedTabs = [] }) {
     { tab: "permissions", icon: ShieldCheck, title: "Phân quyền RBAC", note: "Vai trò & quyền riêng" },
     { tab: "employees", icon: Users, title: "Danh bạ nhân sự", note: "Tìm kiếm nâng cao & sắp xếp" },
     { tab: "departments", icon: Building2, title: "Phòng ban", note: `${summary.tong_phong_ban ?? 0} phòng ban (chỉ xem)` },
-    { tab: "positions", icon: Briefcase, title: "Chức vụ & thang lương", note: `${summary.tong_chuc_vu ?? 0} chức vụ (chỉ xem)` },
   ].filter((s) => can(s.tab));
 
   return (

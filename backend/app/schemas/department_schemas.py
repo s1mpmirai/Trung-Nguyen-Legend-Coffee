@@ -80,6 +80,7 @@ class PositionUpdate(BaseModel):
 
 
 class PositionResponse(PositionBase):
+    phu_cap_chuc_vu: Optional[float] = Field(None, description="Phụ cấp chức vụ (VNĐ); ẩn với Admin")
     so_luong_nv: Optional[int] = 0
     thang_bac_luong: list[SalaryScaleItem] = []
     ngay_tao: Optional[datetime] = None

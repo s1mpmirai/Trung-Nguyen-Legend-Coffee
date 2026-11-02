@@ -60,18 +60,30 @@ const previousMonth = () => {
     : { thang: now.getMonth(), nam: now.getFullYear() };
 };
 
-/** canViewPayroll: chỉ người có PAYROLL_MANAGE (Kế toán, Admin) mới tải quỹ lương toàn công ty */
-export const getManagerDashboardStats = async ({ canViewPayroll = true } = {}) => {
+/** canViewPayroll: chỉ người tính lương (Kế toán) hoặc duyệt lương (Ban Giám đốc) mới tải quỹ lương toàn công ty */
+export const getManagerDashboardStats = async ({
+  canViewPayroll = true,
+  canViewEmployees = true,
+  canViewAttendance = true,
+  canViewLeaves = true,
+  canViewReports = true,
+  canViewProfileRequests = true,
+} = {}) => {
   const kyLuong = previousMonth();
   const [empSettled, attSettled, leaveSettled, payrollSettled, trendSettled, statsSettled, profileSettled] =
     await Promise.allSettled([
-      apiClient.get("/employees/get_employee_list", { params: { page: 1, page_size: 200 } }),
-      apiClient.get("/attendance/daily"),
-      apiClient.get("/leaves/pending"),
+      // Không có quyền thì không gọi API (thẻ tương ứng cũng được ẩn ở Dashboard)
+      canViewEmployees
+        ? apiClient.get("/employees/get_employee_list", { params: { page: 1, page_size: 200 } })
+        : Promise.resolve(null),
+      canViewAttendance ? apiClient.get("/attendance/daily") : Promise.resolve(null),
+      canViewLeaves ? apiClient.get("/leaves/pending") : Promise.resolve(null),
       canViewPayroll ? apiClient.get("/payroll/summary", { params: kyLuong }) : Promise.resolve(null),
-      apiClient.get("/attendance/trend", { params: { days: 7 } }),
-      apiClient.get("/employees/reports/statistics"),
-      apiClient.get("/employees/manager/profile-requests", { params: { trang_thai: "CHO_DUYET" } }),
+      canViewAttendance ? apiClient.get("/attendance/trend", { params: { days: 7 } }) : Promise.resolve(null),
+      canViewReports ? apiClient.get("/employees/reports/statistics") : Promise.resolve(null),
+      canViewProfileRequests
+        ? apiClient.get("/employees/manager/profile-requests", { params: { trang_thai: "CHO_DUYET" } })
+        : Promise.resolve(null),
     ]);
 
   // 1. Quân số & cơ cấu phòng ban (nhân sự đang làm việc)

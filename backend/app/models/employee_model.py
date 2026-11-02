@@ -11,7 +11,7 @@ class tai_khoan(Base):
     ma_tk = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     ma_nv = Column(String, unique=True, index=True) # ForeignKey("nhan_vien.ma_nv"), nullable=False
     mat_khau = Column(String, nullable=False)
-    ma_vai_tro = Column(String, nullable=False)  # 'ADMIN', 'QUAN_LY', 'NHAN_VIEN'
+    ma_vai_tro = Column(String, nullable=False)  # 'ADMIN', 'BAN_GIAM_DOC', 'NHAN_SU', 'KE_TOAN', 'NHAN_VIEN'
     trang_thai = Column(String, default='HOAT_DONG')  # 'HOAT_DONG', 'KHOA', 'NGUNG_HOAT_DONG'
     ngay_tao = Column(DateTime, default=datetime.now)
     ngay_cap_nhat = Column(DateTime, default=datetime.now, onupdate=datetime.now)

@@ -9,8 +9,10 @@ from app.db.session import get_db
 from app.schemas.attendance_schemas import AttendanceAdjustRequest
 from app.services import attendance_service
 
-# Toàn bộ API quản lý chấm công yêu cầu quyền ATTENDANCE_MANAGE
-router = APIRouter(dependencies=[Depends(require_permission("ATTENDANCE_MANAGE"))])
+# API xem chấm công: Nhân sự (ATTENDANCE_MANAGE) hoặc người tính / duyệt lương
+# (PAYROLL_MANAGE – Kế toán, PAYROLL_APPROVE – Ban Giám đốc) để đối soát công.
+# Sửa công cần ATTENDANCE_MANAGE, chốt / mở khóa công cần ATTENDANCE_LOCK (kiểm tra ở từng endpoint).
+router = APIRouter(dependencies=[Depends(require_permission("ATTENDANCE_MANAGE", "PAYROLL_MANAGE", "PAYROLL_APPROVE"))])
 DbSession = Annotated[Session, Depends(get_db)]
 
 
@@ -54,7 +56,7 @@ def get_monthly_attendance_summary_endpoint(
 def adjust_attendance_endpoint(
     ma_cc: int,
     data: AttendanceAdjustRequest,
-    account: CurrentAccount,
+    account: Annotated[dict, Depends(require_permission("ATTENDANCE_MANAGE"))],
     db: DbSession = None,
 ):
     """

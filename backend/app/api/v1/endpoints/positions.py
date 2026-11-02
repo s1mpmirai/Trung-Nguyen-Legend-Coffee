@@ -2,7 +2,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import CurrentAccount, require_permission
+from app.core.permissions import CurrentAccount, can_view_salary, require_permission
 from app.db.session import get_db
 from app.repositories import department_repository
 from app.schemas.department_schemas import (
@@ -18,6 +18,11 @@ DbSession = Annotated[Session, Depends(get_db)]
 OrgManager = Annotated[dict, Depends(require_permission("ORG_MANAGE"))]
 
 
+def _hide_salary(position: dict) -> dict:
+    """Admin chỉ xem tên / cấp bậc chức vụ, không xem thang bậc lương và phụ cấp."""
+    return {**position, "phu_cap_chuc_vu": None, "thang_bac_luong": []}
+
+
 @router.get("", response_model=list[PositionResponse], summary="Danh sách chức vụ")
 def list_positions_endpoint(
     db: DbSession,
@@ -27,10 +32,14 @@ def list_positions_endpoint(
     sort_order: Optional[str] = Query("asc", description="Thứ tự sắp xếp: asc hoặc desc"),
     trang_thai: Optional[int] = Query(None, description="1: Đang sử dụng, 0: Ngừng sử dụng"),
 ):
-    """Lấy danh sách tất cả các chức vụ trong hệ thống kèm thang bảng lương."""
-    return department_repository.get_positions_list(
+    """Lấy danh sách tất cả các chức vụ trong hệ thống kèm thang bảng lương (Admin: không kèm lương)."""
+    show_salary = can_view_salary(account)
+    if not show_salary and sort_by == "phu_cap_chuc_vu":
+        sort_by = None
+    positions = department_repository.get_positions_list(
         db, search=search, sort_by=sort_by, sort_order=sort_order, trang_thai=trang_thai
     )
+    return positions if show_salary else [_hide_salary(dict(p)) for p in positions]
 
 
 @router.get("/{ma_cv}", response_model=PositionResponse, summary="Chi tiết chức vụ")
@@ -42,7 +51,7 @@ def get_position_endpoint(ma_cv: str, db: DbSession, account: CurrentAccount):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Không tìm thấy chức vụ {ma_cv}",
         )
-    return pos
+    return pos if can_view_salary(account) else _hide_salary(dict(pos))
 
 
 @router.post("", response_model=PositionResponse, status_code=status.HTTP_201_CREATED, summary="Thêm chức vụ mới")
@@ -99,7 +108,9 @@ def delete_position_endpoint(ma_cv: str, db: DbSession, account: OrgManager):
 
 @router.get("/{ma_cv}/salary-scales", response_model=list[SalaryScaleItem], summary="Thang bậc lương chức vụ")
 def get_salary_scales_endpoint(ma_cv: str, db: DbSession, account: CurrentAccount):
-    """Xem danh sách các bậc lương theo chức vụ."""
+    """Xem danh sách các bậc lương theo chức vụ (Admin không được xem)."""
+    if not can_view_salary(account):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Quản trị hệ thống không được xem thang bậc lương")
     return department_repository.get_salary_scales(db, ma_cv)
 
 

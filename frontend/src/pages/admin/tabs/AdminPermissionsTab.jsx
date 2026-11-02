@@ -46,7 +46,8 @@ export const PERMISSION_MAP = {
   ATTENDANCE_MANAGE: { label: "Quản lý chấm công", desc: "Theo dõi giờ vào/ra, duyệt và điều chỉnh công" },
   ATTENDANCE_LOCK: { label: "Chốt / mở khóa công tháng", desc: "Chốt bảng công trước khi tính lương, mở khóa khi lương chưa duyệt" },
   PAYROLL_VIEW: { label: "Xem phiếu lương", desc: "Xem chi tiết lương, phụ cấp, khấu trừ và thực lĩnh" },
-  PAYROLL_MANAGE: { label: "Tính & duyệt bảng lương", desc: "Tính lương tháng, duyệt và xác nhận chi trả" },
+  PAYROLL_MANAGE: { label: "Tính lương", desc: "Tính bảng lương tháng từ bảng công đã chốt và xác nhận chi trả" },
+  PAYROLL_APPROVE: { label: "Duyệt bảng lương", desc: "Duyệt bảng lương tháng hoặc trả về Nháp để tính lại" },
   REPORT_VIEW: { label: "Xem báo cáo nhân sự", desc: "Báo cáo biến động tháng, cơ cấu trình độ – lương – thâm niên" },
   ACCOUNT_MANAGE: { label: "Quản lý tài khoản người dùng", desc: "Cấp tài khoản, khóa / mở khóa, đặt lại mật khẩu (vào được Cổng Quản trị)" },
   PERMISSION_ASSIGN: { label: "Phân quyền & bổ nhiệm vai trò", desc: "Gán vai trò và cấp / thu hồi quyền riêng cho nhân sự" },
@@ -66,31 +67,36 @@ const GROUP_ORDER = ["NHAN_SU", "TO_CHUC", "CHAM_CONG", "DON_TU", "LUONG", "BAO_
 
 export const ROLE_LABELS = {
   ADMIN: "Quản trị viên",
-  QUAN_LY: "Quản lý",
-  TRUONG_NHOM: "Trưởng nhóm",
+  BAN_GIAM_DOC: "Ban Giám đốc",
+  NHAN_SU: "Phòng Nhân sự",
+  KE_TOAN: "Phòng Kế toán",
   NHAN_VIEN: "Nhân viên",
 };
-const ROLE_ORDER = ["NHAN_VIEN", "TRUONG_NHOM", "QUAN_LY", "ADMIN"];
-const ROLE_RANK = { NHAN_VIEN: 1, TRUONG_NHOM: 2, QUAN_LY: 3, ADMIN: 4 };
+const ROLE_ORDER = ["NHAN_VIEN", "KE_TOAN", "NHAN_SU", "BAN_GIAM_DOC", "ADMIN"];
+const ROLE_RANK = { NHAN_VIEN: 1, KE_TOAN: 2, NHAN_SU: 2, BAN_GIAM_DOC: 3, ADMIN: 4 };
 const ROLE_HINTS = {
   NHAN_VIEN: "quyền cơ bản: đơn từ, phiếu lương của bản thân",
-  TRUONG_NHOM: "duyệt đơn, chấm công và theo dõi nhóm",
-  QUAN_LY: "quản lý nhân sự, chấm công, lương và báo cáo",
+  KE_TOAN: "tính lương, đối soát công, xác nhận chi trả",
+  NHAN_SU: "hồ sơ, hợp đồng, tổ chức, chấm công, duyệt đơn",
+  BAN_GIAM_DOC: "xem toàn công ty, báo cáo, duyệt đơn và duyệt lương",
   ADMIN: "quản trị tài khoản & phân quyền, chỉ xem dữ liệu nghiệp vụ",
 };
 const ROLE_COLORS = {
   NHAN_VIEN: { head: "text-slate-700", dot: "bg-emerald-100 text-emerald-700" },
-  TRUONG_NHOM: { head: "text-purple-700", dot: "bg-purple-100 text-purple-700" },
-  QUAN_LY: { head: "text-sky-700", dot: "bg-sky-100 text-sky-700" },
+  KE_TOAN: { head: "text-amber-700", dot: "bg-amber-100 text-amber-700" },
+  NHAN_SU: { head: "text-purple-700", dot: "bg-purple-100 text-purple-700" },
+  BAN_GIAM_DOC: { head: "text-sky-700", dot: "bg-sky-100 text-sky-700" },
   ADMIN: { head: "text-sky-800", dot: "bg-sky-600 text-white" },
 };
 const roleBadgeClass = (role) =>
   role === "ADMIN"
     ? "bg-rose-50 text-rose-700 border border-rose-200"
-    : role === "QUAN_LY"
+    : role === "BAN_GIAM_DOC"
     ? "bg-sky-50 text-sky-700 border border-sky-200"
-    : role === "TRUONG_NHOM"
+    : role === "NHAN_SU"
     ? "bg-purple-50 text-purple-700 border border-purple-200"
+    : role === "KE_TOAN"
+    ? "bg-amber-50 text-amber-700 border border-amber-200"
     : "bg-slate-100 text-slate-600 border border-slate-200";
 
 // Quyền chỉ Admin mới được cấp / thu hồi (máy chủ trả 403 với người khác)
@@ -100,6 +106,7 @@ const ADMIN_ONLY_PERMISSIONS = [
   "ORG_MANAGE",
   "CONTRACT_MANAGE",
   "PAYROLL_MANAGE",
+  "PAYROLL_APPROVE",
   "ATTENDANCE_LOCK",
 ];
 
@@ -215,7 +222,7 @@ export default function AdminPermissionsTab({ userSession }) {
 
   // Bổ nhiệm vai trò
   const [promoteTarget, setPromoteTarget] = useState(null);
-  const [promoteRole, setPromoteRole] = useState("TRUONG_NHOM");
+  const [promoteRole, setPromoteRole] = useState("NHAN_SU");
 
   // Tra cứu quyền thực tế
   const [inspectTarget, setInspectTarget] = useState(null);
@@ -282,7 +289,7 @@ export default function AdminPermissionsTab({ userSession }) {
     ROLE_LABELS[code] || (matrixData?.roles || []).find((r) => r.ma_vai_tro === code)?.ten_vai_tro || code;
 
   // ────────────────── BỔ NHIỆM / ĐỔI VAI TRÒ ──────────────────
-  const assignableRoles = actorIsAdmin ? ["NHAN_VIEN", "TRUONG_NHOM", "QUAN_LY", "ADMIN"] : ["NHAN_VIEN", "TRUONG_NHOM"];
+  const assignableRoles = actorIsAdmin ? ["NHAN_VIEN", "KE_TOAN", "NHAN_SU", "BAN_GIAM_DOC", "ADMIN"] : ["NHAN_VIEN"];
 
   const refreshInspect = async (maNv) => {
     if (!maNv) return;

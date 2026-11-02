@@ -119,8 +119,14 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
   const canCreate = access.can("EMPLOYEE_CREATE");
   const canDelete = access.can("EMPLOYEE_DELETE");
   const canUpdate = access.can("EMPLOYEE_UPDATE");
+  // Báo cáo theo kỳ, thống kê trình độ / thâm niên / lương: chỉ người có REPORT_VIEW
+  const canViewReports = access.can("REPORT_VIEW");
+  // Cột Thao tác chỉ hiện khi có ít nhất một quyền thay đổi trạng thái nhân sự
+  const canManageStatus = canUpdate || canDelete;
 
-  const [activeSubTab, setActiveSubTab] = useState(initialTab || "list");
+  const [activeSubTab, setActiveSubTab] = useState(
+    initialTab === "reports" && !access.can("REPORT_VIEW") ? "list" : initialTab || "list"
+  );
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -151,9 +157,9 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
 
   useEffect(() => {
     if (initialTab) {
-      setActiveSubTab(initialTab);
+      setActiveSubTab(initialTab === "reports" && !canViewReports ? "list" : initialTab);
     }
-  }, [initialTab]);
+  }, [initialTab, canViewReports]);
 
   // Bộ lọc dùng chung & theo tab
   const [searchInput, setSearchInput] = useState("");
@@ -290,7 +296,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
 
   const refreshAll = () => {
     fetchEmployeesFromDb();
-    fetchMonthlyReport();
+    if (canViewReports) fetchMonthlyReport();
   };
 
   useEffect(() => {
@@ -298,8 +304,8 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
   }, []);
 
   useEffect(() => {
-    fetchMonthlyReport(selectedMonth);
-  }, [selectedMonth]);
+    if (canViewReports) fetchMonthlyReport(selectedMonth);
+  }, [selectedMonth, canViewReports]);
 
   // Xử lý thêm nhân sự mới: gọi API POST /employees/create_employee
   const handleAddEmployee = async (newEmp) => {
@@ -609,6 +615,8 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
           </p>
         </div>
 
+        {canViewReports && (
+        <>
         {/* 2 Sub-Tabs Chuyển đổi linh hoạt */}
         <div className="flex items-center p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80 shadow-2xs self-start md:self-auto">
           <button
@@ -636,6 +644,8 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
             <span>Báo cáo & Phân tích chuyên sâu</span>
           </button>
         </div>
+        </>
+        )}
       </div>
 
 
@@ -648,10 +658,12 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <Calendar className="w-4 h-4 text-sky-600" />
-              <span>BÁO CÁO THỐNG KÊ TÌNH HÌNH NHÂN SỰ THEO THÁNG</span>
+              <span>{canViewReports ? "BÁO CÁO THỐNG KÊ TÌNH HÌNH NHÂN SỰ THEO THÁNG" : "DANH SÁCH NHÂN SỰ"}</span>
             </h2>
 
             <div className="flex flex-wrap items-center gap-2">
+              {canViewReports && (
+              <>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-slate-500">Kỳ báo cáo:</span>
                 <select
@@ -670,6 +682,9 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
 
               <div className="h-4 w-px bg-slate-200 hidden sm:block mx-1"></div>
 
+
+              </>
+              )}
 
               <button
                 type="button"
@@ -704,6 +719,8 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
             </div>
           )}
 
+          {canViewReports && (
+          <>
           {/* 4 Thẻ KPI Trạng thái nhân sự (Nhấp để lọc nhanh) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* 1. Tổng nhân sự */}
@@ -811,6 +828,9 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
             </div>
           </div>
 
+          </>
+          )}
+
           {/* Thanh công cụ tìm kiếm & lọc Tab 1 */}
           <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-1 min-w-[280px]">
@@ -855,6 +875,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                 ))}
               </select>
 
+              {canViewReports && (
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -865,6 +886,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                 <option value="leave">● Nghỉ phép / Thai sản</option>
                 <option value="resigned">● Đã nghỉ việc</option>
               </select>
+              )}
 
               <button
                 type="button"
@@ -1164,13 +1186,13 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                 <th className="py-3.5 px-4 min-w-[140px]">Thâm niên & Ngày vào</th>
                 <th className="py-3.5 px-4 min-w-[120px] text-right">Mức lương</th>
                 <th className="py-3.5 px-4 min-w-[120px] text-center">Trạng thái</th>
-                <th className="py-3.5 px-4 min-w-[130px] text-center">Thao tác</th>
+                {canManageStatus && <th className="py-3.5 px-4 min-w-[130px] text-center">Thao tác</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {isLoading && employees.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400">
+                  <td colSpan={canManageStatus ? 8 : 7} className="py-16 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Loader2 className="w-7 h-7 animate-spin text-sky-600" />
                       <span className="text-xs font-medium">Đang tải danh sách nhân sự từ CSDL...</span>
@@ -1179,7 +1201,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                 </tr>
               ) : pagedEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400">
+                  <td colSpan={canManageStatus ? 8 : 7} className="py-16 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Users className="w-8 h-8 text-slate-300" />
                       <span className="text-xs font-semibold text-slate-600">
@@ -1319,6 +1341,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                     </td>
 
                     {/* Cột 8: Thao tác (Cho thôi việc / Xóa nhân sự / Khôi phục) */}
+                    {canManageStatus && (
                     <td className="py-3.5 px-4 text-center">
                       {access.maNv && emp.id === access.maNv ? (
                         <span className="text-[11px] italic text-slate-400" title="Không thể tự thay đổi trạng thái của chính mình">
@@ -1371,6 +1394,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                         </div>
                       )}
                     </td>
+                    )}
                   </tr>
                 ))
               )}

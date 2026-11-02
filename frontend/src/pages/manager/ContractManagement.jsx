@@ -393,6 +393,7 @@ export default function ContractManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [liquidateDate, setLiquidateDate] = useState(todayISO());
+  const [terminateEmployee, setTerminateEmployee] = useState(true);
   const [restoringId, setRestoringId] = useState("");
 
   // Danh sách nhân sự cho form lập hợp đồng
@@ -528,6 +529,7 @@ export default function ContractManagement() {
   const requestLiquidate = (c) => {
     setSelectedContract(c);
     setLiquidateDate(todayISO());
+    setTerminateEmployee(true);
     setConfirm({ type: "liquidate", contract: c });
   };
 
@@ -540,8 +542,15 @@ export default function ContractManagement() {
     const c = confirm?.contract;
     if (!c) return;
     if (confirm.type === "liquidate") {
-      await liquidateContract(c.ma_hd, { ngay_ket_thuc: liquidateDate });
-      showToast(`Đã thanh lý hợp đồng ${c.ma_hd} (ngày kết thúc ${formatDate(liquidateDate)}).`);
+      await liquidateContract(c.ma_hd, {
+        ngay_ket_thuc: liquidateDate,
+        cho_thoi_viec: terminateEmployee,
+      });
+      showToast(
+        terminateEmployee
+          ? `Đã thanh lý hợp đồng ${c.ma_hd} và chuyển nhân sự sang Đã nghỉ việc.`
+          : `Đã thanh lý hợp đồng ${c.ma_hd} (ngày kết thúc ${formatDate(liquidateDate)}).`
+      );
     } else {
       await deleteContract(c.ma_hd);
       showToast(`Đã xóa hợp đồng ${c.ma_hd} (có thể khôi phục).`);
@@ -1173,20 +1182,39 @@ export default function ContractManagement() {
         onCancel={() => setConfirm(null)}
       >
         {confirm?.type === "liquidate" && (
-          <div>
-            <label htmlFor="liquidate-date" className="block text-slate-700 font-semibold mb-1">
-              Ngày kết thúc (thanh lý) <span className="text-rose-500">*</span>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label htmlFor="liquidate-date" className="block text-slate-700 font-semibold mb-1">
+                Ngày kết thúc (thanh lý) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                id="liquidate-date"
+                type="date"
+                required
+                min={toInputDate(confirm?.contract?.ngay_bat_dau) || undefined}
+                value={liquidateDate}
+                onChange={(e) => setLiquidateDate(e.target.value)}
+                className={inputClass}
+              />
+              <p className="text-[10px] text-slate-400 mt-1">Hợp đồng chỉ có thể xóa sau khi đã thanh lý.</p>
+            </div>
+
+            <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100/70 transition">
+              <input
+                type="checkbox"
+                checked={terminateEmployee}
+                onChange={(e) => setTerminateEmployee(e.target.checked)}
+                className="mt-0.5 accent-rose-600 cursor-pointer"
+              />
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-slate-800">
+                  Đồng thời cho nhân sự này thôi việc
+                </span>
+                <span className="text-[11px] text-slate-500 leading-relaxed mt-0.5">
+                  Chuyển hồ sơ sang "Đã nghỉ việc", khóa tài khoản và ẩn khỏi danh sách đang làm việc. (Bỏ chọn nếu thanh lý để ký tiếp hợp đồng mới).
+                </span>
+              </div>
             </label>
-            <input
-              id="liquidate-date"
-              type="date"
-              required
-              min={toInputDate(confirm?.contract?.ngay_bat_dau) || undefined}
-              value={liquidateDate}
-              onChange={(e) => setLiquidateDate(e.target.value)}
-              className={inputClass}
-            />
-            <p className="text-[10px] text-slate-400 mt-1">Hợp đồng chỉ có thể xóa sau khi đã thanh lý.</p>
           </div>
         )}
       </ConfirmDialog>

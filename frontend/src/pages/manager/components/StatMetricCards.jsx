@@ -4,15 +4,34 @@ import CardErrorNotice from "./CardErrorNotice";
 
 const CardError = ({ message }) => <CardErrorNotice message={message} compact />;
 
-export default function StatMetricCards({ stats, errors = {}, onNavigateTab }) {
+// Tailwind cần tên class đầy đủ: số cột theo số thẻ được hiển thị
+const GRID_COLS = { 1: "lg:grid-cols-1", 2: "lg:grid-cols-2", 3: "lg:grid-cols-3", 4: "lg:grid-cols-4" };
+
+/**
+ * visible: thẻ nào được hiển thị theo quyền { employees, attendance, leaves, profileRequests, payroll }.
+ * Thẻ không có quyền thì ẩn hẳn, không hiện thông báo "không có quyền".
+ */
+export default function StatMetricCards({ stats, errors = {}, onNavigateTab, visible = {} }) {
   const data = stats || {};
+  const show = {
+    employees: visible.employees !== false,
+    attendance: visible.attendance !== false,
+    leaves: visible.leaves !== false,
+    profileRequests: visible.profileRequests !== false,
+    payroll: visible.payroll !== false,
+  };
+  const showPending = show.leaves || show.profileRequests;
+  const pendingTab = show.leaves ? "leaves" : "profile-requests";
+  const cardCount = [show.employees, show.attendance, showPending, show.payroll].filter(Boolean).length;
+  if (cardCount === 0) return null;
   // Không có quyền tính lương thì thẻ quỹ lương chỉ hiển thị thông báo, không dẫn sang trang lương
   const openPayroll = data.canViewPayroll === false ? null : onNavigateTab;
   const fmt = (value) => (value === null || value === undefined ? "—" : value);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className={`grid grid-cols-1 sm:grid-cols-2 ${GRID_COLS[cardCount]} gap-4`}>
       {/* 1. QUÂN SỐ NHÂN SỰ */}
+      {show.employees && (
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow flex flex-col justify-between">
         <div className="flex items-center justify-between text-slate-500 mb-2">
           <span className="text-xs font-bold tracking-wider text-slate-700 uppercase">
@@ -39,8 +58,10 @@ export default function StatMetricCards({ stats, errors = {}, onNavigateTab }) {
           </div>
         )}
       </div>
+      )}
 
       {/* 2. ĐIỂM DANH HÔM NAY */}
+      {show.attendance && (
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-shadow flex flex-col justify-between">
         <div className="flex items-center justify-between text-slate-500 mb-2">
           <span className="text-xs font-bold tracking-wider text-slate-700 uppercase">
@@ -72,16 +93,18 @@ export default function StatMetricCards({ stats, errors = {}, onNavigateTab }) {
           </div>
         )}
       </div>
+      )}
 
       {/* 3. VIỆC CẦN DUYỆT GẤP */}
+      {showPending && (
       <div
         role="button"
         tabIndex={0}
-        onClick={() => onNavigateTab && onNavigateTab("leaves")}
+        onClick={() => onNavigateTab && onNavigateTab(pendingTab)}
         onKeyDown={(e) => {
           if ((e.key === "Enter" || e.key === " ") && onNavigateTab) {
             e.preventDefault();
-            onNavigateTab("leaves");
+            onNavigateTab(pendingTab);
           }
         }}
         className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-amber-300 transition-all flex flex-col justify-between cursor-pointer group"
@@ -94,8 +117,8 @@ export default function StatMetricCards({ stats, errors = {}, onNavigateTab }) {
             <ClockAlert className="w-4 h-4" />
           </span>
         </div>
-        {errors.leaves && errors.profileRequests ? (
-          <CardError message={errors.leaves} />
+        {(!show.leaves || errors.leaves) && (!show.profileRequests || errors.profileRequests) ? (
+          <CardError message={errors.leaves || errors.profileRequests} />
         ) : (
           <div>
             <div className="flex items-baseline justify-between mb-2">
@@ -108,10 +131,12 @@ export default function StatMetricCards({ stats, errors = {}, onNavigateTab }) {
               <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition-colors" />
             </div>
             <div className="flex justify-between items-center text-[11px] pt-2 border-t border-slate-100">
+              {show.leaves && (
               <span className="text-sky-700 font-medium">
                 {errors.leaves ? "—" : data.pendingLeavesCount ?? 0} Đơn nghỉ phép
               </span>
-              {data.pendingProfileCount === null || data.pendingProfileCount === undefined ? (
+              )}
+              {!show.profileRequests ? null : data.pendingProfileCount === null || data.pendingProfileCount === undefined ? (
                 <span className="text-slate-400" title={errors.profileRequests || undefined}>
                   — Sửa hồ sơ
                 </span>
@@ -131,8 +156,10 @@ export default function StatMetricCards({ stats, errors = {}, onNavigateTab }) {
           </div>
         )}
       </div>
+      )}
 
       {/* 4. QUỸ LƯƠNG THÁNG */}
+      {show.payroll && (
       <div
         role="button"
         tabIndex={0}
@@ -170,6 +197,7 @@ export default function StatMetricCards({ stats, errors = {}, onNavigateTab }) {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
