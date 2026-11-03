@@ -112,7 +112,7 @@ const estimateLeaveDays = (startStr, endStr, countMode) => {
   return days;
 };
 
-export default function LeaveRequests({ userSession, onLogout }) {
+export default function LeaveRequests({ userSession, onLogout, canViewLeaves = true, canCreateLeaves = true }) {
   const maNv = userSession?.ma_nv || localStorage.getItem('user_ma_nv');
   const currentYear = new Date().getFullYear();
   const todayStr = todayIsoLocal();
@@ -146,8 +146,14 @@ export default function LeaveRequests({ userSession, onLogout }) {
   const { toast, showToast, hideToast } = useToast(4500);
 
   const loadLeaves = useCallback(async () => {
-    setIsLoading(true);
     setLeavesError('');
+    // Không có quyền Xem đơn từ: không gọi API lịch sử đơn
+    if (!canViewLeaves) {
+      setLeaves([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
     try {
       setLeaves(await getLeaveHistory(maNv, { throwOnError: true }));
     } catch (err) {
@@ -155,7 +161,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
     } finally {
       setIsLoading(false);
     }
-  }, [maNv]);
+  }, [maNv, canViewLeaves]);
 
   const loadBalance = useCallback(async () => {
     setBalanceLoading(true);
@@ -406,6 +412,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
             </h1>
           </div>
 
+          {canCreateLeaves && (
           <button
             type="button"
             onClick={handleOpenCreateModal}
@@ -414,7 +421,16 @@ export default function LeaveRequests({ userSession, onLogout }) {
             <Plus size={16} className="stroke-[3]" />
             <span>Tạo đơn</span>
           </button>
+          )}
         </div>
+
+        {/* Bị thu hồi quyền Tạo và gửi đơn: vẫn xem được đơn cũ */}
+        {!canCreateLeaves && (
+          <div role="status" className="p-3 bg-gold-50 border border-gold-200 text-coffee-800 rounded-xl text-xs font-medium flex items-start gap-2">
+            <Info size={15} className="flex-shrink-0 mt-0.5 text-gold-700" />
+            <span>Tài khoản của bạn chưa được cấp quyền Tạo và gửi đơn, nên chỉ xem được các đơn đã gửi.</span>
+          </div>
+        )}
 
         {/* THẺ QUỸ PHÉP NĂM (số liệu từ GET /leaves/balance) */}
         <section
@@ -487,6 +503,8 @@ export default function LeaveRequests({ userSession, onLogout }) {
           )}
         </section>
 
+        {canViewLeaves ? (
+        <>
         {/* CÁC NÚT BỘ LỌC TRẠNG THÁI */}
         <div className="flex items-center space-x-2 overflow-x-auto pb-1 no-scrollbar" role="group" aria-label="Lọc theo trạng thái đơn">
           {FILTERS.map((f) => {
@@ -604,7 +622,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
                   </div>
 
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    {item.trang_thai === 'CHO_DUYET' && (
+                    {item.trang_thai === 'CHO_DUYET' && canCreateLeaves && (
                       <button
                         type="button"
                         onClick={() => setCancelTarget(item)}
@@ -634,6 +652,15 @@ export default function LeaveRequests({ userSession, onLogout }) {
             <p className="text-xs text-slate-500">
               {activeFilter === 'ALL' ? 'Bạn chưa gửi đơn từ nào.' : 'Không có đơn từ nào ở trạng thái này.'}
             </p>
+          </div>
+        )}
+        </>
+        ) : (
+          /* Bị thu hồi quyền Xem đơn từ: chỉ còn tạo đơn mới */
+          <div role="status" className="bg-white rounded-2xl p-6 border border-coffee-100 text-center space-y-2">
+            <FileText size={32} className="mx-auto text-coffee-200 stroke-1" />
+            <p className="text-sm font-semibold text-slate-700">Chưa được cấp quyền Xem đơn từ</p>
+            <p className="text-xs text-slate-500">Bạn vẫn tạo và gửi được đơn mới bằng nút Tạo đơn.</p>
           </div>
         )}
       </main>
@@ -717,7 +744,7 @@ export default function LeaveRequests({ userSession, onLogout }) {
             </dl>
 
             <div className="flex items-center gap-2">
-              {selectedLeave.trang_thai === 'CHO_DUYET' && (
+              {selectedLeave.trang_thai === 'CHO_DUYET' && canCreateLeaves && (
                 <button
                   type="button"
                   onClick={() => setCancelTarget(selectedLeave)}

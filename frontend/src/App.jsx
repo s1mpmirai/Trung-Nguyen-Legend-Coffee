@@ -8,6 +8,7 @@ import EmployeePayroll from "./pages/employee/EmployeePayroll";
 import LeaveRequests from "./pages/employee/LeaveRequests";
 import ManagerDashboard from "./pages/manager/ManagerDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import NoPermissionNotice from "./pages/employee/components/NoPermissionNotice";
 import FirstTimePasswordModal from "./components/common/FirstTimePasswordModal";
 import { getMe } from "./services/adminService";
 import {
@@ -16,6 +17,8 @@ import {
   replaceClean,
   canAccessAdminPortal,
   canAccessManagerPortal,
+  canViewOwnPayroll,
+  hasPersonalPermission,
   getManageHome,
   getPortalHome,
   isLoginRoute,
@@ -161,6 +164,9 @@ function App() {
   // Lấy vai trò / quyền / họ tên mới nhất từ máy chủ và cập nhật bộ nhớ đệm
   const refreshSession = useCallback(async (base) => {
     const me = await getMe();
+    // Đã đăng xuất / đổi tài khoản trong lúc chờ: bỏ kết quả cũ, không khôi phục phiên
+    const current = sessionRef.current;
+    if (!current || current.token !== base.token) return current;
     const next = mergeMe(base, me);
     writeSessionCache(next);
     setSession(next);
@@ -231,6 +237,26 @@ function App() {
       window.removeEventListener("app-route-change", handleRouteSync);
     };
   }, []);
+
+  // 2.5. Giữ quyền luôn mới: Admin có thể cấp / thu hồi quyền trong lúc người dùng đang đăng nhập.
+  // Lấy lại quyền khi chuyển trang và khi máy chủ từ chối một yêu cầu vì thiếu quyền.
+  const lastRefreshRef = useRef(0);
+  const refreshPermissions = useCallback(() => {
+    const current = sessionRef.current;
+    const now = Date.now();
+    if (!current || now - lastRefreshRef.current < 1500) return;
+    lastRefreshRef.current = now;
+    refreshSession(current).catch(() => {});
+  }, [refreshSession]);
+
+  useEffect(() => {
+    if (!authChecking) refreshPermissions();
+  }, [route, authChecking, refreshPermissions]);
+
+  useEffect(() => {
+    window.addEventListener("app-permission-denied", refreshPermissions);
+    return () => window.removeEventListener("app-permission-denied", refreshPermissions);
+  }, [refreshPermissions]);
 
   // 3. Guard: route hiện tại không hợp lệ với quyền → thay URL trong effect (không setState khi render)
   const resolvedRoute = resolveRoute(route, session);
@@ -383,17 +409,47 @@ function App() {
     );
   }
 
-  // 4. Cổng Nhân viên
+  // 4. Cổng Nhân viên – quyền cá nhân lấy theo Phân quyền (backend cũng chặn API tương ứng)
+  const canViewLeaves = hasPersonalPermission(session, "LEAVE_VIEW");
+  const canCreateLeaves = hasPersonalPermission(session, "LEAVE_CREATE");
+
   const renderContent = () => {
     switch (resolvedRoute) {
       case "payroll":
+        if (!canViewOwnPayroll(session)) {
+          return (
+            <NoPermissionNotice
+              activeTab="payroll"
+              title="Chưa được cấp quyền xem phiếu lương"
+              message="Tài khoản của bạn hiện không có quyền Xem phiếu lương."
+              onLogout={handleLogout}
+            />
+          );
+        }
         return <EmployeePayroll userSession={session} onLogout={handleLogout} />;
       case "profile":
       case "personal":
         return <EmployeeProfile userSession={session} onLogout={handleLogout} />;
       case "requests":
       case "leaves":
-        return <LeaveRequests userSession={session} onLogout={handleLogout} />;
+        if (!canViewLeaves && !canCreateLeaves) {
+          return (
+            <NoPermissionNotice
+              activeTab="requests"
+              title="Chưa được cấp quyền sử dụng Đơn từ"
+              message="Tài khoản của bạn hiện không có quyền Xem đơn từ và Tạo và gửi đơn."
+              onLogout={handleLogout}
+            />
+          );
+        }
+        return (
+          <LeaveRequests
+            userSession={session}
+            onLogout={handleLogout}
+            canViewLeaves={canViewLeaves}
+            canCreateLeaves={canCreateLeaves}
+          />
+        );
       case "attendance":
       default:
         return <AttendanceDashboard userSession={session} onLogout={handleLogout} />;

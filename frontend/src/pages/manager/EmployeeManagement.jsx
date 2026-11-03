@@ -239,6 +239,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
       scheduledTerminationDate,
       managerId: item.ma_nql || null,
       dept: item.ten_pb || item.ma_pb || "Phòng ban",
+      deptId: item.ma_pb || "",
       role: item.ten_cv || item.ma_cv || "Nhân viên",
       location: item.ten_cn || "Trụ sở chính Trung Nguyên",
       degree: deg.key,
@@ -288,7 +289,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
       setMonthlyReport(null);
       setReportError(
         isForbiddenError(err)
-          ? "Bạn không có quyền xem báo cáo nhân sự (cần quyền REPORT_VIEW). Danh sách bên dưới hiển thị toàn bộ nhân sự thay vì theo kỳ báo cáo."
+          ? "Bạn không có quyền xem báo cáo nhân sự. Danh sách bên dưới hiển thị toàn bộ nhân sự thay vì theo kỳ báo cáo."
           : `Không tải được báo cáo tháng ${monthKey}: ${getApiErrorMessage(err)}`
       );
     }
@@ -340,11 +341,12 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
   };
 
   // Danh sách chọn "Quản lý trực tiếp" khi thêm nhân sự: chỉ nhân sự chưa nghỉ việc
+  // (form chỉ hiện người cùng phòng ban với nhân sự mới)
   const managerOptions = useMemo(
     () =>
       employees
         .filter((e) => e.status !== "resigned")
-        .map((e) => ({ id: e.id, name: e.name, dept: e.dept, role: e.role })),
+        .map((e) => ({ id: e.id, name: e.name, dept: e.dept, deptId: e.deptId, role: e.role })),
     [employees]
   );
 

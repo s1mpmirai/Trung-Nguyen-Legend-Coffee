@@ -900,7 +900,7 @@ export default function AttendanceManagement({ userSession, initialPeriod }) {
                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                   : "bg-slate-50 text-slate-500 border-slate-200"
               }`}
-              title="Chỉ tài khoản có quyền Chốt / mở khóa công (ATTENDANCE_LOCK) mới thực hiện được"
+              title="Chỉ tài khoản có quyền Chốt / mở khóa công tháng mới thực hiện được"
             >
               <Lock className="w-3.5 h-3.5" />
               <span>
@@ -932,7 +932,7 @@ export default function AttendanceManagement({ userSession, initialPeriod }) {
           <Lock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
           <span>
             Bạn có thể xem, điều chỉnh và duyệt công của nhân sự trong phạm vi quản lý, nhưng không có quyền{" "}
-            <strong>chốt / mở khóa bảng công tháng</strong> (ATTENDANCE_LOCK). Việc chốt công do Quản lý thực hiện.
+            <strong>chốt / mở khóa bảng công tháng</strong>. Việc chốt công do Quản lý thực hiện.
           </span>
         </div>
       )}

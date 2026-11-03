@@ -3,6 +3,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.core.data_scope import DataScope
+from app.core.org_rules import BOARD_DEPARTMENT, allowed_positions, normalize_company_email
 from app.core.datetime_utils import get_vietnam_today
 from app.repositories.employee_repository import (
     cancel_profile_update_request,
@@ -10,6 +11,7 @@ from app.repositories.employee_repository import (
     create_profile_update_request,
     get_active_employees_for_statistics,
     get_by_cccd,
+    get_by_email,
     get_by_ma_nv,
     get_degrees_of_employees,
     get_employee_list,
@@ -34,6 +36,15 @@ from app.utils.auto_gen import generate_employee_code
 
 
 
+def check_company_email(db: Session, email: str) -> str:
+    """Email doanh nghiệp hợp lệ và chưa có ai dùng; trả về email đã chuẩn hóa."""
+    clean_email = normalize_company_email(email)
+    owner = get_by_email(db, clean_email)
+    if owner is not None:
+        raise ValueError(f"Email {clean_email} đã được sử dụng bởi nhân sự {owner['ho_ten']} ({owner['ma_nv']}).")
+    return clean_email
+
+
 def create_employee(db: Session, data: employee_profile_create) -> dict:
     if data.cccd and get_by_cccd(db, data.cccd) is not None:
         raise ValueError("CCCD đã tồn tại")
@@ -41,6 +52,14 @@ def create_employee(db: Session, data: employee_profile_create) -> dict:
         raise ValueError(f"Phòng ban {data.ma_pb} không tồn tại hoặc đã ngừng hoạt động")
     if not is_active_position(db, data.ma_cv):
         raise ValueError(f"Chức vụ {data.ma_cv} không tồn tại hoặc đã ngừng sử dụng")
+    if (data.ma_cv or "").strip().upper() not in allowed_positions(data.ma_pb):
+        raise ValueError(
+            "Ban Giám đốc chỉ có vị trí Giám đốc."
+            if (data.ma_pb or "").strip().upper() == BOARD_DEPARTMENT
+            else "Phòng ban này chỉ có vị trí Trưởng phòng hoặc Nhân viên."
+        )
+    if data.email is not None:
+        data.email = check_company_email(db, data.email)
 
     ma_nv = generate_employee_code(db)
     employee_data = data.model_dump(exclude={"ma_nv", "ten_nql"})

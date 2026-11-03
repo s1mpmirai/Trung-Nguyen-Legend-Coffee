@@ -100,17 +100,6 @@ Cổng Admin chỉ dành cho ADMIN hoặc tài khoản có `ACCOUNT_MANAGE`, và
 
 `PAYROLL_MANAGE`, `ATTENDANCE_LOCK` có tác dụng toàn công ty nên chỉ Admin được cấp (cùng `ACCOUNT_MANAGE`, `PERMISSION_ASSIGN`, `ORG_MANAGE`, `CONTRACT_MANAGE`); Quản lý chỉ cấp được vai trò Nhân viên/Trưởng nhóm và các quyền nghiệp vụ còn lại cho nhân sự trong phạm vi của mình.
 
-## 6. Kiểm thử
-
-```bash
-cd backend
-pip install -r requirements.txt pytest
-python -m pytest tests -q
-```
-
-- `tests/test_route_auth.py`: mọi API (trừ đăng nhập, health) bắt buộc có token.
-- `tests/test_payroll_calculation.py`: ngày công, trần BH, giảm trừ gia cảnh, thuế lũy tiến, thử việc, ngày lễ, không OT.
-
-## 7. Thông tin nhóm
+## 6. Thông tin nhóm
 
 (Điền danh sách thành viên, MSSV, phân công theo yêu cầu đồ án.)

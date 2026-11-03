@@ -31,6 +31,7 @@ from app.schemas.employee_schemas import (
 from app.services.employee_service import (
     cancel_profile_update,
     change_employee_status,
+    check_company_email as check_company_email_service,
     create_employee as create_employee_service,
     deactivate_employee,
     employee_list,
@@ -100,6 +101,19 @@ def create_employee(
         return create_employee_service(db, data)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+@router.get("/email-available", summary="Kiểm tra email doanh nghiệp hợp lệ và chưa được sử dụng")
+def check_email_available(
+    db: DbSession,
+    account: Annotated[dict, Depends(require_permission("EMPLOYEE_CREATE"))],
+    email: str = Query(..., description="Email đầy đủ hoặc phần trước @trungnguyen.com.vn"),
+):
+    """Trả về email đã chuẩn hóa nếu dùng được; 409 kèm lý do nếu sai định dạng hoặc đã tồn tại."""
+    try:
+        return {"email": check_company_email_service(db, email), "available": True}
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
 
 @router.get("/get_employee_list", response_model=employee_list_response)
 def get_employee_list(

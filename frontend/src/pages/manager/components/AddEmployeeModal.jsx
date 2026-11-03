@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getDepartments, getPositions } from "../../../services/adminService";
+import { checkEmployeeEmailAvailable, getDepartments, getPositions } from "../../../services/adminService";
+import {
+  COMPANY_EMAIL_DOMAIN,
+  allowedPositions,
+  cleanEmailLocalPart,
+  defaultPosition,
+  emailLocalPartError,
+  toCompanyEmail,
+} from "../../../utils/orgRules";
 import { UserPlus, X, CheckCircle2, Save, Loader2 } from "lucide-react";
 import { useEscapeKey } from "./ConfirmDialog";
 
@@ -27,7 +35,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
     maNv: "Tự sinh (Hệ thống)",
     fullName: "",
     cccd: "",
-    email: "",
+    emailLocal: "",
     phone: "",
     birthDate: "1995-06-15",
     gender: "Nam",
@@ -42,6 +50,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
   });
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   useEscapeKey(isOpen, onClose, isSaving);
 
@@ -49,39 +58,100 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
 
-  // Danh sách Quản lý trực tiếp: ưu tiên nhân sự cùng phòng ban đang chọn lên đầu
-  const sortedManagerOptions = useMemo(() => {
-    const deptName = departments.find((d) => d.id === formData.maPb)?.name || "";
-    return [...managerOptions].sort((a, b) => {
-      const aSame = a.dept === deptName ? 0 : 1;
-      const bSame = b.dept === deptName ? 0 : 1;
-      if (aSame !== bSame) return aSame - bSame;
-      return String(a.name || "").localeCompare(String(b.name || ""), "vi");
-    });
+  // Chức danh / vị trí theo phòng ban: Ban Giám đốc chỉ có Giám đốc, phòng khác chỉ Trưởng phòng và Nhân viên
+  const positionOptions = useMemo(() => {
+    const allowed = allowedPositions(formData.maPb);
+    return positions.filter((p) => allowed.includes(p.id));
+  }, [positions, formData.maPb]);
+
+  // Quản lý trực tiếp: chỉ nhân sự cùng phòng ban, trưởng phòng ban lên đầu
+  const sameDeptManagers = useMemo(() => {
+    const headId = departments.find((d) => d.id === formData.maPb)?.headId;
+    return managerOptions
+      .filter((m) => m.deptId === formData.maPb)
+      .sort((a, b) => {
+        if (a.id === headId) return -1;
+        if (b.id === headId) return 1;
+        return String(a.name || "").localeCompare(String(b.name || ""), "vi");
+      });
   }, [managerOptions, departments, formData.maPb]);
+
+  /** Mặc định quản lý trực tiếp là trưởng phòng ban (nếu đang làm việc trong phòng). */
+  const defaultManagerFor = (maPb, deptList = departments) => {
+    const headId = deptList.find((d) => d.id === maPb)?.headId;
+    return headId && managerOptions.some((m) => m.id === headId && m.deptId === maPb) ? headId : "";
+  };
+
+  // Đổi phòng ban: chức vụ và quản lý trực tiếp đi theo phòng ban mới
+  const handleDepartmentChange = (maPb) => {
+    setFormData((prev) => ({
+      ...prev,
+      maPb,
+      maCv: allowedPositions(maPb).includes(prev.maCv) ? prev.maCv : defaultPosition(maPb),
+      managerId: defaultManagerFor(maPb),
+    }));
+  };
   useEffect(() => {
     if (!isOpen) return;
     Promise.all([getDepartments({ trang_thai: 1 }), getPositions({ trang_thai: 1 })])
       .then(([pbs, cvs]) => {
-        const deptList = (pbs || []).map((pb) => ({ id: pb.ma_pb, name: pb.ten_pb }));
+        const deptList = (pbs || []).map((pb) => ({ id: pb.ma_pb, name: pb.ten_pb, headId: pb.ma_truong_pb || "" }));
         const posList = (cvs || []).map((cv) => ({ id: cv.ma_cv, name: cv.ten_cv }));
         setDepartments(deptList);
         setPositions(posList);
-        // Giá trị mặc định phải nằm trong danh sách đang hoạt động
-        setFormData((prev) => ({
-          ...prev,
-          maPb: deptList.some((d) => d.id === prev.maPb) ? prev.maPb : deptList[0]?.id || "",
-          maCv: posList.some((p) => p.id === prev.maCv) ? prev.maCv : posList[0]?.id || "",
-        }));
+        // Giá trị mặc định phải nằm trong danh sách đang hoạt động và đúng quy tắc của phòng ban
+        setFormData((prev) => {
+          const maPb = deptList.some((d) => d.id === prev.maPb) ? prev.maPb : deptList[0]?.id || "";
+          const allowed = allowedPositions(maPb).filter((id) => posList.some((p) => p.id === id));
+          const maCv = allowed.includes(prev.maCv) ? prev.maCv : allowed.includes(defaultPosition(maPb)) ? defaultPosition(maPb) : allowed[0] || "";
+          const managerStillValid = managerOptions.some((m) => m.id === prev.managerId && m.deptId === maPb);
+          return {
+            ...prev,
+            maPb,
+            maCv,
+            managerId: managerStillValid ? prev.managerId : defaultManagerFor(maPb, deptList),
+          };
+        });
       })
       .catch((err) => setLoadError(`Không tải được danh mục phòng ban / chức vụ: ${err.message}`));
-  }, [isOpen]);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Danh sách nhân sự / phòng ban tải xong sau khi mở form: chọn trưởng phòng ban làm quản lý mặc định
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData((prev) => {
+      const stillValid = managerOptions.some((m) => m.id === prev.managerId && m.deptId === prev.maPb);
+      if (stillValid) return prev;
+      const next = defaultManagerFor(prev.maPb);
+      return next === prev.managerId ? prev : { ...prev, managerId: next };
+    });
+  }, [isOpen, managerOptions, departments]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSaving) return;
+
+    // Email doanh nghiệp: kiểm tra định dạng trước, rồi hỏi máy chủ email đã tồn tại chưa
+    const formatError = emailLocalPartError(formData.emailLocal);
+    if (formatError) {
+      setEmailError(formatError);
+      return;
+    }
+    setIsSaving(true);
+    let companyEmail = toCompanyEmail(formData.emailLocal);
+    try {
+      const res = await checkEmployeeEmailAvailable(companyEmail);
+      companyEmail = res?.email || companyEmail;
+      setEmailError("");
+    } catch (err) {
+      setEmailError(
+        err?.status === 409 ? err.message : "Không kiểm tra được email. Vui lòng kiểm tra kết nối rồi thử lại."
+      );
+      setIsSaving(false);
+      return;
+    }
 
     // Chuẩn hóa mức lương về số nguyên phục vụ DB DECIMAL(12,0)
     const cleanSalary = Number(String(formData.salary).replace(/[^0-9]/g, ""));
@@ -96,7 +166,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
       gioi_tinh: formData.gender === "Nữ" ? "Nu" : formData.gender === "Khác" ? "Khac" : "Nam",
       cccd: formData.cccd.trim(),
       sdt: formData.phone.trim(),
-      email: formData.email.trim(),
+      email: companyEmail,
       ma_pb: formData.maPb,
       ma_cv: formData.maCv,
       ngay_vao_lam: formData.startDate,
@@ -121,7 +191,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
       salary: cleanSalary,
     };
 
-    setIsSaving(true);
     try {
       // onSave trả về false khi máy chủ từ chối -> giữ modal để người dùng sửa lại
       const ok = onSave ? await onSave(payload) : true;
@@ -253,17 +322,47 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
 
               {/* Email */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                <label htmlFor="add-emp-email" className="text-xs font-semibold text-slate-700 flex items-center gap-1">
                   Email doanh nghiệp <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="nam.nguyen@trungnguyen.com.vn"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 placeholder:text-slate-400 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all"
-                />
+                <div
+                  className={`w-full flex items-center bg-[#f8fafc] border rounded-xl text-xs transition-all focus-within:bg-white focus-within:ring-2 ${
+                    emailError
+                      ? "border-rose-400 focus-within:ring-rose-100"
+                      : "border-slate-200 focus-within:border-sky-500 focus-within:ring-sky-100"
+                  }`}
+                >
+                  <input
+                    id="add-emp-email"
+                    type="text"
+                    required
+                    inputMode="email"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder="vd: nam.nguyen"
+                    value={formData.emailLocal}
+                    onChange={(e) => {
+                      setFormData({ ...formData, emailLocal: cleanEmailLocalPart(e.target.value) });
+                      if (emailError) setEmailError("");
+                    }}
+                    aria-invalid={Boolean(emailError)}
+                    aria-describedby="add-emp-email-msg"
+                    className="min-w-0 flex-1 pl-3 py-2 bg-transparent text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                  />
+                  {formData.emailLocal && (
+                    <span className="pr-3 text-slate-500 font-medium whitespace-nowrap select-none" aria-hidden="true">
+                      @{COMPANY_EMAIL_DOMAIN}
+                    </span>
+                  )}
+                </div>
+                <p
+                  id="add-emp-email-msg"
+                  role={emailError ? "alert" : undefined}
+                  className={`text-[11px] ${emailError ? "text-rose-600 font-medium" : "text-slate-400"}`}
+                >
+                  {emailError || `Chỉ nhập phần trước @${COMPANY_EMAIL_DOMAIN}.`}
+                </p>
               </div>
 
               {/* Ngày sinh */}
@@ -327,7 +426,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
                 </label>
                 <select
                   value={formData.maPb}
-                  onChange={(e) => setFormData({ ...formData, maPb: e.target.value })}
+                  onChange={(e) => handleDepartmentChange(e.target.value)}
                   className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all cursor-pointer"
                 >
                   {departments.map((dept) => (
@@ -348,12 +447,17 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
                   onChange={(e) => setFormData({ ...formData, maCv: e.target.value })}
                   className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all cursor-pointer"
                 >
-                  {positions.map((pos) => (
+                  {positionOptions.map((pos) => (
                     <option key={pos.id} value={pos.id}>
                       {pos.id} - {pos.name}
                     </option>
                   ))}
                 </select>
+                <p className="text-[11px] text-slate-400">
+                  {allowedPositions(formData.maPb).length === 1
+                    ? "Ban Giám đốc chỉ có vị trí Giám đốc."
+                    : "Phòng ban chỉ có vị trí Trưởng phòng hoặc Nhân viên."}
+                </p>
               </div>
 
 
@@ -366,20 +470,24 @@ export default function AddEmployeeModal({ isOpen, onClose, onSave, managerOptio
                   id="add-emp-ma-nql"
                   value={formData.managerId}
                   onChange={(e) => setFormData({ ...formData, managerId: e.target.value })}
+                  disabled={sameDeptManagers.length === 0}
                   aria-describedby="add-emp-ma-nql-help"
-                  className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all cursor-pointer"
+                  className="w-full px-3 py-2 bg-[#f8fafc] border border-slate-200 text-slate-800 rounded-xl text-xs focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 focus:outline-none transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <option value="">— Mặc định: Trưởng phòng ban —</option>
-                  {sortedManagerOptions.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {`${m.id} - ${m.name}${
-                        m.role || m.dept ? ` (${[m.role, m.dept].filter(Boolean).join(" • ")})` : ""
-                      }`}
-                    </option>
-                  ))}
+                  {sameDeptManagers.length === 0 && <option value="">— Phòng ban chưa có nhân sự —</option>}
+                  {sameDeptManagers.length > 0 && !formData.managerId && <option value="">— Chọn quản lý trực tiếp —</option>}
+                  {sameDeptManagers.map((m) => {
+                    const isHead = m.id === departments.find((d) => d.id === formData.maPb)?.headId;
+                    return (
+                      <option key={m.id} value={m.id}>
+                        {`${m.id} - ${m.name}${m.role ? ` (${m.role})` : ""}${isHead ? " • Trưởng phòng ban" : ""}`}
+                      </option>
+                    );
+                  })}
                 </select>
                 <p id="add-emp-ma-nql-help" className="text-[11px] text-slate-400">
-                  Bỏ trống = Trưởng phòng ban. Người được chọn sẽ duyệt đơn từ và chấm công của nhân sự này.
+                  Chỉ chọn nhân sự cùng phòng ban, mặc định là trưởng phòng ban. Người được chọn sẽ duyệt đơn từ và chấm công
+                  của nhân sự này.
                 </p>
               </div>
 

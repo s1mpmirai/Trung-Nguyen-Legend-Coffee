@@ -3,7 +3,12 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import CurrentAccount, ensure_self_or_permission, has_permission
+from app.core.permissions import (
+    CurrentAccount,
+    ensure_personal_permission,
+    ensure_self_or_permission,
+    has_permission,
+)
 from app.db.session import get_db
 from app.schemas.payroll_schemas import (
     payroll_month_response,
@@ -25,6 +30,17 @@ def _only_official(account: dict) -> bool:
     return not has_permission(account, "PAYROLL_MANAGE", "PAYROLL_APPROVE")
 
 
+def _payroll_target(account: dict, ma_nv: str) -> str:
+    """
+    Phiếu lương của chính mình cần quyền PAYROLL_VIEW (trừ người tính / duyệt lương vốn xem được mọi bảng lương);
+    phiếu lương của người khác cần PAYROLL_MANAGE hoặc PAYROLL_APPROVE.
+    """
+    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE", "PAYROLL_APPROVE")
+    if clean_id == account["ma_nv"] and _only_official(account):
+        ensure_personal_permission(account, "PAYROLL_VIEW")
+    return clean_id
+
+
 @router.get(
     "/{ma_nv}/month",
     response_model=Optional[payroll_month_response],
@@ -38,7 +54,7 @@ def get_payroll_month(
     db: DbSession = None,
 ):
     """Lấy chi tiết bảng lương 1 tháng của nhân viên để xem hoặc in phiếu lương (Trả về null với 200 OK nếu chưa có dữ liệu)."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE", "PAYROLL_APPROVE")
+    clean_id = _payroll_target(account, ma_nv)
     return get_employee_payroll_month(db, clean_id, thang, nam, _only_official(account))
 
 
@@ -54,7 +70,7 @@ def get_payroll_year(
     db: DbSession = None,
 ):
     """Lấy tổng hợp bảng lương cả năm của nhân viên để xem hoặc in bảng năm (Trả về null với 200 OK nếu chưa có dữ liệu)."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE", "PAYROLL_APPROVE")
+    clean_id = _payroll_target(account, ma_nv)
     return get_employee_payroll_year(db, clean_id, nam, _only_official(account))
 
 
@@ -65,7 +81,7 @@ def get_payroll_months_list(
     db: DbSession = None,
 ):
     """Lấy danh sách các tháng/năm đã có bảng lương của nhân viên."""
-    clean_id = ensure_self_or_permission(account, ma_nv, "PAYROLL_MANAGE", "PAYROLL_APPROVE")
+    clean_id = _payroll_target(account, ma_nv)
     return get_employee_payroll_history(db, clean_id, _only_official(account))
 
 

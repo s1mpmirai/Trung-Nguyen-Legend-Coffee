@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   FileText,
   Search,
@@ -19,6 +19,7 @@ import {
   Filter,
   Loader2,
   Info,
+  ChevronDown,
 } from "lucide-react";
 import {
   getContracts,
@@ -51,8 +52,8 @@ import {
 // Nhãn loại hợp đồng thống nhất trên toàn bộ màn hình (bộ lọc, bảng, biểu mẫu)
 const CONTRACT_TYPES = [
   { value: "THU_VIEC", label: "Thử việc", badge: "bg-amber-50 text-amber-700 border-amber-200" },
-  { value: "XAC_DINH_1_NAM", label: "Xác định thời hạn 1 năm", badge: "bg-sky-50 text-sky-700 border-sky-200" },
-  { value: "XAC_DINH_3_NAM", label: "Xác định thời hạn 3 năm", badge: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+  { value: "XAC_DINH_1_NAM", label: "Xác định thời hạn 1 năm", years: 1, badge: "bg-sky-50 text-sky-700 border-sky-200" },
+  { value: "XAC_DINH_3_NAM", label: "Xác định thời hạn 3 năm", years: 3, badge: "bg-indigo-50 text-indigo-700 border-indigo-200" },
   { value: "KHONG_XAC_DINH", label: "Không xác định thời hạn", badge: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   { value: "THOI_VU", label: "Thời vụ", badge: "bg-slate-50 text-slate-700 border-slate-200" },
 ];
@@ -76,6 +77,29 @@ const todayISO = () => {
 
 const toInputDate = (val) => (val ? String(val).split("T")[0] : "");
 
+/**
+ * Ngày kết thúc tự tính theo loại hợp đồng có số năm cố định (1 năm, 3 năm):
+ * ngày bắt đầu + N năm - 1 ngày, vd: 03/11/2026 → 02/11/2027.
+ * Loại khác (thử việc, thời vụ, không xác định thời hạn) trả về "" để người dùng tự nhập.
+ */
+const autoEndDate = (loaiHd, ngayBatDau) => {
+  const years = CONTRACT_TYPES.find((t) => t.value === loaiHd)?.years;
+  if (!years || !/^\d{4}-\d{2}-\d{2}$/.test(ngayBatDau || "")) return "";
+  const [y, m, d] = ngayBatDau.split("-").map(Number);
+  const end = new Date(Date.UTC(y + years, m - 1, d));
+  end.setUTCDate(end.getUTCDate() - 1);
+  return end.toISOString().slice(0, 10);
+};
+
+/** Bỏ dấu tiếng Việt để tìm "nguyen van" vẫn ra "Nguyễn Văn". */
+const foldText = (val) =>
+  String(val || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+
 const formatDate = (val) => {
   if (!val) return "";
   const [y, m, d] = String(val).split("T")[0].split("-");
@@ -95,7 +119,7 @@ const emptyForm = () => ({
   loai_hd: "XAC_DINH_1_NAM",
   ngay_ky: todayISO(),
   ngay_bat_dau: todayISO(),
-  ngay_ket_thuc: "",
+  ngay_ket_thuc: autoEndDate("XAC_DINH_1_NAM", todayISO()),
   luong_co_ban: "",
   ty_le_huong: 100,
   so_tai_khoan: "",
@@ -127,16 +151,160 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+/** Ô chọn nhân sự ký hợp đồng có tìm kiếm theo mã, họ tên, phòng ban, chức vụ (gõ có dấu hoặc không dấu). */
+function EmployeeSearchSelect({ id, employees, value, onChange }) {
+  const selected = employees.find((emp) => emp.ma_nv === value) || null;
+  const [text, setText] = useState("");
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const wrapperRef = useRef(null);
+  const listRef = useRef(null);
+
+  const labelOf = (emp) => `${emp.ma_nv} - ${emp.ho_ten || ""}`;
+
+  // Form được đặt lại (mở modal mới) thì xóa chữ đang tìm
+  useEffect(() => {
+    setText(selected ? labelOf(selected) : "");
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setOpen(false);
+        setText(selected ? labelOf(selected) : "");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [selected]);
+
+  const q = foldText(text.trim());
+  const showAll = !q || (selected && text === labelOf(selected));
+  const filtered = showAll
+    ? employees
+    : employees.filter((emp) =>
+        [emp.ma_nv, emp.ho_ten, emp.ten_pb, emp.ten_cv].some((field) => foldText(field).includes(q))
+      );
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [text]);
+
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    listRef.current.children[activeIndex]?.scrollIntoView?.({ block: "nearest" });
+  }, [activeIndex, open]);
+
+  const choose = (emp) => {
+    onChange(emp.ma_nv);
+    setText(labelOf(emp));
+    setOpen(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setActiveIndex((i) => Math.min(i + 1, Math.max(filtered.length - 1, 0)));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      // Không gửi form khi đang chọn nhân sự
+      e.preventDefault();
+      if (open && filtered[activeIndex]) choose(filtered[activeIndex]);
+    } else if (e.key === "Escape" && open) {
+      e.stopPropagation();
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+      <input
+        id={id}
+        type="text"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={`${id}-list`}
+        aria-autocomplete="list"
+        aria-activedescendant={open && filtered[activeIndex] ? `${id}-opt-${filtered[activeIndex].ma_nv}` : undefined}
+        autoComplete="off"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          setOpen(true);
+          if (value) onChange("");
+        }}
+        onFocus={(e) => {
+          setOpen(true);
+          e.target.select();
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder="Tìm theo mã, họ tên, phòng ban hoặc chức vụ..."
+        className={`${inputClass} pl-8 pr-8`}
+      />
+      <ChevronDown
+        className={`w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 transition-transform pointer-events-none ${open ? "rotate-180" : ""}`}
+        aria-hidden="true"
+      />
+      {open && (
+        <ul
+          id={`${id}-list`}
+          ref={listRef}
+          role="listbox"
+          className="absolute z-30 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-y-auto"
+        >
+          {filtered.length === 0 ? (
+            <li className="p-3 text-xs text-slate-400 text-center">Không tìm thấy nhân sự nào</li>
+          ) : (
+            filtered.map((emp, index) => (
+              <li
+                key={emp.ma_nv}
+                id={`${id}-opt-${emp.ma_nv}`}
+                role="option"
+                aria-selected={value === emp.ma_nv}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => choose(emp)}
+                onMouseEnter={() => setActiveIndex(index)}
+                className={`px-3 py-2 cursor-pointer border-b border-slate-50 last:border-b-0 ${
+                  index === activeIndex ? "bg-amber-50" : ""
+                } ${value === emp.ma_nv ? "font-semibold" : ""}`}
+              >
+                <span className="text-slate-900">
+                  {emp.ho_ten || emp.ma_nv} <span className="text-slate-400 font-mono">({emp.ma_nv})</span>
+                </span>
+                <span className="block text-[11px] text-slate-500">
+                  {emp.ten_cv || "—"} • {emp.ten_pb || "Chưa phân phòng ban"}
+                </span>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /** Các trường điều khoản hợp đồng dùng chung cho form Lập mới và Cập nhật. */
 function ContractTermsFields({ formData, setFormData, mode }) {
   const isIndefinite = formData.loai_hd === "KHONG_XAC_DINH";
   const set = (key, value) => setFormData((prev) => ({ ...prev, [key]: value }));
   const idPrefix = `contract-${mode}`;
 
+  // Ngày kết thúc đang là ngày tự tính (người dùng chưa tự sửa) thì được tính lại
+  const isAutoEnd = (prev) => !prev.ngay_ket_thuc || prev.ngay_ket_thuc === autoEndDate(prev.loai_hd, prev.ngay_bat_dau);
+
   const handleTypeChange = (value) => {
     setFormData((prev) => {
       const next = { ...prev, loai_hd: value };
+      const autoEnd = autoEndDate(value, prev.ngay_bat_dau);
       if (value === "KHONG_XAC_DINH") next.ngay_ket_thuc = "";
+      // Loại có số năm cố định: luôn đẩy ngày kết thúc theo đúng số năm
+      else if (autoEnd) next.ngay_ket_thuc = autoEnd;
+      // Thử việc / thời vụ: bỏ ngày tự tính của loại cũ để người dùng nhập đúng thời hạn
+      else if (isAutoEnd(prev)) next.ngay_ket_thuc = "";
       // Gợi ý tỷ lệ hưởng: thử việc 85%, chính thức 100% (chỉ khi người dùng chưa tự chỉnh)
       if (mode === "create") {
         if (value === "THU_VIEC" && Number(prev.ty_le_huong) === 100) next.ty_le_huong = 85;
@@ -145,6 +313,18 @@ function ContractTermsFields({ formData, setFormData, mode }) {
       return next;
     });
   };
+
+  const handleStartChange = (value) => {
+    setFormData((prev) => {
+      const next = { ...prev, ngay_bat_dau: value };
+      const autoEnd = autoEndDate(prev.loai_hd, value);
+      if (autoEnd && isAutoEnd(prev)) next.ngay_ket_thuc = autoEnd;
+      return next;
+    });
+  };
+
+  const durationYears = CONTRACT_TYPES.find((t) => t.value === formData.loai_hd)?.years;
+  const endIsAuto = Boolean(durationYears) && formData.ngay_ket_thuc === autoEndDate(formData.loai_hd, formData.ngay_bat_dau);
 
   return (
     <>
@@ -190,7 +370,7 @@ function ContractTermsFields({ formData, setFormData, mode }) {
           type="date"
           required
           value={formData.ngay_bat_dau}
-          onChange={(e) => set("ngay_bat_dau", e.target.value)}
+          onChange={(e) => handleStartChange(e.target.value)}
           className={inputClass}
         />
       </div>
@@ -210,6 +390,9 @@ function ContractTermsFields({ formData, setFormData, mode }) {
           className={inputClass}
         />
         {isIndefinite && <p className="text-[10px] text-slate-400 mt-1">Hợp đồng không xác định thời hạn không có ngày kết thúc.</p>}
+        {endIsAuto && (
+          <p className="text-[10px] text-slate-400 mt-1">Tự tính theo thời hạn {durationYears} năm từ ngày bắt đầu hiệu lực.</p>
+        )}
       </div>
 
       <div>
@@ -1007,20 +1190,12 @@ export default function ContractManagement() {
               <label htmlFor="contract-create-employee" className="block text-slate-700 font-semibold mb-1">
                 Nhân sự ký hợp đồng <span className="text-rose-500">*</span>
               </label>
-              <select
+              <EmployeeSearchSelect
                 id="contract-create-employee"
-                required
+                employees={employeeOptions}
                 value={formData.ma_nv}
-                onChange={(e) => setFormData((prev) => ({ ...prev, ma_nv: e.target.value }))}
-                className={inputClass}
-              >
-                <option value="">-- Chọn nhân sự --</option>
-                {employeeOptions.map((emp) => (
-                  <option key={emp.ma_nv} value={emp.ma_nv}>
-                    {emp.ma_nv} - {emp.ho_ten} ({emp.ten_pb || "Chưa phân phòng ban"})
-                  </option>
-                ))}
-              </select>
+                onChange={(ma_nv) => setFormData((prev) => ({ ...prev, ma_nv }))}
+              />
               {employeeLoadError && <p className="text-[11px] text-rose-600 mt-1">{employeeLoadError}</p>}
               {selectedEmployee && (
                 <p className="text-[11px] text-slate-500 mt-1">

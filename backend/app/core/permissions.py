@@ -6,7 +6,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.data_scope import DataScope
-from app.core.roles import ADMIN_ROLE, ADMIN_SYSTEM_PERMISSIONS, BUSINESS_ROLES
+from app.core.roles import (
+    ADMIN_ROLE,
+    ADMIN_SYSTEM_PERMISSIONS,
+    BUSINESS_ROLES,
+    PERMISSION_LABELS,
+    PERSONAL_PERMISSIONS,
+)
 from app.core.security import decode_access_token, oauth2_scheme
 from app.db.session import get_db
 from app.repositories import auth_repository
@@ -33,6 +39,12 @@ MANAGE_PORTAL_PERMISSIONS = (
     "PERMISSION_ASSIGN",
     "ACCOUNT_MANAGE",
 )
+
+
+def permission_names(*permission_codes: str) -> str:
+    """Tên quyền dễ đọc cho thông báo lỗi, vd: “Xem đơn từ” hoặc “Tạo và gửi đơn”."""
+    names = [f"“{PERMISSION_LABELS.get(code, 'chức năng này')}”" for code in permission_codes]
+    return " hoặc ".join(dict.fromkeys(names))
 
 
 def normalize_ma_nv(ma_nv: str | None) -> str:
@@ -84,6 +96,25 @@ def has_permission(account: dict[str, Any], *permission_codes: str) -> bool:
     return any(code in account["permissions"] for code in permission_codes)
 
 
+def has_personal_permission(account: dict[str, Any], *permission_codes: str) -> bool:
+    """
+    Quyền cá nhân ở Cổng Nhân viên (LEAVE_VIEW, LEAVE_CREATE, PAYROLL_VIEW) trên dữ liệu của chính mình.
+    ADMIN cũng là nhân sự (chấm công, nhận lương) nhưng bộ quyền ADMIN cố định, nên luôn có quyền cá nhân.
+    """
+    if account["ma_vai_tro"] == ADMIN_ROLE:
+        return any(code in PERSONAL_PERMISSIONS for code in permission_codes)
+    return any(code in account["permissions"] for code in permission_codes)
+
+
+def ensure_personal_permission(account: dict[str, Any], *permission_codes: str) -> None:
+    """Chặn chức năng cá nhân khi quyền tương ứng đã bị thu hồi khỏi vai trò hoặc tài khoản."""
+    if not has_personal_permission(account, *permission_codes):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Tài khoản của bạn chưa được cấp quyền {permission_names(*permission_codes)}.",
+        )
+
+
 def can_view_salary(account: dict[str, Any]) -> bool:
     """
     Quản trị hệ thống (ADMIN) và tài khoản chỉ có quyền tài khoản / phân quyền (dùng Cổng Quản trị)
@@ -104,7 +135,7 @@ def require_permission(*permission_codes: str) -> Callable[..., dict[str, Any]]:
         if not has_permission(account, *permission_codes):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Bạn không có quyền thực hiện chức năng này ({', '.join(permission_codes)})",
+                detail=f"Bạn không có quyền thực hiện chức năng này. Cần quyền {permission_names(*permission_codes)}.",
             )
         return account
 

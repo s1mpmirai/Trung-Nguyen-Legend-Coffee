@@ -199,20 +199,9 @@ export default function Login({ onLoginSuccess }) {
 
             {/* Input 2: Mật khẩu */}
             <div className="space-y-1.5">
-              <div className="flex justify-between items-center">
-                <label htmlFor="login-password" className="block text-xs font-semibold text-slate-700">
-                  Mật khẩu
-                </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setInfoMessage('Vui lòng liên hệ Phòng Nhân sự hoặc Quản trị viên hệ thống để được cấp lại mật khẩu.')
-                  }
-                  className="text-[11px] font-semibold text-coffee-600 hover:text-coffee-800 hover:underline min-h-[32px] px-1"
-                >
-                  Quên mật khẩu?
-                </button>
-              </div>
+              <label htmlFor="login-password" className="block text-xs font-semibold text-slate-700">
+                Mật khẩu
+              </label>
               <div className="relative flex items-center">
                 <div className="absolute left-3.5 text-slate-400" aria-hidden="true">
                   <Lock size={18} />
@@ -238,17 +227,26 @@ export default function Login({ onLoginSuccess }) {
               </div>
             </div>
 
-            {/* Checkbox: Ghi nhớ mã nhân viên (không lưu mật khẩu) */}
-            <div className="flex items-center pt-1">
-              <label className="flex items-center space-x-2.5 cursor-pointer text-xs text-slate-600 select-none min-h-[32px]">
+            {/* Hàng dưới ô mật khẩu: Ghi nhớ mã nhân viên (trái) + Quên mật khẩu (phải) */}
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2.5 min-w-0 cursor-pointer text-xs text-slate-600 select-none min-h-[32px]">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 accent-coffee-600"
+                  className="w-4 h-4 shrink-0 rounded border-slate-300 accent-coffee-600"
                 />
                 <span>Ghi nhớ mã nhân viên trên thiết bị này</span>
               </label>
+              <button
+                type="button"
+                onClick={() =>
+                  setInfoMessage('Vui lòng liên hệ Phòng Nhân sự hoặc Quản trị viên hệ thống để được cấp lại mật khẩu.')
+                }
+                className="shrink-0 whitespace-nowrap text-[11px] font-semibold text-coffee-600 hover:text-coffee-800 hover:underline min-h-[32px] px-1"
+              >
+                Quên mật khẩu?
+              </button>
             </div>
 
             {/* Nút bấm Đăng nhập */}

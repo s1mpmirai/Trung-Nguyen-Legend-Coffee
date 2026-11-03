@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import CurrentAccount, ensure_self_or_managed
+from app.core.permissions import CurrentAccount, ensure_personal_permission, ensure_self_or_managed
 from app.db.session import get_db
 from app.schemas.leave_schemas import annual_leave_balance_response, leave_create, leave_response
 from app.services import leave_service
@@ -33,6 +33,7 @@ def create_leave_endpoint(
     Nhân viên nộp đơn xin nghỉ (nghỉ phép, nghỉ ốm, thai sản, nghỉ không lương, nghỉ việc).
     Đơn mới tạo sẽ ở trạng thái 'CHO_DUYET'. Đơn luôn được tạo cho chính người đang đăng nhập.
     """
+    ensure_personal_permission(account, "LEAVE_CREATE")
     data.ma_nv = account["ma_nv"]
     try:
         return leave_service.create_employee_leave(db, data)
@@ -59,6 +60,8 @@ def get_leaves_by_employee_endpoint(
 ):
     """Lấy toàn bộ lịch sử đơn từ mà nhân viên này đã từng nộp."""
     clean_id = ensure_self_or_managed(db, account, ma_nv, "LEAVE_APPROVE")
+    if clean_id == account["ma_nv"]:
+        ensure_personal_permission(account, "LEAVE_VIEW")
     return leave_service.get_employee_leave_history(db, clean_id)
 
 
@@ -75,6 +78,9 @@ def get_annual_leave_balance_endpoint(
 ):
     """Phép năm = 12 ngày (tính theo tỷ lệ tháng ở năm đầu) + 1 ngày cho mỗi 5 năm thâm niên."""
     clean_id = ensure_self_or_managed(db, account, ma_nv, "LEAVE_APPROVE")
+    if clean_id == account["ma_nv"]:
+        # Số dư phép cần cho cả việc xem đơn lẫn tạo đơn mới
+        ensure_personal_permission(account, "LEAVE_VIEW", "LEAVE_CREATE")
     return leave_service.get_annual_leave_balance(db, clean_id, nam)
 
 
@@ -94,6 +100,7 @@ def cancel_leave_endpoint(
     db: DbSession = None,
 ):
     """Nhân viên tự hủy đơn nghỉ của mình nếu đơn chưa được duyệt."""
+    ensure_personal_permission(account, "LEAVE_CREATE")
     try:
         return leave_service.cancel_employee_leave(db, ma_don, account["ma_nv"])
     except ValueError as err:

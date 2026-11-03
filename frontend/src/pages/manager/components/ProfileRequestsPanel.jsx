@@ -165,7 +165,7 @@ export default function ProfileRequestsPanel({ userSession, onPendingCountChange
         <ShieldOff className="w-8 h-8 text-slate-300" />
         <p className="text-sm font-semibold text-slate-700">Bạn không có quyền duyệt yêu cầu sửa hồ sơ</p>
         <p className="text-xs text-slate-500 max-w-md">
-          Chức năng này cần quyền <strong>Cập nhật hồ sơ nhân sự (EMPLOYEE_UPDATE)</strong>. Vui lòng liên hệ Quản lý
+          Chức năng này cần quyền <strong>Cập nhật thông tin nhân sự</strong>. Vui lòng liên hệ Quản lý
           hoặc Quản trị viên nếu bạn cần được cấp quyền.
         </p>
       </div>

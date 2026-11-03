@@ -66,6 +66,19 @@ const MANAGER_PORTAL_PERMISSIONS = [
   "PERMISSION_ASSIGN",
 ];
 
+// ───────────────────────── QUYỀN CÁ NHÂN Ở CỔNG NHÂN VIÊN ─────────────────────────
+// Khớp has_personal_permission / ensure_personal_permission ở backend/app/core/permissions.py:
+// cấp / thu hồi qua Phân quyền ở Cổng Quản trị; ADMIN luôn có (bộ quyền ADMIN cố định).
+
+/** Có ít nhất một trong các quyền cá nhân (LEAVE_VIEW, LEAVE_CREATE, PAYROLL_VIEW). */
+export const hasPersonalPermission = (session, ...codes) =>
+  isAdminRole(session?.role) || codes.some((code) => normalizePerms(session?.permissions).includes(code));
+
+/** Xem phiếu lương của chính mình: PAYROLL_VIEW, hoặc người tính / duyệt lương (xem được mọi bảng lương). */
+export const canViewOwnPayroll = (session) =>
+  hasPersonalPermission(session, "PAYROLL_VIEW") ||
+  normalizePerms(session?.permissions).some((p) => p === "PAYROLL_MANAGE" || p === "PAYROLL_APPROVE");
+
 /** Cổng Quản trị: CHỈ vai trò ADMIN hoặc tài khoản được cấp ACCOUNT_MANAGE. */
 export const canAccessAdminPortal = (role, permissions = []) =>
   isAdminRole(role) || normalizePerms(permissions).includes("ACCOUNT_MANAGE");

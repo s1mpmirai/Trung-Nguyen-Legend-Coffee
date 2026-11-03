@@ -21,6 +21,15 @@ def get_by_cccd(db: Session, cccd: str) -> dict | None:
     return dict(row) if row else None
 
 
+def get_by_email(db: Session, email: str) -> dict | None:
+    """Nhân sự đang dùng email này (kể cả đã nghỉ việc, vì cột email là duy nhất)."""
+    row = db.execute(
+        text("SELECT ma_nv, ho_ten, email FROM nhan_vien WHERE LOWER(email) = LOWER(:email) LIMIT 1"),
+        {"email": (email or "").strip()},
+    ).mappings().first()
+    return dict(row) if row else None
+
+
 def get_latest_employee_code(db: Session) -> str | None:
     return db.execute(
         text(
@@ -56,15 +65,20 @@ def contract_end_date(start: date, loai_hd: str) -> date | None:
 
 
 def resolve_direct_manager(db: Session, ma_pb: str, ma_nql: str | None) -> str | None:
-    """Quản lý trực tiếp của nhân sự mới: mã được chọn, mặc định là trưởng phòng ban."""
+    """
+    Quản lý trực tiếp của nhân sự mới: mã được chọn, mặc định là trưởng phòng ban.
+    Người được chọn phải đang làm việc trong cùng phòng ban với nhân sự mới.
+    """
     if ma_nql:
         row = db.execute(
-            text("SELECT ma_nv FROM nhan_vien WHERE ma_nv = :ma_nv AND trang_thai <> 'DA_NGHI_VIEC'"),
+            text("SELECT ma_nv, ma_pb FROM nhan_vien WHERE ma_nv = :ma_nv AND trang_thai <> 'DA_NGHI_VIEC'"),
             {"ma_nv": ma_nql.strip().upper()},
-        ).scalar()
+        ).mappings().first()
         if row is None:
             raise ValueError(f"Quản lý trực tiếp {ma_nql} không tồn tại hoặc đã nghỉ việc")
-        return row
+        if (row["ma_pb"] or "").upper() != (ma_pb or "").strip().upper():
+            raise ValueError("Quản lý trực tiếp phải là nhân sự đang làm việc trong cùng phòng ban.")
+        return row["ma_nv"]
     return db.execute(
         text("SELECT ma_truong_pb FROM phong_ban WHERE ma_pb = :ma_pb"), {"ma_pb": ma_pb}
     ).scalar()

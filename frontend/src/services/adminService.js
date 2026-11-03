@@ -180,6 +180,14 @@ export async function deleteContract(ma_hd) {
 }
 
 // ── 7. EMPLOYEES (DANH BẠ NHÂN SỰ – TÌM KIẾM NÂNG CAO) ──────────────
+/**
+ * Kiểm tra email doanh nghiệp hợp lệ và chưa được sử dụng (GET /employees/email-available).
+ * Ném lỗi 409 kèm lý do khi email sai định dạng hoặc đã tồn tại.
+ */
+export async function checkEmployeeEmailAvailable(email) {
+  return apiClient.get("/employees/email-available", { params: { email } });
+}
+
 export async function getEmployeesList(params = {}) {
   return apiClient.get("/employees/get_employee_list", { params });
 }

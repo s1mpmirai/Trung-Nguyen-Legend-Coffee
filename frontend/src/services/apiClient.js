@@ -173,6 +173,12 @@ export async function request(endpoint, options = {}) {
       handleSessionExpired();
     }
 
+    // Bị từ chối quyền: báo App lấy lại quyền mới nhất (Admin có thể vừa thu hồi quyền).
+    // Bỏ qua /auth/me để không lặp vô hạn khi tài khoản bị khóa.
+    if (response.status === 403 && !/^\/auth\/me\b/i.test(cleanEndpoint)) {
+      window.dispatchEvent(new Event("app-permission-denied"));
+    }
+
     if (!response.ok) {
       let errorMessage = formatApiErrorDetail(data && (data.detail ?? data.message));
       if (!errorMessage) {
