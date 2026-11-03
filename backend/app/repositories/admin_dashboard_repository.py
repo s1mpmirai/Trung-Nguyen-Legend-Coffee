@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.core.datetime_utils import get_vietnam_now
+from app.repositories.contract_repository import renewal_due_condition
 
 
 def get_admin_dashboard_stats(db: Session) -> dict:
@@ -84,13 +85,14 @@ def get_admin_dashboard_stats(db: Session) -> dict:
 
     # 5. Thống kê hợp đồng
     hd_stats = db.execute(text("""
-        SELECT 
+        SELECT
             COUNT(*) AS tong_hd,
-            SUM(CASE WHEN trang_thai = 'HIEU_LUC' THEN 1 ELSE 0 END) AS hieu_luc,
-            SUM(CASE WHEN trang_thai = 'HIEU_LUC' AND ngay_ket_thuc IS NOT NULL AND DATEDIFF(ngay_ket_thuc, CURDATE()) BETWEEN 0 AND 30 THEN 1 ELSE 0 END) AS sap_het_han_30
-        FROM hop_dong_lao_dong
-        WHERE trang_thai <> 'DA_HUY'
-    """)).mappings().first()
+            SUM(CASE WHEN hd.trang_thai = 'HIEU_LUC' THEN 1 ELSE 0 END) AS hieu_luc,
+            SUM(CASE WHEN {renewal} THEN 1 ELSE 0 END) AS sap_het_han_30
+        FROM hop_dong_lao_dong hd
+        JOIN nhan_vien nv ON hd.ma_nv = nv.ma_nv
+        WHERE hd.trang_thai <> 'DA_HUY'
+    """.format(renewal=renewal_due_condition("30")))).mappings().first()
 
     tong_hop_dong = hd_stats["tong_hd"] or 0
     hop_dong_hieu_luc = hd_stats["hieu_luc"] or 0
@@ -136,12 +138,10 @@ def get_admin_dashboard_stats(db: Session) -> dict:
         FROM hop_dong_lao_dong hd
         JOIN nhan_vien nv ON hd.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
-        WHERE hd.trang_thai = 'HIEU_LUC' 
-          AND hd.ngay_ket_thuc IS NOT NULL 
-          AND DATEDIFF(hd.ngay_ket_thuc, CURDATE()) BETWEEN 0 AND 30
+        WHERE {renewal}
         ORDER BY so_ngay_con_lai ASC
         LIMIT 5
-    """)).mappings().all()
+    """.format(renewal=renewal_due_condition("30")))).mappings().all()
     danh_sach_hd_sap_het_han = [dict(r) for r in expiring_rows]
 
     return {

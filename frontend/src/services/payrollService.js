@@ -101,6 +101,16 @@ export function breakdownProgressiveTax(thuNhapTinhThue) {
  * Nhận biết bảng lương áp dụng chế độ thử việc (85% lương, không đóng BH, khấu trừ 10%).
  * Backend ghi chú "Thử việc..." và không áp dụng giảm trừ gia cảnh cho HĐ thử việc.
  */
+/**
+ * Tỷ lệ hưởng (0–1) đã dùng khi tính bảng lương. Bảng lương mới lưu sẵn ty_le_huong (%);
+ * bảng lương cũ chưa có thì suy theo chế độ thử việc (85%) hoặc chính thức (100%).
+ */
+export function payrollRateOf(payroll) {
+  const saved = Number(payroll?.ty_le_huong);
+  if (payroll?.ty_le_huong !== null && payroll?.ty_le_huong !== undefined && !Number.isNaN(saved)) return saved / 100;
+  return isProbationPayroll(payroll) ? PAYROLL_RULES.TY_LE_HUONG_THU_VIEC : 1;
+}
+
 export function isProbationPayroll(payroll) {
   if (!payroll) return false;
   if (/thử việc/i.test(payroll.ghi_chu || "")) return true;

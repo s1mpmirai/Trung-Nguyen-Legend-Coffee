@@ -2,6 +2,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.errors import db_error_message
 from app.core.permissions import CurrentAccount, require_permission
 from app.db.session import get_db
 from app.repositories import department_repository
@@ -51,9 +52,10 @@ def create_department_endpoint(data: DepartmentCreate, db: DbSession, account: O
     try:
         return department_repository.create_department(db, data.model_dump())
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Lỗi khi thêm phòng ban: {str(e)}",
+            detail=db_error_message(e, "thêm phòng ban"),
         )
 
 
@@ -71,9 +73,10 @@ def update_department_endpoint(ma_pb: str, data: DepartmentUpdate, db: DbSession
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Lỗi khi cập nhật phòng ban: {str(e)}",
+            detail=db_error_message(e, "cập nhật phòng ban"),
         )
 
 
@@ -94,4 +97,5 @@ def delete_department_endpoint(ma_pb: str, db: DbSession, account: OrgManager):
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=db_error_message(e, "xóa phòng ban"))

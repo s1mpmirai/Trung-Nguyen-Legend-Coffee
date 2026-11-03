@@ -1,4 +1,6 @@
 from sqlalchemy import text
+
+from app.core.org_rules import BOARD_DEPARTMENT, BOARD_HEAD_POSITIONS, DEPARTMENT_HEAD_POSITIONS
 from sqlalchemy.orm import Session
 from app.core.datetime_utils import get_vietnam_now
 from app.utils.sorting import build_order_by
@@ -106,7 +108,7 @@ def get_department_by_id(db: Session, ma_pb: str) -> dict | None:
 
     # Lấy danh sách nhân viên trực thuộc
     emp_query = """
-        SELECT e.ma_nv, e.ho_ten, cv.ten_cv, e.sdt, e.email, e.trang_thai
+        SELECT e.ma_nv, e.ho_ten, e.ma_cv, cv.ten_cv, e.sdt, e.email, e.trang_thai
         FROM nhan_vien e
         LEFT JOIN chuc_vu cv ON e.ma_cv = cv.ma_cv
         WHERE e.ma_pb = :ma_pb
@@ -118,7 +120,42 @@ def get_department_by_id(db: Session, ma_pb: str) -> dict | None:
     return dept
 
 
+def validate_department_head(db: Session, ma_pb: str, ma_truong_pb: str | None) -> str | None:
+    """
+    Trưởng phòng ban phải là nhân sự đang làm việc trong chính phòng ban đó và giữ chức vụ Trưởng phòng
+    (Ban Giám đốc: Giám đốc / Tổng Giám đốc). Để trống = chưa bổ nhiệm (gỡ trưởng phòng hiện tại).
+    """
+    code = (ma_truong_pb or "").strip().upper()
+    if not code:
+        return None
+    emp = db.execute(
+        text("""
+            SELECT nv.ma_nv, nv.ho_ten, nv.ma_pb, nv.ma_cv, nv.trang_thai
+            FROM nhan_vien nv WHERE nv.ma_nv = :ma_nv
+        """),
+        {"ma_nv": code},
+    ).mappings().first()
+    if emp is None:
+        raise ValueError(f"Không tìm thấy nhân sự có mã {code}.")
+    who = f"{emp['ho_ten']} ({emp['ma_nv']})"
+    if emp["trang_thai"] == "DA_NGHI_VIEC":
+        raise ValueError(f"{who} đã nghỉ việc, không thể bổ nhiệm làm trưởng phòng ban.")
+    if (emp["ma_pb"] or "").upper() != (ma_pb or "").upper():
+        raise ValueError(f"{who} không thuộc phòng ban này. Trưởng phòng ban phải là nhân sự của chính phòng ban.")
+    is_board = (ma_pb or "").upper() == BOARD_DEPARTMENT
+    allowed = BOARD_HEAD_POSITIONS if is_board else DEPARTMENT_HEAD_POSITIONS
+    if emp["ma_cv"] not in allowed:
+        raise ValueError(
+            f"{who} cần giữ chức vụ {'Giám đốc' if is_board else 'Trưởng phòng'} mới được bổ nhiệm làm người đứng đầu phòng ban."
+        )
+    return code
+
+
 def create_department(db: Session, data: dict) -> dict:
+    # Phòng ban mới chưa có nhân sự nên chưa thể có trưởng phòng
+    if (data.get("ma_truong_pb") or "").strip():
+        raise ValueError("Phòng ban mới chưa có nhân sự. Hãy để trống trưởng phòng, thêm nhân sự vào phòng rồi bổ nhiệm sau.")
+    data["ma_truong_pb"] = None
     if not data.get("ma_pb"):
         data["ma_pb"] = generate_department_code(db)
 
@@ -140,11 +177,17 @@ def update_department(db: Session, ma_pb: str, data: dict) -> dict | None:
     if not dept:
         return None
 
-    clean_data = {k: v for k, v in data.items() if v is not None}
+    clean_data = {k: v for k, v in data.items() if v is not None and k != "ma_truong_pb"}
+    new_head = None
+    if "ma_truong_pb" in data:
+        # Gửi null / chuỗi rỗng = gỡ trưởng phòng hiện tại
+        new_head = validate_department_head(db, ma_pb, data["ma_truong_pb"])
+        clean_data["ma_truong_pb"] = new_head
     if not clean_data:
         return dept
 
-    clean_data["ngay_cap_nhat"] = get_vietnam_now()
+    now_vn = get_vietnam_now()
+    clean_data["ngay_cap_nhat"] = now_vn
     set_clauses = [f"{k} = :{k}" for k in clean_data.keys()]
 
     query = f"""
@@ -153,6 +196,16 @@ def update_department(db: Session, ma_pb: str, data: dict) -> dict | None:
         WHERE ma_pb = :ma_pb
     """
     db.execute(text(query), {**clean_data, "ma_pb": ma_pb})
+    if new_head:
+        # Nhân sự trong phòng đang không có quản lý trực tiếp (vd: trưởng phòng cũ đã nghỉ) chuyển cho trưởng phòng mới
+        db.execute(
+            text("""
+                UPDATE nhan_vien
+                SET ma_nql = :truong, ngay_cap_nhat = :now
+                WHERE ma_pb = :ma_pb AND ma_nql IS NULL AND ma_nv <> :truong AND trang_thai <> 'DA_NGHI_VIEC'
+            """),
+            {"truong": new_head, "ma_pb": ma_pb, "now": now_vn},
+        )
     db.commit()
     return get_department_by_id(db, ma_pb)
 

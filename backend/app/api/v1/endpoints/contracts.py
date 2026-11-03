@@ -3,9 +3,11 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.errors import db_error_message
 from app.core.permissions import CurrentAccount, ensure_self_or_permission, require_permission
 from app.db.session import get_db
 from app.repositories import contract_repository
+from app.services import contract_service
 from app.schemas.contract_schemas import (
     ContractCreate,
     ContractListResponse,
@@ -33,6 +35,7 @@ def list_contracts_endpoint(
     sort_order: Optional[str] = Query("asc", description="Thứ tự sắp xếp: asc hoặc desc"),
 ):
     """Lấy danh sách hợp đồng lao động của toàn bộ nhân sự (Admin & Quản lý)."""
+    contract_repository.expire_overdue_contracts(db)
     return contract_repository.get_contract_list(
         db,
         page=page,
@@ -69,19 +72,20 @@ def get_employee_contracts_endpoint(ma_nv: str, db: DbSession, account: CurrentA
 def create_contract_endpoint(data: ContractCreate, db: DbSession, account: ContractManager):
     """Tạo mới / ký hợp đồng lao động cho nhân sự."""
     try:
-        return contract_repository.create_contract(db, data.model_dump())
+        return contract_service.create_contract(db, data.model_dump())
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Lỗi khi tạo hợp đồng: {str(e)}",
-        )
+            detail=db_error_message(e, "tạo hợp đồng"),
+        ) from e
 
 
 @router.put("/{ma_hd}", response_model=ContractResponse, summary="Cập nhật hợp đồng")
 def update_contract_endpoint(ma_hd: str, data: ContractUpdate, db: DbSession, account: ContractManager):
     """Cập nhật thông tin hợp đồng (lương cơ bản, tỷ lệ hưởng, STK, ngân hàng, MST, số BHXH)."""
     try:
-        contract = contract_repository.update_contract(db, ma_hd, data.model_dump(exclude_unset=True))
+        contract = contract_service.update_contract(db, ma_hd, data.model_dump(exclude_unset=True))
         if not contract:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -91,10 +95,11 @@ def update_contract_endpoint(ma_hd: str, data: ContractUpdate, db: DbSession, ac
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Lỗi khi cập nhật hợp đồng: {str(e)}",
-        )
+            detail=db_error_message(e, "cập nhật hợp đồng"),
+        ) from e
 
 
 @router.put("/{ma_hd}/liquidate", response_model=ContractResponse, summary="Thanh lý hợp đồng")
@@ -124,7 +129,10 @@ def liquidate_contract_endpoint(
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=db_error_message(e, "thanh lý hợp đồng")
+        ) from e
 
 
 @router.put("/{ma_hd}/restore", response_model=ContractResponse, summary="Khôi phục hợp đồng đã xóa")
@@ -156,4 +164,7 @@ def delete_contract_endpoint(ma_hd: str, db: DbSession, account: ContractManager
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=db_error_message(e, "xóa hợp đồng")
+        ) from e

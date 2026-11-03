@@ -11,7 +11,7 @@ def get_payroll_by_month(db: Session, ma_nv: str, thang: int, nam: int, chi_da_d
     query = """
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
-            bl.luong_co_ban, bl.he_so_luong,
+            bl.luong_co_ban, bl.he_so_luong, bl.ty_le_huong,
             bl.so_cong_chuan, bl.so_cong_thuc_te, bl.so_gio_tang_ca,
             bl.luong_theo_cong, bl.tien_tang_ca,
             bl.tong_phu_cap, bl.tien_thuong,
@@ -58,7 +58,7 @@ def get_all_company_payroll(db: Session, thang: int, nam: int) -> list[dict]:
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
             nv.ho_ten, nv.ma_pb, pb.ten_pb, cv.ten_cv,
-            bl.luong_co_ban, bl.he_so_luong, bl.so_cong_chuan,
+            bl.luong_co_ban, bl.he_so_luong, bl.ty_le_huong, bl.so_cong_chuan,
             bl.so_cong_thuc_te,
             bl.luong_theo_cong, bl.so_gio_tang_ca, bl.tien_tang_ca, bl.tong_phu_cap, bl.tien_thuong,
             bl.luong_gross, bl.bhxh, bl.bhyt, bl.bhtn, bl.thue_tncn, bl.tong_khau_tru,
@@ -232,14 +232,14 @@ def upsert_payroll_line(db: Session, line: dict) -> None:
     """Thêm mới hoặc cập nhật 1 dòng bảng lương ở trạng thái NHAP (người gọi commit)."""
     query = """
         INSERT INTO bang_luong (
-            thang, nam, ma_nv, luong_co_ban, he_so_luong,
+            thang, nam, ma_nv, luong_co_ban, he_so_luong, ty_le_huong,
             so_cong_chuan, so_cong_thuc_te, so_gio_tang_ca,
             luong_theo_cong, tien_tang_ca, tong_phu_cap, tien_thuong,
             luong_gross, bhxh, bhyt, bhtn,
             giam_tru_gia_canh, thu_nhap_tinh_thue, thue_tncn, khau_tru_khac,
             tong_khau_tru, luong_net, trang_thai, ghi_chu, nguoi_lap
         ) VALUES (
-            :thang, :nam, :ma_nv, :luong_co_ban, :he_so_luong,
+            :thang, :nam, :ma_nv, :luong_co_ban, :he_so_luong, :ty_le_huong,
             :so_cong_chuan, :so_cong_thuc_te, :so_gio_tang_ca,
             :luong_theo_cong, :tien_tang_ca, :tong_phu_cap, :tien_thuong,
             :luong_gross, :bhxh, :bhyt, :bhtn,
@@ -249,6 +249,7 @@ def upsert_payroll_line(db: Session, line: dict) -> None:
         ON DUPLICATE KEY UPDATE
             luong_co_ban       = VALUES(luong_co_ban),
             he_so_luong        = VALUES(he_so_luong),
+            ty_le_huong        = VALUES(ty_le_huong),
             so_cong_chuan      = VALUES(so_cong_chuan),
             so_cong_thuc_te    = VALUES(so_cong_thuc_te),
             so_gio_tang_ca     = VALUES(so_gio_tang_ca),
@@ -270,7 +271,7 @@ def upsert_payroll_line(db: Session, line: dict) -> None:
             nguoi_lap          = VALUES(nguoi_lap),
             ngay_cap_nhat      = NOW()
     """
-    db.execute(text(query), {"nguoi_lap": None, **line})
+    db.execute(text(query), {"nguoi_lap": None, "ty_le_huong": None, **line})
 
 
 def get_payroll_by_year(db: Session, ma_nv: str, nam: int, chi_da_duyet: bool = False) -> dict | None:
@@ -282,7 +283,7 @@ def get_payroll_by_year(db: Session, ma_nv: str, nam: int, chi_da_duyet: bool = 
     query = """
         SELECT
             bl.ma_bl, bl.thang, bl.nam, bl.ma_nv,
-            bl.luong_co_ban, bl.he_so_luong,
+            bl.luong_co_ban, bl.he_so_luong, bl.ty_le_huong,
             bl.so_cong_chuan, bl.so_cong_thuc_te, bl.so_gio_tang_ca,
             bl.luong_theo_cong, bl.tien_tang_ca,
             bl.tong_phu_cap, bl.tien_thuong,

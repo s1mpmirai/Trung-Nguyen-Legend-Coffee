@@ -189,10 +189,18 @@ def update_profile(
     Nhân viên tự sửa hồ sơ phải dùng POST /profile/{ma_nv}/request-update (chờ Quản lý duyệt).
     """
     clean_id = ensure_in_scope(db, account, ma_nv)
+    # Tách nhiệm vụ: sửa hồ sơ (nhất là số tài khoản nhận lương) của chính mình phải qua người khác duyệt
+    if clean_id == account["ma_nv"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Không thể tự sửa trực tiếp hồ sơ của chính mình. Vui lòng gửi yêu cầu chỉnh sửa ở Cổng Nhân viên để người khác phê duyệt.",
+        )
     try:
         return update_employee_contact(db, clean_id, data)
-    except ValueError as error:
+    except LookupError as error:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
 
 # ─── QUY TRÌNH DUYỆT SỬA HỒ SƠ CÁ NHÂN (EMPLOYEE <-> MANAGER) ────────────────

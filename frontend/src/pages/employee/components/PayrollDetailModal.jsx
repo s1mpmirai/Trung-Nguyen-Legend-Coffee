@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { X } from "lucide-react";
-import { formatMoney, isProbationPayroll } from "../../../services/payrollService";
+import { formatMoney, isProbationPayroll, payrollRateOf } from "../../../services/payrollService";
 import { formatDays } from "../utils/format";
 import { AmountToggleButton, HIDDEN_AMOUNT } from "./NetSalaryCard";
 import PayrollFormulaSteps from "./PayrollFormulaSteps";
@@ -28,7 +28,11 @@ function PayrollDetailModal({ isOpen, payroll, isHidden, onToggleHidden, onClose
 
   // Danh sách thu nhập
   const incomeItems = [
-    { label: `Lương hợp đồng${probation ? " (hưởng 85% khi thử việc)" : ""}`, value: payroll.luong_co_ban, isRef: true },
+    {
+      label: `Lương hợp đồng${probation ? ` (hưởng ${Math.round(payrollRateOf(payroll) * 1000) / 10}% khi thử việc)` : ""}`,
+      value: payroll.luong_co_ban,
+      isRef: true,
+    },
     { label: "Lương theo công", value: payroll.luong_theo_cong },
     { label: "Phụ cấp chức vụ", value: payroll.tong_phu_cap },
     { label: "Tiền thưởng", value: payroll.tien_thuong },

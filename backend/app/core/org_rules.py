@@ -15,11 +15,15 @@ EMAIL_LOCAL_MAX_LENGTH = 64
 
 BOARD_DEPARTMENT = "PB01"  # Ban Giám đốc
 DIRECTOR_POSITION = "CV07"  # Giám đốc
+GENERAL_DIRECTOR_POSITION = "CV08"  # Tổng Giám đốc (chỉ dùng cho dữ liệu sẵn có của Ban Giám đốc)
 HEAD_POSITION = "CV05"  # Trưởng phòng
 STAFF_POSITION = "CV01"  # Nhân viên
 
 BOARD_POSITIONS = (DIRECTOR_POSITION,)
 DEPARTMENT_POSITIONS = (HEAD_POSITION, STAFF_POSITION)
+# Chức vụ được làm người đứng đầu phòng ban
+BOARD_HEAD_POSITIONS = (DIRECTOR_POSITION, GENERAL_DIRECTOR_POSITION)
+DEPARTMENT_HEAD_POSITIONS = (HEAD_POSITION,)
 
 
 def allowed_positions(ma_pb: str | None) -> tuple[str, ...]:

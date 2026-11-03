@@ -2,14 +2,31 @@ import React, { useState, useEffect } from "react";
 import { Lock, AlertCircle, Send, Loader2 } from "lucide-react";
 import { PROFILE_FIELD_LABELS, currentProfileValues } from "./profileFields";
 import { getApiErrorMessage } from "../utils/format";
+import { COMPANY_EMAIL_DOMAIN } from "../../../utils/orgRules";
 
-// Kiểm tra định dạng cơ bản cho các trường (chỉ khi người dùng nhập)
+// Kiểm tra các trường thay đổi (khớp backend/app/core/profile_rules.py; máy chủ kiểm tra lại khi gửi và khi duyệt)
+const MIN_WORKING_AGE = 15;
+const ageOn = (birth, today) =>
+  today.getFullYear() - birth.getFullYear() -
+  (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate()) ? 1 : 0);
+
 const VALIDATORS = {
-  sdt: [/^[0-9+() .-]{9,15}$/, "Số điện thoại không hợp lệ (9 – 15 chữ số)."],
-  email: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Địa chỉ email không hợp lệ."],
-  so_tai_khoan: [/^[0-9]{6,20}$/, "Số tài khoản chỉ gồm 6 – 20 chữ số."],
-  ma_so_thue: [/^[0-9]{10}(-?[0-9]{3})?$/, "Mã số thuế gồm 10 hoặc 13 chữ số."],
-  so_bhxh: [/^[0-9]{10}$/, "Số sổ BHXH gồm 10 chữ số."],
+  sdt: (v) =>
+    /^(?:\+84|0)\d{9,10}$/.test(v.replace(/[\s.()-]/g, "")) ? "" : "Số điện thoại không hợp lệ (10–11 chữ số, bắt đầu bằng 0 hoặc +84).",
+  email: (v) =>
+    new RegExp(`^[a-z0-9]+(?:[._-][a-z0-9]+)*@${COMPANY_EMAIL_DOMAIN.replace(/\./g, "\\.")}$`).test(v.toLowerCase())
+      ? ""
+      : `Email doanh nghiệp phải có dạng ten@${COMPANY_EMAIL_DOMAIN} (chữ không dấu, số và dấu chấm, gạch dưới hoặc gạch ngang).`,
+  ngay_sinh: (v) => {
+    const birth = new Date(`${v}T00:00:00`);
+    const today = new Date();
+    if (Number.isNaN(birth.getTime()) || birth > today || ageOn(birth, today) > 100) return "Ngày sinh không hợp lệ.";
+    return ageOn(birth, today) < MIN_WORKING_AGE ? `Nhân sự phải đủ ${MIN_WORKING_AGE} tuổi trở lên.` : "";
+  },
+  so_tai_khoan: (v) => (/^[0-9]{6,20}$/.test(v.replace(/\s/g, "")) ? "" : "Số tài khoản chỉ gồm 6–20 chữ số."),
+  ma_so_thue: (v) =>
+    /^(?:[0-9]{10}(?:-?[0-9]{3})?|[0-9]{12})$/.test(v.replace(/\s/g, "")) ? "" : "Mã số thuế gồm 10, 12 hoặc 13 chữ số.",
+  so_bhxh: (v) => (/^(?:[0-9]{10}|[0-9]{12})$/.test(v.replace(/\s/g, "")) ? "" : "Số sổ BHXH gồm 10 hoặc 12 chữ số."),
 };
 
 /**
@@ -55,9 +72,9 @@ function EditProfileModal({ isOpen, employee, pendingRequest, onClose, onSubmit 
         setError(`Không thể để trống “${PROFILE_FIELD_LABELS[key]}” khi hồ sơ đã có thông tin này.`);
         return;
       }
-      const rule = VALIDATORS[key];
-      if (rule && !rule[0].test(newVal)) {
-        setError(rule[1]);
+      const fieldError = VALIDATORS[key]?.(newVal);
+      if (fieldError) {
+        setError(fieldError);
         return;
       }
       thongTinMoi[key] = newVal;
@@ -187,7 +204,7 @@ function EditProfileModal({ isOpen, employee, pendingRequest, onClose, onSubmit 
               </div>
             </div>
             {renderInput("sdt", { type: "tel", inputMode: "tel", placeholder: "VD: 0912345678", autoComplete: "tel" })}
-            {renderInput("email", { type: "email", placeholder: "VD: ten@trungnguyen.com.vn", autoComplete: "email" })}
+            {renderInput("email", { type: "email", placeholder: `VD: ten@${COMPANY_EMAIL_DOMAIN}`, autoComplete: "email" })}
             {renderInput("dia_chi", { type: "text", placeholder: "Số nhà, đường, phường/xã, tỉnh/thành phố", autoComplete: "street-address" })}
           </fieldset>
 

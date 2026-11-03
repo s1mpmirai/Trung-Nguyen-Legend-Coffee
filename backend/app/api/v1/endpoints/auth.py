@@ -13,6 +13,16 @@ from app.services.auth_service import first_time_change_password, get_me
 
 router = APIRouter()
 
+
+def _authenticate(db: Session, request: request_login) -> dict | None:
+    """Đăng nhập; tài khoản bị khóa / đã nghỉ việc (đúng mật khẩu) trả 403 kèm lý do thay vì "sai mật khẩu"."""
+    from app.services.auth_service import AccountInactiveError, authenticate_user
+
+    try:
+        return authenticate_user(db, request.ma_nv, request.mat_khau)
+    except AccountInactiveError as error:
+        raise HTTPException(status_code=403, detail=str(error)) from error
+
 DbSession = Annotated[Session, Depends(get_db)]
 
 @router.post("/admin-login")
@@ -21,8 +31,7 @@ def admin_login(
     request: request_login,
     db: DbSession,
 ):
-    from app.services.auth_service import authenticate_user
-    user = authenticate_user(db, request.ma_nv, request.mat_khau)
+    user = _authenticate(db, request)
     if user is None:
         raise HTTPException(status_code=401, detail="Mã tài khoản hoặc mật khẩu không chính xác")
 
@@ -39,8 +48,7 @@ def management_login(
     request: request_login,
     db: DbSession,
 ):
-    from app.services.auth_service import authenticate_user
-    user = authenticate_user(db, request.ma_nv, request.mat_khau)
+    user = _authenticate(db, request)
     if user is None:
         raise HTTPException(status_code=401, detail="Mã tài khoản hoặc mật khẩu không chính xác")
 
@@ -66,8 +74,7 @@ def employee_login(
     request: request_login,
     db: DbSession,
 ):
-    from app.services.auth_service import authenticate_user
-    user = authenticate_user(db, request.ma_nv, request.mat_khau)
+    user = _authenticate(db, request)
     if user is None:
         raise HTTPException(status_code=401, detail="Mã nhân viên hoặc mật khẩu không chính xác")
 

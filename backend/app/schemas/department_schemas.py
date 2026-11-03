@@ -28,6 +28,7 @@ class DepartmentUpdate(BaseModel):
 class DepartmentEmployeeItem(BaseModel):
     ma_nv: str
     ho_ten: str
+    ma_cv: Optional[str] = None
     ten_cv: Optional[str] = None
     sdt: Optional[str] = None
     email: Optional[str] = None

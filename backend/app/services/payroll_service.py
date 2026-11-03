@@ -104,7 +104,8 @@ def compute_payroll_line(emp: dict, so_cong_chuan: int, tien_thuong: float = 0, 
       Net               = Gross - BH - Thuế TNCN - Khấu trừ khác
     """
     luong_hop_dong = float(emp["luong_hop_dong"] or emp["luong_bac"] or 0)
-    ty_le_huong = float(emp["ty_le_huong"] or 100) / 100
+    # Tỷ lệ 0 là giá trị thật (không được coi là "chưa nhập" rồi tính thành 100%)
+    ty_le_huong = (100.0 if emp["ty_le_huong"] is None else float(emp["ty_le_huong"])) / 100
     phu_cap_chuc_vu = float(emp["phu_cap_chuc_vu"] or 0)
     so_cong_thuc_te = float(emp["so_cong_thuc_te"] or 0)
     so_nguoi_pt = int(emp["so_nguoi_pt"] or 0)
@@ -143,6 +144,7 @@ def compute_payroll_line(emp: dict, so_cong_chuan: int, tien_thuong: float = 0, 
         "ma_nv": emp["ma_nv"],
         "luong_co_ban": round(luong_hop_dong),
         "he_so_luong": float(emp["he_so_luong"] or 1.0),
+        "ty_le_huong": round(ty_le_huong * 100, 2),
         "so_cong_chuan": so_cong_chuan,
         "so_cong_thuc_te": so_cong_thuc_te,
         "so_nguoi_pt": so_nguoi_pt,

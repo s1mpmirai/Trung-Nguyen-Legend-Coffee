@@ -4,7 +4,7 @@ import {
   formatMoney,
   mapPayrollStatus,
   isProbationPayroll,
-  PAYROLL_RULES,
+  payrollRateOf,
 } from "../../../services/payrollService";
 import { formatDays } from "../utils/format";
 
@@ -281,7 +281,7 @@ function PayrollPrintView({ mode, payroll, yearSummary, year, employee }) {
   }
 
   const probation = isProbationPayroll(payroll);
-  const tyLeHuong = probation ? PAYROLL_RULES.TY_LE_HUONG_THU_VIEC : 1;
+  const tyLeHuong = payrollRateOf(payroll);
   const congChuan = Number(payroll.so_cong_chuan) || 0;
   const congThucTe = Number(payroll.so_cong_thuc_te) || 0;
   const tyLeCong = congChuan > 0 ? Math.min(1, congThucTe / congChuan) : 0;
@@ -319,7 +319,7 @@ function PayrollPrintView({ mode, payroll, yearSummary, year, employee }) {
             <tr>
               <th scope="row">Lương hợp đồng</th>
               <td>
-                {money(payroll.luong_co_ban)} đ{probation ? " (thử việc – hưởng 85%)" : ""}
+                {money(payroll.luong_co_ban)} đ{probation ? ` (thử việc – hưởng ${Math.round(tyLeHuong * 1000) / 10}%)` : ""}
               </td>
               <th scope="row">Người phụ thuộc</th>
               <td>{soNguoiPT ?? "—"}</td>

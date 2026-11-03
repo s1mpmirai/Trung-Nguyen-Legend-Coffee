@@ -39,6 +39,17 @@ def _check_can_manage(actor: dict, target_ma_nv: str, target_role: str | None) -
         raise PermissionError("Chỉ Admin mới được thao tác trên tài khoản có vai trò ADMIN.")
 
 
+class AccountInactiveError(Exception):
+    """Đúng mật khẩu nhưng tài khoản đang bị khóa hoặc nhân sự đã nghỉ việc."""
+
+
+def _inactive_message(db: Session, ma_nv: str) -> str:
+    emp = employee_get_by_ma_nv(db, ma_nv) or {}
+    if emp.get("trang_thai") == "DA_NGHI_VIEC":
+        return "Tài khoản đã ngừng hoạt động vì nhân sự đã nghỉ việc. Vui lòng liên hệ Phòng Nhân sự nếu cần hỗ trợ."
+    return "Tài khoản của bạn đang bị khóa. Vui lòng liên hệ Quản trị viên hệ thống để được mở khóa."
+
+
 def authenticate_user(db: Session, ma_nv: str, mat_khau: str) -> dict | None:
     clean_id = _clean(ma_nv)
     # Chỉ tài khoản do Admin cấp mới được đăng nhập (không tự tạo tài khoản khi đăng nhập)
@@ -63,7 +74,8 @@ def authenticate_user(db: Session, ma_nv: str, mat_khau: str) -> dict | None:
     apply_due_terminations(db, clean_id)
     db.refresh(account)
     if account.trang_thai != "HOAT_DONG":
-        return None
+        # Chỉ báo lý do khi đã nhập đúng mật khẩu, để không lộ trạng thái tài khoản cho người đoán mật khẩu
+        raise AccountInactiveError(_inactive_message(db, clean_id))
 
     account.lan_dn_cuoi = get_vietnam_now()
     db.commit()

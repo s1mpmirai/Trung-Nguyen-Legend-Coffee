@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.data_scope import DataScope
 from app.core.org_rules import BOARD_DEPARTMENT, allowed_positions, normalize_company_email
+from app.core.profile_rules import clean_profile_changes
 from app.core.datetime_utils import get_vietnam_today
 from app.repositories.employee_repository import (
     cancel_profile_update_request,
@@ -18,6 +19,7 @@ from app.repositories.employee_repository import (
     get_expiring_contracts,
     get_monthly_personnel_report as repo_get_monthly_report,
     get_pending_profile_request_by_employee,
+    get_profile_request_by_id,
     get_profile_requests_for_manager,
     is_active_department,
     is_active_position,
@@ -119,14 +121,30 @@ def get_employee_profile(db: Session, ma_nv: str) -> dict:
         raise ValueError(f"Không tìm thấy thông tin nhân viên {ma_nv}")
     return profile
 
-def update_employee_contact(db: Session, ma_nv: str, data: employee_contact_update) -> dict:
+def check_profile_changes(db: Session, ma_nv: str, changes: dict) -> dict:
+    """
+    Chuẩn hóa và kiểm tra các trường hồ sơ thay đổi (định dạng, tuổi lao động, email doanh nghiệp
+    không trùng người khác). Trả về các trường thật sự thay đổi.
+    """
     profile = get_by_ma_nv(db, ma_nv)
     if not profile:
-        raise ValueError(f"Không tìm thấy thông tin nhân viên {ma_nv}")
-    
-    update_dict = data.model_dump(exclude_unset=True)
-    updated = update_contact(db, ma_nv, update_dict)
-    return updated
+        raise LookupError(f"Không tìm thấy thông tin nhân viên {ma_nv}")
+    cleaned = clean_profile_changes(changes, profile, get_vietnam_today())
+    if "email" in cleaned:
+        owner = get_by_email(db, cleaned["email"])
+        if owner is not None and owner["ma_nv"] != ma_nv:
+            raise ValueError(
+                f"Email {cleaned['email']} đã được sử dụng bởi nhân sự {owner['ho_ten']} ({owner['ma_nv']})."
+            )
+    return cleaned
+
+
+def update_employee_contact(db: Session, ma_nv: str, data: employee_contact_update) -> dict:
+    """[Nhân sự] Sửa trực tiếp hồ sơ của người khác (endpoint đã chặn tự sửa hồ sơ của chính mình)."""
+    cleaned = check_profile_changes(db, ma_nv, data.model_dump(exclude_unset=True))
+    if not cleaned:
+        return get_by_ma_nv(db, ma_nv)
+    return update_contact(db, ma_nv, cleaned)
 
 
 def request_profile_update(db: Session, ma_nv: str, data: profile_update_request_create) -> dict:
@@ -134,7 +152,10 @@ def request_profile_update(db: Session, ma_nv: str, data: profile_update_request
     profile = get_by_ma_nv(db, ma_nv)
     if not profile:
         raise ValueError(f"Không tìm thấy thông tin nhân viên {ma_nv}")
-    return create_profile_update_request(db, ma_nv, data.thong_tin_moi, data.ly_do)
+    cleaned = check_profile_changes(db, ma_nv, data.thong_tin_moi or {})
+    if not cleaned:
+        raise ValueError("Bạn chưa thay đổi thông tin nào so với hồ sơ hiện tại.")
+    return create_profile_update_request(db, ma_nv, cleaned, data.ly_do)
 
 
 def get_pending_profile_update(db: Session, ma_nv: str) -> dict | None:
@@ -155,13 +176,22 @@ def get_profile_requests_manager(
 
 
 def review_profile_update(db: Session, ma_yc: int, data: profile_update_review_request) -> dict:
-    """Quản lý phê duyệt (DA_DUYET) hoặc từ chối (TU_CHOI) yêu cầu cập nhật hồ sơ."""
+    """
+    Quản lý phê duyệt (DA_DUYET) hoặc từ chối (TU_CHOI) yêu cầu cập nhật hồ sơ.
+    Khi duyệt, dữ liệu được kiểm tra lại (vd: email có thể đã bị người khác dùng từ lúc gửi yêu cầu).
+    """
+    thong_tin_ap_dung = None
+    if data.trang_thai == "DA_DUYET":
+        req = get_profile_request_by_id(db, ma_yc)
+        if req and req["trang_thai"] == "CHO_DUYET":
+            thong_tin_ap_dung = check_profile_changes(db, req["ma_nv"], req["thong_tin_moi"] or {})
     return review_profile_update_request(
         db=db,
         ma_yc=ma_yc,
         trang_thai=data.trang_thai,
         nguoi_duyet=data.nguoi_duyet,
         y_kien_duyet=data.y_kien_duyet,
+        thong_tin_ap_dung=thong_tin_ap_dung,
     )
 
 

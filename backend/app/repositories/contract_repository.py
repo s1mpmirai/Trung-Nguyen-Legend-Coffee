@@ -4,6 +4,40 @@ from sqlalchemy.orm import Session
 from app.core.datetime_utils import get_vietnam_now
 from app.utils.sorting import build_order_by
 
+def renewal_due_condition(days: str = ":expiring_days", today: str = "CURDATE()") -> str:
+    """
+    Điều kiện SQL (bí danh hd = hợp đồng, nv = nhân viên) cho hợp đồng cần gia hạn:
+    sắp hết hạn trong `days` ngày hoặc đã quá hạn, nhân sự vẫn đang làm và chưa có hợp đồng mới hơn.
+    """
+    return f"""
+        hd.trang_thai IN ('HIEU_LUC', 'HET_HAN')
+        AND hd.ngay_ket_thuc IS NOT NULL
+        AND hd.ngay_ket_thuc <= DATE_ADD({today}, INTERVAL {days} DAY)
+        AND nv.trang_thai <> 'DA_NGHI_VIEC'
+        AND NOT EXISTS (
+            SELECT 1 FROM hop_dong_lao_dong moi
+            WHERE moi.ma_nv = hd.ma_nv
+              AND moi.ma_hd <> hd.ma_hd
+              AND moi.trang_thai <> 'DA_HUY'
+              AND moi.ngay_bat_dau > hd.ngay_bat_dau
+        )
+    """
+
+
+def expire_overdue_contracts(db: Session) -> int:
+    """Chuyển các hợp đồng đã qua ngày kết thúc mà vẫn ghi Hiệu lực sang Hết hạn."""
+    result = db.execute(
+        text("""
+            UPDATE hop_dong_lao_dong
+            SET trang_thai = 'HET_HAN', ngay_cap_nhat = :now
+            WHERE trang_thai = 'HIEU_LUC' AND ngay_ket_thuc IS NOT NULL AND ngay_ket_thuc < :today
+        """),
+        {"now": get_vietnam_now(), "today": get_vietnam_now().date()},
+    )
+    db.commit()
+    return result.rowcount or 0
+
+
 CONTRACT_SORT_COLUMNS = {
     "ma_hd": "hd.ma_hd",
     "ma_nv": "hd.ma_nv",
@@ -63,7 +97,7 @@ def get_contract_list(
         conditions.append("hd.trang_thai <> 'DA_HUY'")
 
     if expiring_days is not None:
-        conditions.append("hd.trang_thai = 'HIEU_LUC' AND hd.ngay_ket_thuc IS NOT NULL AND DATEDIFF(hd.ngay_ket_thuc, CURDATE()) BETWEEN 0 AND :expiring_days")
+        conditions.append(renewal_due_condition())
         params["expiring_days"] = expiring_days
 
     where_sql = " AND ".join(conditions)
@@ -76,12 +110,14 @@ def get_contract_list(
     """
     total = db.execute(text(count_query), params).scalar() or 0
 
-    stats_query = """
-        SELECT 
-            SUM(CASE WHEN trang_thai = 'HIEU_LUC' THEN 1 ELSE 0 END) AS so_hieu_luc,
-            SUM(CASE WHEN trang_thai = 'DA_THANH_LY' THEN 1 ELSE 0 END) AS so_da_thanh_ly,
-            SUM(CASE WHEN trang_thai = 'HIEU_LUC' AND ngay_ket_thuc IS NOT NULL AND DATEDIFF(ngay_ket_thuc, CURDATE()) BETWEEN 0 AND 30 THEN 1 ELSE 0 END) AS so_sap_het_han_30_ngay
-        FROM hop_dong_lao_dong
+    # "Sắp hết hạn" = cần gia hạn: còn ≤ 30 ngày hoặc đã quá hạn mà nhân sự vẫn đang làm, chưa ký HĐ mới
+    stats_query = f"""
+        SELECT
+            SUM(CASE WHEN hd.trang_thai = 'HIEU_LUC' THEN 1 ELSE 0 END) AS so_hieu_luc,
+            SUM(CASE WHEN hd.trang_thai = 'DA_THANH_LY' THEN 1 ELSE 0 END) AS so_da_thanh_ly,
+            SUM(CASE WHEN {renewal_due_condition("30")} THEN 1 ELSE 0 END) AS so_sap_het_han_30_ngay
+        FROM hop_dong_lao_dong hd
+        JOIN nhan_vien nv ON hd.ma_nv = nv.ma_nv
     """
     stats_row = db.execute(text(stats_query)).mappings().first()
 
@@ -233,7 +269,8 @@ def update_contract(db: Session, ma_hd: str, data: dict) -> dict | None:
     if not contract:
         return None
 
-    clean_data = {k: v for k, v in data.items() if v is not None}
+    # Dữ liệu đã được contract_service kiểm tra; None nghĩa là xóa giá trị (vd: ngày kết thúc của HĐ không thời hạn)
+    clean_data = dict(data)
     if not clean_data:
         return contract
 

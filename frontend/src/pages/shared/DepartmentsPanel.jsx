@@ -14,8 +14,10 @@ import {
   RotateCcw,
   RefreshCw,
 } from "lucide-react";
+import { headPositions } from "../../utils/orgRules";
 import {
   getDepartments,
+  getDepartmentDetail,
   createDepartment,
   updateDepartment,
   deleteDepartment,
@@ -79,6 +81,9 @@ export default function DepartmentsPanel({ readOnly = false }) {
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Nhân sự của phòng đang sửa (để chọn trưởng phòng): null = đang tải / chưa có
+  const [deptMembers, setDeptMembers] = useState(null);
+  const [membersError, setMembersError] = useState("");
   const [confirm, setConfirm] = useState(null);
   const [restoringId, setRestoringId] = useState("");
 
@@ -122,6 +127,14 @@ export default function DepartmentsPanel({ readOnly = false }) {
     setModalMode("edit");
     setEditingPb(pb);
     setFormError("");
+    setDeptMembers(null);
+    setMembersError("");
+    getDepartmentDetail(pb.ma_pb)
+      .then((detail) => setDeptMembers(Array.isArray(detail?.danh_sach_nhan_vien) ? detail.danh_sach_nhan_vien : []))
+      .catch(() => {
+        setDeptMembers([]);
+        setMembersError("Không tải được danh sách nhân sự của phòng ban.");
+      });
     setFormData({
       ma_pb: pb.ma_pb,
       ten_pb: pb.ten_pb,
@@ -158,7 +171,8 @@ export default function DepartmentsPanel({ readOnly = false }) {
         const created = await createDepartment({
           ma_pb: code || null,
           ten_pb: formData.ten_pb.trim(),
-          ma_truong_pb: formData.ma_truong_pb.trim().toUpperCase() || null,
+          // Phòng ban mới chưa có nhân sự: bổ nhiệm trưởng phòng sau khi đã thêm nhân sự
+          ma_truong_pb: null,
           sdt: formData.sdt.trim() || null,
           mo_ta: formData.mo_ta.trim() || null,
         });
@@ -535,16 +549,43 @@ export default function DepartmentsPanel({ readOnly = false }) {
 
             <div className="space-y-1">
               <label htmlFor="pb-head" className="block text-[11px] font-semibold text-slate-700">
-                Mã nhân viên trưởng phòng
+                Trưởng phòng ban
               </label>
-              <input
-                id="pb-head"
-                type="text"
-                value={formData.ma_truong_pb}
-                onChange={(e) => setFormData({ ...formData, ma_truong_pb: e.target.value })}
-                placeholder="Để trống nếu chưa bổ nhiệm"
-                className={`${fieldClass} font-mono uppercase`}
-              />
+              {modalMode === "create" ? (
+                <p id="pb-head" className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  Phòng ban mới chưa có nhân sự. Hãy thêm nhân sự vào phòng rồi bổ nhiệm trưởng phòng sau.
+                </p>
+              ) : (
+                <>
+                  <select
+                    id="pb-head"
+                    value={formData.ma_truong_pb}
+                    onChange={(e) => setFormData({ ...formData, ma_truong_pb: e.target.value })}
+                    disabled={deptMembers === null}
+                    aria-describedby="pb-head-hint"
+                    className={`${fieldClass} cursor-pointer disabled:opacity-60`}
+                  >
+                    <option value="">— Chưa bổ nhiệm —</option>
+                    {(deptMembers || [])
+                      .filter(
+                        (m) =>
+                          m.ma_nv === formData.ma_truong_pb ||
+                          (m.trang_thai !== "DA_NGHI_VIEC" && headPositions(editingPb?.ma_pb).includes(m.ma_cv))
+                      )
+                      .map((m) => (
+                        <option key={m.ma_nv} value={m.ma_nv}>
+                          {`${m.ma_nv} - ${m.ho_ten}${m.ten_cv ? ` (${m.ten_cv})` : ""}${m.trang_thai === "DA_NGHI_VIEC" ? " – đã nghỉ việc" : ""}`}
+                        </option>
+                      ))}
+                  </select>
+                  <p id="pb-head-hint" className={`text-[10px] ${membersError ? "text-rose-600" : "text-slate-400"}`}>
+                    {membersError ||
+                      (deptMembers === null
+                        ? "Đang tải nhân sự của phòng ban..."
+                        : "Chỉ chọn nhân sự đang làm việc trong phòng và giữ chức vụ Trưởng phòng (Ban Giám đốc: Giám đốc).")}
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="space-y-1">

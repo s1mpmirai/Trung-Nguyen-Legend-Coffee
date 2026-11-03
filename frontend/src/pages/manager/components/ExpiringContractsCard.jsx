@@ -39,7 +39,7 @@ export default function ExpiringContractsCard({ contracts, error, onNavigateTab 
         <div className="flex flex-col gap-3 my-2">
           {error && <CardErrorNotice message={error} />}
           {!error && list.length === 0 && (
-            <p className="py-6 text-center text-xs text-slate-400">Không có hợp đồng sắp hết hạn trong 60 ngày tới</p>
+            <p className="py-6 text-center text-xs text-slate-400">Không có hợp đồng sắp hết hạn trong 60 ngày tới hoặc đã quá hạn chưa gia hạn</p>
           )}
           {list.map((c) => {
             const days = getRemainingDays(c);

@@ -10,12 +10,17 @@ const EMAIL_LOCAL_MAX_LENGTH = 64;
 
 export const BOARD_DEPARTMENT = "PB01"; // Ban Giám đốc
 export const DIRECTOR_POSITION = "CV07"; // Giám đốc
+export const GENERAL_DIRECTOR_POSITION = "CV08"; // Tổng Giám đốc (dữ liệu sẵn có của Ban Giám đốc)
 export const HEAD_POSITION = "CV05"; // Trưởng phòng
 export const STAFF_POSITION = "CV01"; // Nhân viên
 
 /** Chức vụ được phép chọn theo phòng ban. */
 export const allowedPositions = (maPb) =>
   String(maPb || "").toUpperCase() === BOARD_DEPARTMENT ? [DIRECTOR_POSITION] : [HEAD_POSITION, STAFF_POSITION];
+
+/** Chức vụ được làm người đứng đầu phòng ban (khớp validate_department_head ở backend). */
+export const headPositions = (maPb) =>
+  String(maPb || "").toUpperCase() === BOARD_DEPARTMENT ? [DIRECTOR_POSITION, GENERAL_DIRECTOR_POSITION] : [HEAD_POSITION];
 
 /** Chức vụ mặc định khi chọn phòng ban: Giám đốc cho Ban Giám đốc, Nhân viên cho phòng ban khác. */
 export const defaultPosition = (maPb) =>

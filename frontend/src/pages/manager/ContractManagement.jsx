@@ -305,10 +305,12 @@ function ContractTermsFields({ formData, setFormData, mode }) {
       else if (autoEnd) next.ngay_ket_thuc = autoEnd;
       // Thử việc / thời vụ: bỏ ngày tự tính của loại cũ để người dùng nhập đúng thời hạn
       else if (isAutoEnd(prev)) next.ngay_ket_thuc = "";
-      // Gợi ý tỷ lệ hưởng: thử việc 85%, chính thức 100% (chỉ khi người dùng chưa tự chỉnh)
-      if (mode === "create") {
-        if (value === "THU_VIEC" && Number(prev.ty_le_huong) === 100) next.ty_le_huong = 85;
-        if (value !== "THU_VIEC" && prev.loai_hd === "THU_VIEC" && Number(prev.ty_le_huong) === 85) next.ty_le_huong = 100;
+      // Tỷ lệ hưởng: thử việc 85–100% (mặc định 85%), hợp đồng chính thức luôn 100%
+      const rate = Number(prev.ty_le_huong);
+      if (value === "THU_VIEC") {
+        if (!(rate >= 85 && rate < 100)) next.ty_le_huong = 85;
+      } else {
+        next.ty_le_huong = 100;
       }
       return next;
     });
@@ -419,14 +421,20 @@ function ContractTermsFields({ formData, setFormData, mode }) {
         <input
           id={`${idPrefix}-rate`}
           type="number"
-          min="50"
+          min="85"
           max="100"
+          step="0.5"
           required
-          value={formData.ty_le_huong}
+          disabled={formData.loai_hd !== "THU_VIEC"}
+          value={formData.loai_hd !== "THU_VIEC" ? 100 : formData.ty_le_huong}
           onChange={(e) => set("ty_le_huong", e.target.value)}
           className={inputClass}
         />
-        <p className="text-[10px] text-slate-400 mt-1">Thử việc thường hưởng 85%, chính thức 100%.</p>
+        <p className="text-[10px] text-slate-400 mt-1">
+          {formData.loai_hd === "THU_VIEC"
+            ? "Thử việc hưởng từ 85% đến 100% lương (Điều 26 Bộ luật Lao động)."
+            : "Hợp đồng chính thức hưởng 100% lương."}
+        </p>
       </div>
 
       <div>
@@ -490,10 +498,12 @@ function ContractTermsFields({ formData, setFormData, mode }) {
 const validateTerms = (form) => {
   if (!form.luong_co_ban || Number(form.luong_co_ban) <= 0) return "Lương cơ bản phải lớn hơn 0.";
   const rate = Number(form.ty_le_huong);
-  if (Number.isNaN(rate) || rate < 50 || rate > 100) return "Tỷ lệ hưởng lương phải trong khoảng 50% – 100%.";
+  if (form.loai_hd === "THU_VIEC" && (Number.isNaN(rate) || rate < 85 || rate > 100)) {
+    return "Lương thử việc phải từ 85% đến 100% mức lương của công việc (Điều 26 Bộ luật Lao động).";
+  }
   if (form.loai_hd !== "KHONG_XAC_DINH" && !form.ngay_ket_thuc) return "Vui lòng nhập ngày kết thúc hợp đồng.";
-  if (form.ngay_ket_thuc && form.ngay_bat_dau && form.ngay_ket_thuc < form.ngay_bat_dau) {
-    return "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.";
+  if (form.loai_hd !== "KHONG_XAC_DINH" && form.ngay_ket_thuc && form.ngay_bat_dau && form.ngay_ket_thuc <= form.ngay_bat_dau) {
+    return "Ngày kết thúc phải sau ngày bắt đầu hiệu lực.";
   }
   return "";
 };
@@ -505,7 +515,7 @@ const toPayload = (form) => ({
   ngay_bat_dau: form.ngay_bat_dau || null,
   ngay_ket_thuc: form.loai_hd === "KHONG_XAC_DINH" ? null : form.ngay_ket_thuc || null,
   luong_co_ban: Number(form.luong_co_ban),
-  ty_le_huong: Number(form.ty_le_huong),
+  ty_le_huong: form.loai_hd === "THU_VIEC" ? Number(form.ty_le_huong) : 100,
   so_tai_khoan: form.so_tai_khoan.trim() || null,
   ngan_hang: form.ngan_hang.trim() || null,
   ma_so_thue: form.ma_so_thue.trim() || null,
@@ -856,7 +866,7 @@ export default function ContractManagement() {
               {stats.so_sap_het_han_30_ngay}
             </div>
             <div className={`text-xs font-medium ${expiringOnly ? "text-amber-100" : "text-slate-500"}`}>
-              Sắp hết hạn (≤ 30 ngày) – bấm để lọc
+              Cần gia hạn: còn ≤ 30 ngày hoặc đã quá hạn – bấm để lọc
             </div>
           </div>
         </button>
@@ -955,7 +965,7 @@ export default function ContractManagement() {
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Sắp hết hạn 30 ngày</span>
+            <span>Cần gia hạn</span>
           </button>
 
           {activeFilterCount > 0 && (
@@ -1017,6 +1027,8 @@ export default function ContractManagement() {
                     const typeInfo = contractType(c.loai_hd);
                     const isExpiring =
                       c.con_lai_ngay !== null && c.con_lai_ngay !== undefined && c.con_lai_ngay >= 0 && c.con_lai_ngay <= 30 && c.trang_thai === "HIEU_LUC";
+                    const isOverdue =
+                      c.trang_thai === "HET_HAN" && c.con_lai_ngay !== null && c.con_lai_ngay !== undefined && c.con_lai_ngay < 0;
                     const isActive = c.trang_thai === "HIEU_LUC";
                     const isDeleted = c.trang_thai === "DA_HUY";
 
@@ -1048,6 +1060,12 @@ export default function ContractManagement() {
                             <div className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md mt-1 border border-amber-200">
                               <AlertTriangle className="w-3 h-3" aria-hidden="true" />
                               Còn {c.con_lai_ngay} ngày hết hạn
+                            </div>
+                          )}
+                          {isOverdue && (
+                            <div className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md mt-1 border border-rose-200">
+                              <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+                              Đã hết hạn {Math.abs(c.con_lai_ngay)} ngày – cần gia hạn hoặc thanh lý
                             </div>
                           )}
                         </td>

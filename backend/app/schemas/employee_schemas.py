@@ -103,7 +103,7 @@ class employee_contact_update(BaseModel):
     ngay_sinh: Optional[date] = Field(None, description="Ngày sinh")
     gioi_tinh: Optional[str] = Field(None, description="Giới tính: Nam, Nu, Khac")
     sdt: Optional[str] = Field(None, description="Số điện thoại")
-    email: Optional[EmailStr] = Field(None, description="Email")
+    email: Optional[str] = Field(None, description="Email doanh nghiệp (@trungnguyen.com.vn)")
     dia_chi: Optional[str] = Field(None, description="Địa chỉ")
     so_tai_khoan: Optional[str] = Field(None, description="Số tài khoản ngân hàng")
     ngan_hang: Optional[str] = Field(None, description="Tên ngân hàng")

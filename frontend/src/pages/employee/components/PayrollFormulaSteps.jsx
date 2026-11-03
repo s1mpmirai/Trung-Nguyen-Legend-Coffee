@@ -4,6 +4,7 @@ import {
   PAYROLL_RULES as R,
   breakdownProgressiveTax,
   isProbationPayroll,
+  payrollRateOf,
 } from "../../../services/payrollService";
 import { formatDays } from "../utils/format";
 
@@ -12,7 +13,7 @@ const pct = (rate) => `${(rate * 100).toLocaleString("vi-VN", { maximumFractionD
 /**
  * PayrollFormulaSteps – Diễn giải từng bước cách tính lương bằng SỐ LIỆU THẬT của nhân viên.
  * Công thức đồng bộ với backend (payroll_service.compute_payroll_line):
- *   Lương thực hưởng = Lương HĐ × tỷ lệ hưởng (thử việc 85%)
+ *   Lương thực hưởng = Lương HĐ × tỷ lệ hưởng (thử việc 85–100% theo hợp đồng, chính thức 100%)
  *   Lương theo công  = Lương thực hưởng ÷ công chuẩn × công thực tế (công chuẩn = T2–T6 trừ ngày lễ)
  *   Phụ cấp          = Phụ cấp chức vụ × min(1; công thực tế ÷ công chuẩn)
  *   Gross            = Lương theo công + Phụ cấp + Thưởng
@@ -26,7 +27,7 @@ const pct = (rate) => `${(rate * 100).toLocaleString("vi-VN", { maximumFractionD
  */
 function PayrollFormulaSteps({ payroll, fmt }) {
   const probation = isProbationPayroll(payroll);
-  const tyLeHuong = probation ? R.TY_LE_HUONG_THU_VIEC : 1;
+  const tyLeHuong = payrollRateOf(payroll);
   const luongHD = Number(payroll.luong_co_ban) || 0;
   const luongThucHuong = luongHD * tyLeHuong;
   const congChuan = Number(payroll.so_cong_chuan) || 0;

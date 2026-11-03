@@ -16,6 +16,7 @@ class payroll_month_response(BaseModel):
     so_nguoi_pt: Optional[int] = None
     luong_co_ban: float = 0
     he_so_luong: float = 1.0
+    ty_le_huong: Optional[float] = None
     so_cong_chuan: float = 22.0
     so_cong_thuc_te: float = 0
     so_gio_tang_ca: float = 0
@@ -77,6 +78,7 @@ class payroll_summary_item(BaseModel):
     ten_pb: Optional[str] = None
     ten_cv: Optional[str] = None
     luong_co_ban: Optional[float] = 0
+    ty_le_huong: Optional[float] = None
     he_so_luong: Optional[float] = 1.0
     so_cong_chuan: Optional[float] = 22.0
     so_cong_thuc_te: float = 0

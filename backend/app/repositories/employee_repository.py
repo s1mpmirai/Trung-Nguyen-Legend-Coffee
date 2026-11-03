@@ -79,9 +79,43 @@ def resolve_direct_manager(db: Session, ma_pb: str, ma_nql: str | None) -> str |
         if (row["ma_pb"] or "").upper() != (ma_pb or "").strip().upper():
             raise ValueError("Quản lý trực tiếp phải là nhân sự đang làm việc trong cùng phòng ban.")
         return row["ma_nv"]
+    # Mặc định: trưởng phòng ban, chỉ khi người đó còn làm việc và thuộc đúng phòng ban
     return db.execute(
-        text("SELECT ma_truong_pb FROM phong_ban WHERE ma_pb = :ma_pb"), {"ma_pb": ma_pb}
+        text("""
+            SELECT nv.ma_nv
+            FROM phong_ban pb
+            JOIN nhan_vien nv ON nv.ma_nv = pb.ma_truong_pb
+            WHERE pb.ma_pb = :ma_pb AND nv.ma_pb = pb.ma_pb AND nv.trang_thai <> 'DA_NGHI_VIEC'
+        """),
+        {"ma_pb": ma_pb},
     ).scalar()
+
+
+def release_leadership(db: Session, ma_nv: str, now) -> None:
+    """
+    Nhân sự nghỉ việc: thôi giữ chức trưởng phòng ban, cấp dưới đang làm chuyển sang trưởng phòng ban
+    của chính họ (nếu còn); không còn ai thì để trống để Phòng Nhân sự phân công lại.
+    Người gọi commit.
+    """
+    db.execute(
+        text("UPDATE phong_ban SET ma_truong_pb = NULL, ngay_cap_nhat = :now WHERE ma_truong_pb = :ma_nv"),
+        {"ma_nv": ma_nv, "now": now},
+    )
+    db.execute(
+        text("""
+            UPDATE nhan_vien sub
+            LEFT JOIN phong_ban pb ON pb.ma_pb = sub.ma_pb
+            LEFT JOIN nhan_vien truong
+                   ON truong.ma_nv = pb.ma_truong_pb AND truong.trang_thai <> 'DA_NGHI_VIEC'
+            SET sub.ma_nql = CASE
+                    WHEN truong.ma_nv IS NOT NULL AND truong.ma_nv <> sub.ma_nv THEN truong.ma_nv
+                    ELSE NULL
+                END,
+                sub.ngay_cap_nhat = :now
+            WHERE sub.ma_nql = :ma_nv AND sub.trang_thai <> 'DA_NGHI_VIEC'
+        """),
+        {"ma_nv": ma_nv, "now": now},
+    )
 
 
 def create(db: Session, employee: dict) -> dict:
@@ -684,7 +718,9 @@ def review_profile_update_request(
     trang_thai: str,
     nguoi_duyet: str | None = None,
     y_kien_duyet: str | None = None,
+    thong_tin_ap_dung: dict | None = None,
 ) -> dict:
+    """thong_tin_ap_dung: dữ liệu đã được kiểm tra lại lúc duyệt (None = dùng nguyên nội dung yêu cầu)."""
     if trang_thai not in ["DA_DUYET", "TU_CHOI"]:
         raise ValueError("Trạng thái phê duyệt không hợp lệ (chỉ chấp nhận DA_DUYET hoặc TU_CHOI)")
 
@@ -699,7 +735,7 @@ def review_profile_update_request(
     now_vn = get_vietnam_now()
 
     if trang_thai == "DA_DUYET":
-        thong_tin_moi = req["thong_tin_moi"] or {}
+        thong_tin_moi = thong_tin_ap_dung if thong_tin_ap_dung is not None else (req["thong_tin_moi"] or {})
         # Áp dụng thông tin mới vào bảng nhan_vien
         update_contact(db, req["ma_nv"], thong_tin_moi)
 
@@ -729,7 +765,8 @@ def review_profile_update_request(
 def apply_due_terminations(db: Session, ma_nv: str | None = None) -> int:
     """
     Áp dụng các quyết định thôi việc đã đến ngày hiệu lực (ngay_nghi_viec <= hôm nay):
-    chuyển DA_NGHI_VIEC, khóa tài khoản, thanh lý hợp đồng còn hiệu lực.
+    chuyển DA_NGHI_VIEC, khóa tài khoản, thanh lý hợp đồng còn hiệu lực,
+    thôi giữ chức trưởng phòng và chuyển cấp dưới sang trưởng phòng ban (release_leadership).
     Gọi khi đăng nhập, ở mỗi request (theo ma_nv) và định kỳ hằng giờ (toàn bộ nhân sự).
     """
     today = get_vietnam_now().date()
@@ -745,6 +782,9 @@ def apply_due_terminations(db: Session, ma_nv: str | None = None) -> int:
                  OR EXISTS (SELECT 1 FROM tai_khoan tk WHERE tk.ma_nv = nv.ma_nv AND tk.trang_thai <> 'KHOA')
                  OR EXISTS (SELECT 1 FROM hop_dong_lao_dong h
                             WHERE h.ma_nv = nv.ma_nv AND h.trang_thai IN ('HIEU_LUC', 'TAM_HOAN'))
+                 OR EXISTS (SELECT 1 FROM phong_ban pb WHERE pb.ma_truong_pb = nv.ma_nv)
+                 OR EXISTS (SELECT 1 FROM nhan_vien sub
+                            WHERE sub.ma_nql = nv.ma_nv AND sub.trang_thai <> 'DA_NGHI_VIEC')
               )
               {where_nv}
         """),
@@ -777,6 +817,7 @@ def apply_due_terminations(db: Session, ma_nv: str | None = None) -> int:
             """),
             params,
         )
+        release_leadership(db, row["ma_nv"], now_vn)
     db.commit()
     return len(due)
 
@@ -1009,7 +1050,9 @@ def get_degrees_of_employees(db: Session, ma_nv_list: list[str]) -> dict[str, st
 
 
 def get_expiring_contracts(db: Session, today: date, days: int, ma_pb: Optional[str] = None) -> list[dict]:
-    """Hợp đồng còn hiệu lực sắp hết hạn (hoặc đã quá hạn nhưng chưa xử lý) trong `days` ngày tới."""
+    """Hợp đồng cần gia hạn: sắp hết hạn trong `days` ngày tới hoặc đã quá hạn mà chưa ký hợp đồng mới."""
+    from app.repositories.contract_repository import renewal_due_condition
+
     where_pb = "AND nv.ma_pb = :ma_pb" if ma_pb else ""
     query = text(f"""
         SELECT
@@ -1020,10 +1063,7 @@ def get_expiring_contracts(db: Session, today: date, days: int, ma_pb: Optional[
         JOIN nhan_vien nv ON hd.ma_nv = nv.ma_nv
         LEFT JOIN phong_ban pb ON nv.ma_pb = pb.ma_pb
         LEFT JOIN chuc_vu cv ON nv.ma_cv = cv.ma_cv
-        WHERE hd.trang_thai = 'HIEU_LUC'
-          AND hd.ngay_ket_thuc IS NOT NULL
-          AND hd.ngay_ket_thuc <= DATE_ADD(:today, INTERVAL :days DAY)
-          AND nv.trang_thai <> 'DA_NGHI_VIEC'
+        WHERE {renewal_due_condition(":days", ":today")}
           {where_pb}
         ORDER BY hd.ngay_ket_thuc ASC
     """)

@@ -2,6 +2,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.errors import db_error_message
 from app.core.permissions import CurrentAccount, can_view_salary, require_permission
 from app.db.session import get_db
 from app.repositories import department_repository
@@ -60,9 +61,10 @@ def create_position_endpoint(data: PositionCreate, db: DbSession, account: OrgMa
     try:
         return department_repository.create_position(db, data.model_dump())
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Lỗi khi thêm chức vụ: {str(e)}",
+            detail=db_error_message(e, "thêm chức vụ"),
         )
 
 
@@ -80,9 +82,10 @@ def update_position_endpoint(ma_cv: str, data: PositionUpdate, db: DbSession, ac
     except HTTPException:
         raise
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Lỗi khi cập nhật chức vụ: {str(e)}",
+            detail=db_error_message(e, "cập nhật chức vụ"),
         )
 
 
@@ -103,7 +106,8 @@ def delete_position_endpoint(ma_cv: str, db: DbSession, account: OrgManager):
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=db_error_message(e, "xóa chức vụ"))
 
 
 @router.get("/{ma_cv}/salary-scales", response_model=list[SalaryScaleItem], summary="Thang bậc lương chức vụ")
@@ -122,7 +126,8 @@ def create_salary_scale_endpoint(ma_cv: str, data: SalaryScaleItem, db: DbSessio
         data_dict["ma_cv"] = ma_cv
         return department_repository.create_salary_scale(db, data_dict)
     except Exception as e:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Lỗi khi thêm bậc lương: {str(e)}",
+            detail=db_error_message(e, "thêm bậc lương"),
         )

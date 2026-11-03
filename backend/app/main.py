@@ -3,12 +3,16 @@ import contextlib
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.core.errors import db_error_message
+from app.repositories.contract_repository import expire_overdue_contracts
 from app.repositories.employee_repository import apply_due_terminations
 
 logger = logging.getLogger("uvicorn.error")
@@ -22,6 +26,9 @@ def _run_termination_sweep() -> None:
         so_nhan_su = apply_due_terminations(db)
         if so_nhan_su:
             logger.info("Đã áp dụng thôi việc đến hạn cho %s nhân sự", so_nhan_su)
+        so_hop_dong = expire_overdue_contracts(db)
+        if so_hop_dong:
+            logger.info("Đã chuyển %s hợp đồng quá hạn sang Hết hạn", so_hop_dong)
     except Exception:
         logger.exception("Lỗi khi áp dụng thôi việc đến hạn")
         db.rollback()
@@ -45,6 +52,15 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Trung Nguyen Legend HRM API", version="1.0.0", lifespan=lifespan)
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_error_handler(_: Request, exc: SQLAlchemyError) -> JSONResponse:
+    """Lỗi CSDL chưa được endpoint xử lý: trả câu báo tiếng Việt, chi tiết kỹ thuật chỉ ghi log."""
+    return JSONResponse(
+        status_code=409 if isinstance(exc, IntegrityError) else 500,
+        content={"detail": db_error_message(exc, "lưu dữ liệu")},
+    )
 
 app.add_middleware(
     CORSMiddleware,
