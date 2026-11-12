@@ -25,7 +25,8 @@ const SESSION_KEYS = [
 function handleSessionExpired() {
   const portal = localStorage.getItem("auth_portal");
   SESSION_KEYS.forEach((key) => localStorage.removeItem(key));
-  window.location.assign(portal === "manage" ? "/login-manage" : "/login");
+  const loginPath = portal === "admin" ? "/login-admin" : portal === "manage" ? "/login-manage" : "/login";
+  window.location.assign(loginPath);
 }
 
 // Các route đăng nhập: 401 ở đây nghĩa là sai mật khẩu, không phải phiên hết hạn

@@ -2,7 +2,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.permissions import MANAGE_PORTAL_PERMISSIONS, CurrentAccount
+from app.core.permissions import (
+    ADMIN_PORTAL_PERMISSION,
+    MANAGER_PORTAL_PERMISSIONS,
+    CurrentAccount,
+)
 from app.core.roles import ADMIN_ROLE, BUSINESS_ROLES
 from app.db.session import get_db
 from app.schemas.auth_schemas import (
@@ -31,13 +35,22 @@ def admin_login(
     request: request_login,
     db: DbSession,
 ):
+    """Cổng Quản trị (/login-admin): CHỈ vai trò ADMIN hoặc tài khoản được cấp ACCOUNT_MANAGE.
+
+    Tách biệt với Cổng Quản lý (yêu cầu đồ án II.2): Quản lý nghiệp vụ không đăng nhập ở đây.
+    """
     user = _authenticate(db, request)
     if user is None:
         raise HTTPException(status_code=401, detail="Mã tài khoản hoặc mật khẩu không chính xác")
 
     role = str(user.get("ma_vai_tro") or "").upper()
-    if role != "ADMIN":
-        raise HTTPException(status_code=403, detail="Tài khoản không có quyền Quản trị viên tối cao")
+    perms = user.get("permissions") or []
+    if role != ADMIN_ROLE and ADMIN_PORTAL_PERMISSION not in perms:
+        if role in BUSINESS_ROLES or any(p in perms for p in MANAGER_PORTAL_PERMISSIONS):
+            detail = "Tài khoản Quản lý vui lòng đăng nhập tại Cổng Quản lý (/login-manage)"
+        else:
+            detail = "Tài khoản Nhân viên vui lòng đăng nhập tại Cổng Nhân viên (/login)"
+        raise HTTPException(status_code=403, detail=detail)
 
     return user
 
@@ -48,22 +61,29 @@ def management_login(
     request: request_login,
     db: DbSession,
 ):
+    """Cổng Quản lý (/login-manage): Ban Giám đốc, Nhân sự, Kế toán hoặc tài khoản có quyền nghiệp vụ.
+
+    Quản trị viên hệ thống (ADMIN) không đăng nhập ở đây mà dùng Cổng Quản trị (/login-admin).
+    """
     user = _authenticate(db, request)
     if user is None:
         raise HTTPException(status_code=401, detail="Mã tài khoản hoặc mật khẩu không chính xác")
 
     role = str(user.get("ma_vai_tro") or "").upper()
     perms = user.get("permissions") or []
-    has_mgmt_perm = any(p in perms for p in MANAGE_PORTAL_PERMISSIONS)
 
-    if role == "NHAN_VIEN" and not has_mgmt_perm:
+    if role == ADMIN_ROLE:
         raise HTTPException(
             status_code=403,
-            detail="Tài khoản Nhân viên vui lòng đăng nhập tại Cổng Nhân Viên (/login)"
+            detail="Quản trị viên hệ thống vui lòng đăng nhập tại Cổng Quản trị (/login-admin)",
         )
 
-    if role != ADMIN_ROLE and role not in BUSINESS_ROLES and not has_mgmt_perm:
-        raise HTTPException(status_code=403, detail="Tài khoản không có quyền Quản lý hoặc Quản trị chức năng")
+    if role not in BUSINESS_ROLES and not any(p in perms for p in MANAGER_PORTAL_PERMISSIONS):
+        if ADMIN_PORTAL_PERMISSION in perms:
+            detail = "Tài khoản này chỉ có quyền quản trị, vui lòng đăng nhập tại Cổng Quản trị (/login-admin)"
+        else:
+            detail = "Tài khoản Nhân viên vui lòng đăng nhập tại Cổng Nhân viên (/login)"
+        raise HTTPException(status_code=403, detail=detail)
 
     return user
 

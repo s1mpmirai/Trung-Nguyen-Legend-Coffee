@@ -10,24 +10,57 @@ import {
   ArrowLeft,
   ArrowRight,
   Briefcase,
+  Calculator,
+  Crown,
+  ServerCog,
 } from 'lucide-react';
 import logoImg from '../../assets/logo/Logo Trung Nguyên_black.png';
-import { loginManagePortal } from '../../services/adminService';
+import { loginAdminPortal, loginManagePortal } from '../../services/adminService';
 import DemoAccountButtons from '../../components/common/DemoAccountButtons';
-
-// Tài khoản demo đăng nhập nhanh (mật khẩu theo dữ liệu mẫu)
-const DEMO_ACCOUNTS = [
-  { id: 'NV21', password: '1', label: 'Admin (IT)', icon: ShieldCheck },
-  { id: 'NV02', password: '1', label: 'Quản lý', icon: Briefcase },
-];
+import { navigateClean } from '../../utils/navigation';
 
 /**
- * AdminManagerLogin – Cổng đăng nhập dành cho Quản trị viên, Quản lý, Trưởng nhóm
- * và nhân sự được cấp quyền nghiệp vụ.
- * Sau khi đăng nhập, App điều hướng theo quyền: ADMIN / ACCOUNT_MANAGE → Cổng Quản trị,
- * còn lại → Cổng Quản lý; tài khoản phải đổi mật khẩu tạm được chuyển sang hộp thoại đổi mật khẩu.
+ * Cấu hình từng cổng đăng nhập. Hai cổng tách biệt hoàn toàn (yêu cầu đồ án II.2):
+ * - admin  (/login-admin):  Quản trị viên hệ thống – tài khoản, phân quyền. API /auth/admin-login.
+ * - manage (/login-manage): Quản lý nghiệp vụ nhân sự. API /auth/manager-login (từ chối tài khoản ADMIN).
+ * Tài khoản demo theo dữ liệu mẫu (mật khẩu "1").
  */
-export default function AdminManagerLogin({ onLoginSuccess }) {
+const PORTAL_CONFIG = {
+  admin: {
+    title: 'Đăng nhập Cổng Quản trị',
+    subtitle: 'Dành cho Quản trị viên hệ thống: quản lý tài khoản và phân quyền người dùng',
+    badge: 'CỔNG QUẢN TRỊ HỆ THỐNG',
+    badgeClass: 'bg-slate-900 text-white border-slate-900',
+    BadgeIcon: ServerCog,
+    login: loginAdminPortal,
+    idPrefix: 'admin-login',
+    fallbackError: 'Thông tin đăng nhập không hợp lệ hoặc tài khoản không có quyền vào Cổng Quản trị.',
+    demoAccounts: [{ id: 'NV21', password: '1', label: 'Admin (IT)', icon: ShieldCheck }],
+  },
+  manage: {
+    title: 'Đăng nhập Cổng Quản lý',
+    subtitle: 'Dành cho Ban Giám đốc, Phòng Nhân sự, Phòng Kế toán và nhân sự được cấp quyền nghiệp vụ',
+    badge: 'CỔNG QUẢN LÝ NHÂN SỰ',
+    badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
+    BadgeIcon: Briefcase,
+    login: loginManagePortal,
+    idPrefix: 'manage-login',
+    fallbackError: 'Thông tin đăng nhập không hợp lệ hoặc tài khoản không có quyền vào Cổng Quản lý.',
+    demoAccounts: [
+      { id: 'NV01', password: '1', label: 'Giám đốc', icon: Crown },
+      { id: 'NV02', password: '1', label: 'Nhân sự', icon: Briefcase },
+      { id: 'NV11', password: '1', label: 'Kế toán', icon: Calculator },
+    ],
+  },
+};
+
+/**
+ * PortalLogin – trang đăng nhập Cổng Quản trị (portal="admin") hoặc Cổng Quản lý (portal="manage").
+ * Tài khoản phải đổi mật khẩu tạm được App chuyển sang hộp thoại đổi mật khẩu.
+ */
+export default function PortalLogin({ portal = 'manage', onLoginSuccess }) {
+  const config = PORTAL_CONFIG[portal] || PORTAL_CONFIG.manage;
+  const { BadgeIcon } = config;
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -52,7 +85,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
 
     try {
       const cleanId = rawId.trim().toUpperCase().replace('-', '');
-      const data = await loginManagePortal(cleanId, rawPassword);
+      const data = await config.login(cleanId, rawPassword);
 
       setIsLoading(false);
       onLoginSuccess?.({
@@ -64,10 +97,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
       });
     } catch (err) {
       setIsLoading(false);
-      setErrorMessage(
-        err?.message ||
-          'Thông tin đăng nhập không hợp lệ hoặc tài khoản không có quyền vào Cổng Điều hành.'
-      );
+      setErrorMessage(err?.message || config.fallbackError);
     }
   };
 
@@ -97,11 +127,20 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
             />
           </div>
 
+          <div className="flex justify-center mb-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold tracking-wider ${config.badgeClass}`}
+            >
+              <BadgeIcon size={12} aria-hidden="true" />
+              {config.badge}
+            </span>
+          </div>
+
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
-            Đăng nhập Cổng Điều hành
+            {config.title}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Dành cho Quản trị viên, Quản lý, Trưởng nhóm và nhân sự được cấp quyền nghiệp vụ
+            {config.subtitle}
           </p>
         </div>
 
@@ -117,7 +156,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Input: Mã tài khoản */}
           <div className="space-y-1.5">
-            <label htmlFor="manage-login-id" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <label htmlFor={`${config.idPrefix}-id`} className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
               Mã tài khoản
             </label>
             <div className="relative flex items-center">
@@ -125,7 +164,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
                 <User size={18} />
               </div>
               <input
-                id="manage-login-id"
+                id={`${config.idPrefix}-id`}
                 type="text"
                 autoComplete="username"
                 autoFocus
@@ -141,7 +180,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
           {/* Input: Mật khẩu */}
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
-              <label htmlFor="manage-login-password" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <label htmlFor={`${config.idPrefix}-password`} className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 Mật khẩu
               </label>
             </div>
@@ -150,7 +189,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
                 <Lock size={18} />
               </div>
               <input
-                id="manage-login-password"
+                id={`${config.idPrefix}-password`}
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 value={password}
@@ -191,9 +230,9 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
           </button>
         </form>
 
-        {/* Đăng nhập nhanh: Admin hệ thống (NV21 – nhân viên IT) và Quản lý (NV02) */}
+        {/* Đăng nhập nhanh bằng tài khoản demo của đúng cổng này */}
         <div className="mt-5">
-          <DemoAccountButtons accounts={DEMO_ACCOUNTS} onSelect={handleDemoLogin} disabled={isLoading} />
+          <DemoAccountButtons accounts={config.demoAccounts} onSelect={handleDemoLogin} disabled={isLoading} />
         </div>
 
         {/* Chuyển hướng sang Cổng nhân viên */}
@@ -202,8 +241,7 @@ export default function AdminManagerLogin({ onLoginSuccess }) {
             href="/login"
             onClick={(e) => {
               e.preventDefault();
-              window.history.pushState(null, '', '/login');
-              window.dispatchEvent(new Event('app-route-change'));
+              navigateClean('login');
             }}
             className="inline-flex items-center space-x-1.5 text-xs font-medium text-slate-500 hover:text-[#0EA5E9] transition-colors py-1.5 px-3 rounded-lg hover:bg-sky-50"
           >

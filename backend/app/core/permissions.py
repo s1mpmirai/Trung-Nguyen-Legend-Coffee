@@ -23,9 +23,13 @@ from app.repositories.permission_repository import get_employee_permissions
 # - ADMIN (chỉ xem danh bạ), Ban Giám đốc, Phòng Nhân sự, Phòng Kế toán: toàn công ty.
 # - Nhân viên được cấp quyền riêng: chỉ cấp dưới trực tiếp (nhan_vien.ma_nql).
 
-# Có ít nhất một quyền này thì được vào cổng điều hành (/login-manage).
-# Giữ khớp với MANAGER_PORTAL_PERMISSIONS + ACCOUNT_MANAGE ở frontend/src/utils/navigation.js.
-MANAGE_PORTAL_PERMISSIONS = (
+# Cổng Quản trị (/login-admin): vai trò ADMIN hoặc tài khoản được cấp quyền này.
+# Giữ khớp với canAccessAdminPortal ở frontend/src/utils/navigation.js.
+ADMIN_PORTAL_PERMISSION = "ACCOUNT_MANAGE"
+
+# Cổng Quản lý (/login-manage): vai trò nghiệp vụ (BUSINESS_ROLES) hoặc có ít nhất một quyền này.
+# Giữ khớp với MANAGER_PORTAL_PERMISSIONS ở frontend/src/utils/navigation.js.
+MANAGER_PORTAL_PERMISSIONS = (
     "EMPLOYEE_VIEW",
     "EMPLOYEE_CREATE",
     "EMPLOYEE_UPDATE",
@@ -37,7 +41,6 @@ MANAGE_PORTAL_PERMISSIONS = (
     "PAYROLL_APPROVE",
     "REPORT_VIEW",
     "PERMISSION_ASSIGN",
-    "ACCOUNT_MANAGE",
 )
 
 

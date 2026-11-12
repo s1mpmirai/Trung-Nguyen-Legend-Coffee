@@ -94,27 +94,48 @@ export const canAccessManagerPortal = (role, permissions = []) => {
   return normalizePerms(permissions).some((p) => MANAGER_PORTAL_PERMISSIONS.includes(p));
 };
 
-/** Trang chủ của cổng điều hành theo quyền: Quản trị → /admin, Quản lý → /manager, còn lại → Nhân viên. */
-export const getManageHome = (role, permissions = []) => {
-  if (canAccessAdminPortal(role, permissions)) return "admin";
-  if (canAccessManagerPortal(role, permissions)) return "manager";
-  return "attendance";
+// ───────────────────────── CỔNG ĐĂNG NHẬP ─────────────────────────
+// Ba cổng đăng nhập tách biệt; phiên gắn với cổng đã đăng nhập (session.portal):
+//   "admin"    – /login-admin  → Cổng Quản trị (/admin)
+//   "manage"   – /login-manage → Cổng Quản lý (/manager)
+//   "employee" – /login        → Cổng Nhân viên
+export const PORTALS = ["admin", "manage", "employee"];
+
+export const normalizePortal = (portal) => (PORTALS.includes(portal) ? portal : "employee");
+
+/** Trang đăng nhập của từng cổng. */
+export const getLoginRoute = (portal) => {
+  const p = normalizePortal(portal);
+  if (p === "admin") return "login-admin";
+  if (p === "manage") return "login-manage";
+  return "login";
 };
 
-/** Trang chủ theo cổng đã đăng nhập ("manage" | "employee"). */
+/**
+ * Trang chủ theo cổng đã đăng nhập. Nếu quyền vào cổng đó vừa bị thu hồi (quyền lấy lại từ /auth/me),
+ * đưa về Cổng Nhân viên chứ không chuyển ngang sang cổng điều hành còn lại.
+ */
 export const getPortalHome = (session) => {
   if (!session) return "login";
-  if (session.portal === "manage") return getManageHome(session.role, session.permissions);
+  const portal = normalizePortal(session.portal);
+  if (portal === "admin" && canAccessAdminPortal(session.role, session.permissions)) return "admin";
+  if (portal === "manage" && canAccessManagerPortal(session.role, session.permissions)) return "manager";
   return "attendance";
 };
 
+export const isAdminLoginRoute = (route) => route === "login-admin";
+
+export const isManagerLoginRoute = (route) => route === "login-manage" || route === "login-manager";
+
 export const isLoginRoute = (route) =>
-  route === "login" || route === "login-manage" || route === "login-manager" || route === "login-admin";
+  route === "login" || isAdminLoginRoute(route) || isManagerLoginRoute(route);
 
-export const isManageLoginRoute = (route) =>
-  route === "login-manage" || route === "login-manager" || route === "login-admin";
-
-export const isManagePortalRoute = (route) => {
+export const isAdminPortalRoute = (route) => {
   const r = String(route || "").toLowerCase();
-  return r === "admin" || r.startsWith("admin/") || r === "manager" || r.startsWith("manager/") || isManageLoginRoute(r);
+  return r === "admin" || r.startsWith("admin/") || isAdminLoginRoute(r);
+};
+
+export const isManagerPortalRoute = (route) => {
+  const r = String(route || "").toLowerCase();
+  return r === "manager" || r.startsWith("manager/") || isManagerLoginRoute(r);
 };

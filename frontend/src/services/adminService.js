@@ -16,7 +16,12 @@
 import apiClient from "./apiClient";
 
 // ── 0. AUTH / PHIÊN ĐĂNG NHẬP ─────────────────────────────────────────
-// Đăng nhập Cổng Điều hành (Admin / Quản lý / Trưởng nhóm / nhân sự được cấp quyền nghiệp vụ)
+// Đăng nhập Cổng Quản trị (/login-admin): chỉ ADMIN hoặc tài khoản có ACCOUNT_MANAGE
+export async function loginAdminPortal(ma_nv, mat_khau) {
+  return apiClient.post("/auth/admin-login", { ma_nv, mat_khau });
+}
+
+// Đăng nhập Cổng Quản lý (/login-manage): Ban Giám đốc / Nhân sự / Kế toán / nhân sự được cấp quyền nghiệp vụ
 export async function loginManagePortal(ma_nv, mat_khau) {
   return apiClient.post("/auth/manager-login", { ma_nv, mat_khau });
 }

@@ -36,15 +36,23 @@ Mật khẩu dữ liệu mẫu là `1` (chỉ dùng để demo; tài khoản do 
 
 | Mã NV | Vai trò | Cổng đăng nhập |
 | --- | --- | --- |
-| NV21 | ADMIN (nhân viên Phòng IT, quản trị hệ thống) | `/login-manage` → Cổng Admin |
+| NV21 | ADMIN (nhân viên Phòng IT, quản trị hệ thống) | `/login-admin` → Cổng Quản trị |
 | NV01 | BAN_GIAM_DOC (Tổng Giám đốc) | `/login-manage` → Cổng Quản lý (toàn công ty, báo cáo, duyệt đơn, duyệt bảng lương) |
 | NV02, NV08 | NHAN_SU (Phòng Nhân sự) | `/login-manage` → Cổng Quản lý (hồ sơ, hợp đồng, phòng ban, chức vụ & thang lương, chấm công / chốt công, duyệt đơn) |
 | NV03, NV11 | KE_TOAN (Phòng Kế toán); NV03 thêm quyền riêng `PAYROLL_APPROVE` chỉ để duyệt lương Ban Giám đốc | `/login-manage` → Cổng Quản lý (tính lương, xác nhận chi trả, không duyệt lương). NV11 tính lương rồi bấm "Gửi duyệt", NV01 duyệt hoặc trả về; bảng lương của NV01 do NV03 duyệt |
 | NV04, NV05, NV06, NV09 | NHAN_VIEN (trước là trưởng phòng / trưởng nhóm) | `/login` → Cổng Nhân viên |
 | NV10 | NHAN_VIEN | `/login` → Cổng Nhân viên |
-| NV14 | NHAN_VIEN + quyền riêng `ACCOUNT_MANAGE` | `/login-manage` → Cổng Admin (chỉ mục Tài khoản) |
+| NV14 | NHAN_VIEN + quyền riêng `ACCOUNT_MANAGE` | `/login-admin` → Cổng Quản trị (chỉ mục Tài khoản) |
 
 Mọi nhân sự có tài khoản đều đăng nhập được Cổng Nhân viên để chấm công và xem lương của mình.
+
+Ba trang đăng nhập tách biệt, mỗi phiên gắn với cổng đã đăng nhập (không chuyển ngang giữa Cổng Quản trị và Cổng Quản lý):
+
+| Trang | API | Ai đăng nhập được |
+| --- | --- | --- |
+| `/login-admin` | `POST /auth/admin-login` | Vai trò ADMIN hoặc tài khoản có `ACCOUNT_MANAGE` |
+| `/login-manage` | `POST /auth/manager-login` | Ban Giám đốc, Nhân sự, Kế toán hoặc có quyền nghiệp vụ; **từ chối ADMIN** |
+| `/login` | `POST /auth/employee-login` | Mọi tài khoản đang hoạt động |
 
 ## 3. Sao lưu và phục hồi CSDL
 

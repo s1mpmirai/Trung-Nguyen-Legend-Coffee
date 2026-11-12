@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, ShieldAlert, X } from "lucide-react";
 import Login from "./pages/auth/Login";
-import AdminManagerLogin from "./pages/auth/AdminManagerLogin";
+import PortalLogin from "./pages/auth/PortalLogin";
 import AttendanceDashboard from "./pages/employee/AttendanceDashboard";
 import EmployeeProfile from "./pages/employee/EmployeeProfile";
 import EmployeePayroll from "./pages/employee/EmployeePayroll";
@@ -19,10 +19,13 @@ import {
   canAccessManagerPortal,
   canViewOwnPayroll,
   hasPersonalPermission,
-  getManageHome,
+  getLoginRoute,
   getPortalHome,
+  isAdminLoginRoute,
+  isAdminPortalRoute,
   isLoginRoute,
-  isManagePortalRoute,
+  isManagerPortalRoute,
+  normalizePortal,
 } from "./utils/navigation";
 
 // ───────────────────────── BỘ NHỚ ĐỆM PHIÊN (localStorage) ─────────────────────────
@@ -57,7 +60,7 @@ function readCachedSession() {
     token,
     role: String(localStorage.getItem("user_role") || "").toUpperCase(),
     permissions: readPermissionsCache(),
-    portal: localStorage.getItem("auth_portal") === "manage" ? "manage" : "employee",
+    portal: normalizePortal(localStorage.getItem("auth_portal")),
   };
 }
 
@@ -94,35 +97,43 @@ const mergeMe = (session, me) => ({
 const isAdminRoute = (r) => r === "admin" || r.startsWith("admin/");
 const isManagerRoute = (r) => r === "manager" || r.startsWith("manager/");
 
-/** Trả về route được phép hiển thị cho phiên hiện tại (không gây side effect). */
+/**
+ * Trả về route được phép hiển thị cho phiên hiện tại (không gây side effect).
+ * Phiên gắn với cổng đã đăng nhập: phiên Cổng Quản trị không mở được /manager và ngược lại
+ * (giao diện Admin tách biệt với giao diện quản lý nhân sự – yêu cầu đồ án II.2).
+ */
 function resolveRoute(route, session) {
   const r = String(route || "");
   if (!session) {
-    if (r === "login") return "login";
-    if (isManagePortalRoute(r)) return "login-manage";
+    if (isAdminPortalRoute(r)) return "login-admin";
+    if (isManagerPortalRoute(r)) return "login-manage";
     return "login";
   }
   // Người đã đăng nhập vẫn được mở trang đăng nhập khi chủ động truy cập (đổi tài khoản)
-  if (isLoginRoute(r)) return r === "login" ? "login" : "login-manage";
+  if (isLoginRoute(r)) return r;
   if (!r) return getPortalHome(session);
   if (isAdminRoute(r)) {
-    return canAccessAdminPortal(session.role, session.permissions) ? r : getManageHome(session.role, session.permissions);
+    return session.portal === "admin" && canAccessAdminPortal(session.role, session.permissions)
+      ? r
+      : getPortalHome(session);
   }
   if (isManagerRoute(r)) {
-    return canAccessManagerPortal(session.role, session.permissions) ? r : getManageHome(session.role, session.permissions);
+    return session.portal === "manage" && canAccessManagerPortal(session.role, session.permissions)
+      ? r
+      : getPortalHome(session);
   }
   if (EMPLOYEE_ROUTES.includes(r)) return r;
   return getPortalHome(session);
 }
 
-/** Đọc route hiện tại, chuẩn hóa URL (bỏ dấu #, gộp các đường dẫn đăng nhập cũ). */
+/** Đọc route hiện tại, chuẩn hóa URL (bỏ dấu #, gộp đường dẫn đăng nhập cũ /login-manager). */
 function readCurrentRoute() {
   if (window.location.hash) {
     const clean = window.location.hash.replace(/^#\/?/, "");
     window.history.replaceState(window.history.state, "", clean ? `/${clean}` : "/");
   }
   const route = getCleanRoute();
-  if (route === "login-manager" || route === "login-admin") {
+  if (route === "login-manager") {
     window.history.replaceState(null, "", "/login-manage");
     return "login-manage";
   }
@@ -201,7 +212,7 @@ function App() {
           clearSessionCache();
           setSession(null);
           setNotice(err.message || "Tài khoản của bạn hiện không thể truy cập hệ thống.");
-          goTo(cached.portal === "manage" ? "login-manage" : "login");
+          goTo(getLoginRoute(cached.portal));
         }
         // Lỗi mạng: tạm dùng dữ liệu đệm, các API sau sẽ tự báo lỗi
         setAuthChecking(false);
@@ -262,10 +273,16 @@ function App() {
   const resolvedRoute = resolveRoute(route, session);
   useEffect(() => {
     if (authChecking || resolvedRoute === route) return;
-    if (session && (isAdminRoute(route) || isManagerRoute(route))) {
+    if (session && isAdminRoute(route)) {
       setNotice(
-        isAdminRoute(route)
-          ? "Cổng Quản trị chỉ dành cho Quản trị viên hoặc tài khoản được cấp quyền Quản lý tài khoản."
+        canAccessAdminPortal(session.role, session.permissions)
+          ? "Cổng Quản trị tách biệt với các cổng khác. Vui lòng đăng nhập tại /login-admin."
+          : "Cổng Quản trị chỉ dành cho Quản trị viên hoặc tài khoản được cấp quyền Quản lý tài khoản."
+      );
+    } else if (session && isManagerRoute(route)) {
+      setNotice(
+        canAccessManagerPortal(session.role, session.permissions)
+          ? "Cổng Quản lý tách biệt với các cổng khác. Vui lòng đăng nhập tại /login-manage."
           : "Bạn không có quyền truy cập Cổng Quản lý."
       );
     }
@@ -278,7 +295,7 @@ function App() {
       token: userData?.token || userData?.access_token,
       role: String(userData?.role || userData?.ma_vai_tro || "").toUpperCase(),
       permissions: Array.isArray(userData?.permissions) ? userData.permissions : [],
-      portal: portalOrigin === "manage" ? "manage" : "employee",
+      portal: normalizePortal(portalOrigin),
       must_change_password: Boolean(userData?.must_change_password),
     };
     writeSessionCache(next);
@@ -311,14 +328,13 @@ function App() {
   };
 
   const handleLogout = () => {
-    const current = sessionRef.current;
-    const isManageUser =
-      current?.portal === "manage" || isAdminRoute(resolvedRoute) || isManagerRoute(resolvedRoute);
+    // Đăng xuất về đúng trang đăng nhập của cổng đang dùng
+    const loginRoute = getLoginRoute(sessionRef.current?.portal);
 
     clearSessionCache();
     setSession(null);
     setMustChangePassword(false);
-    goTo(isManageUser ? "login-manage" : "login");
+    goTo(loginRoute);
   };
 
   const notificationToast = notice ? (
@@ -357,11 +373,22 @@ function App() {
 
   // 1. Chưa đăng nhập hoặc đang ở trang đăng nhập
   if (!session || isLoginRoute(resolvedRoute)) {
-    if (resolvedRoute === "login-manage") {
+    // Cổng Quản trị hệ thống (/login-admin): nền tối để phân biệt rõ với Cổng Quản lý
+    if (isAdminLoginRoute(resolvedRoute)) {
+      return (
+        <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col justify-center items-center">
+          {notificationToast}
+          <PortalLogin portal="admin" onLoginSuccess={(userData) => handleLoginSuccess(userData, "admin")} />
+        </div>
+      );
+    }
+
+    // Cổng Quản lý nhân sự (/login-manage)
+    if (resolvedRoute !== "login") {
       return (
         <div className="min-h-screen w-full bg-gradient-to-br from-slate-100 via-sky-50/40 to-slate-200 flex flex-col justify-center items-center">
           {notificationToast}
-          <AdminManagerLogin onLoginSuccess={(userData) => handleLoginSuccess(userData, "manage")} />
+          <PortalLogin portal="manage" onLoginSuccess={(userData) => handleLoginSuccess(userData, "manage")} />
         </div>
       );
     }
