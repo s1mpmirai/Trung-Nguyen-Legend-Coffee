@@ -373,6 +373,16 @@ export default function PayrollManagement({ userSession, onNavigateTab, onPendin
   const reopenTargets = getActionTargets("reopen");
   const payTargets = getActionTargets("pay");
 
+  // Bảng lương của chính người đang đăng nhập đang chờ duyệt / đã duyệt: các nút trên luôn bỏ qua dòng này,
+  // nêu rõ ai xử lý để không tưởng nhầm là đã trả về / đã duyệt hết.
+  const ownRow = payrollData.find((r) => r.id === access.maNv && (r.status === "submitted" || r.status === "ready"));
+  const ownRowHint = ownRow
+    ? `Bảng lương của bạn (${ownRow.id}) đang ${ownRow.status === "submitted" ? "Chờ duyệt" : "Đã duyệt"} và không nằm trong các thao tác ở trên. ` +
+      (ownRow.maPb === BOARD_DEPARTMENT_CODE
+        ? "Lương Ban Giám đốc do người được cấp riêng quyền duyệt lương (Kế toán trưởng) duyệt hoặc trả về."
+        : "Lương của bạn do Ban Giám đốc duyệt hoặc trả về.")
+    : "";
+
   const openStatusAction = (action) => {
     setStatusResult(null);
     setStatusAction(action);
@@ -635,6 +645,13 @@ export default function PayrollManagement({ userSession, onNavigateTab, onPendin
           )}
         </div>
       </div>
+
+      {ownRowHint && (access.can("PAYROLL_APPROVE") || access.can("PAYROLL_MANAGE")) && (
+        <div className="flex items-start gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{ownRowHint}</span>
+        </div>
+      )}
 
       {/* Ban Giám đốc: bảng lương Kế toán đã gửi, đang chờ duyệt */}
       {canApprove && pendingPeriods.length > 0 && (
@@ -1373,6 +1390,13 @@ export default function PayrollManagement({ userSession, onNavigateTab, onPendin
                 Trả <strong>{actionCount}</strong> bảng lương về Kế toán (trạng thái Nháp) để kiểm tra / tính lại.
               </li>
               <li>Kế toán cần tính lại (nếu cần) và gửi duyệt lại.</li>
+              {actionSkipped > 0 && (
+                <li>
+                  Bỏ qua <strong>{actionSkipped}</strong> bảng lương ngoài quyền xử lý của bạn (lương của chính bạn
+                  {approveBoardOnly ? " hoặc của nhân sự ngoài Ban Giám đốc" : ""}). Các bảng này vẫn giữ trạng thái
+                  Chờ duyệt, nên Nhân sự chưa mở khóa được bảng công tháng cho đến khi chúng được trả về / duyệt.
+                </li>
+              )}
             </ul>
           ) : statusAction === "reopen" ? (
             <ul className="list-disc pl-4 space-y-1">
@@ -1380,6 +1404,12 @@ export default function PayrollManagement({ userSession, onNavigateTab, onPendin
                 Đưa <strong>{actionCount}</strong> bảng lương đã duyệt về trạng thái Nháp để kiểm tra / tính lại.
               </li>
               <li>Nhân viên sẽ không xem được phiếu lương cho đến khi được duyệt lại.</li>
+              {actionSkipped > 0 && (
+                <li>
+                  Bỏ qua <strong>{actionSkipped}</strong> bảng lương ngoài quyền xử lý của bạn (lương của chính bạn
+                  {approveBoardOnly ? " hoặc của nhân sự ngoài Ban Giám đốc" : ""}).
+                </li>
+              )}
             </ul>
           ) : statusAction === "pay" ? (
             <ul className="list-disc pl-4 space-y-1">

@@ -3,6 +3,7 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.data_scope import DataScope
 from app.core.datetime_utils import get_vietnam_now, get_vietnam_today
 from app.repositories import attendance_repository as repo
@@ -856,13 +857,46 @@ def toggle_monthly_attendance_lock(
     - Mở khóa: không cho phép khi bảng lương tháng đã được duyệt hoặc đã chi trả.
     """
     if not is_locked:
-        so_bang_luong_da_duyet = repo.count_finalized_payroll(db, thang, nam)
-        if so_bang_luong_da_duyet:
-            raise ValueError(
-                f"Không thể mở khóa: tháng {thang}/{nam} đã có {so_bang_luong_da_duyet} bảng lương đã gửi duyệt / được duyệt / chi trả. "
-                "Hãy để Ban Giám đốc trả các bảng lương về Nháp trước."
-            )
+        vuong = repo.get_finalized_payroll_rows(db, thang, nam)
+        if vuong:
+            raise ValueError(_unlock_blocked_message(thang, nam, vuong))
     return repo.set_monthly_attendance_lock(db, thang, nam, is_locked, nguoi_chot, ghi_chu)
+
+
+def _unlock_blocked_message(thang: int, nam: int, rows: list[dict[str, Any]]) -> str:
+    """
+    Thông báo mở khóa bị chặn: liệt kê từng bảng lương chưa về Nháp và ai có thể trả về.
+    - Đã chi trả: khóa hẳn, không mở khóa tháng được nữa.
+    - Chưa chi trả: lương Ban Giám đốc do người được cấp riêng quyền duyệt lương (Kế toán trưởng) trả về,
+      lương nhân sự khác do Ban Giám đốc trả về.
+    """
+    def ten(r: dict[str, Any]) -> str:
+        return f"{r['ma_nv']} ({r['ho_ten']})" if r.get("ho_ten") else str(r["ma_nv"])
+
+    da_tra = [r for r in rows if r["trang_thai"] == "DA_TRA"]
+    cho_xu_ly = [r for r in rows if r["trang_thai"] != "DA_TRA"]
+    phan = [f"Không thể mở khóa bảng công tháng {thang}/{nam}: còn {len(rows)} bảng lương chưa về Nháp."]
+    if da_tra:
+        phan.append(
+            f"Đã chi trả ({len(da_tra)}): {', '.join(ten(r) for r in da_tra)}. "
+            "Bảng lương đã chi trả không mở lại được, nên tháng này không thể mở khóa nữa."
+        )
+    if cho_xu_ly:
+        bgd = [r for r in cho_xu_ly if (r.get("ma_pb") or "") == settings.board_department_code]
+        khac = [r for r in cho_xu_ly if (r.get("ma_pb") or "") != settings.board_department_code]
+        nhan = {"CHO_DUYET": "Chờ duyệt", "DA_DUYET": "Đã duyệt"}
+
+        def liet_ke(nhom: list[dict[str, Any]]) -> str:
+            return ", ".join(f"{ten(r)} [{nhan.get(r['trang_thai'], r['trang_thai'])}]" for r in nhom)
+
+        if khac:
+            phan.append(f"Ban Giám đốc cần trả về Nháp ({len(khac)}): {liet_ke(khac)}.")
+        if bgd:
+            phan.append(
+                f"Lương Ban Giám đốc ({len(bgd)}): {liet_ke(bgd)}. Ban Giám đốc không tự xử lý lương của mình, "
+                "cần người được cấp riêng quyền duyệt lương (Kế toán trưởng) trả về Nháp."
+            )
+    return " ".join(phan)
 
 
 def get_attendance_trend(db: Session, days: int = 7, scope: DataScope | None = None) -> list[dict[str, Any]]:

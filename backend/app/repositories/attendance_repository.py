@@ -637,6 +637,23 @@ def count_finalized_payroll(db: Session, thang: int, nam: int) -> int:
     ).scalar() or 0)
 
 
+def get_finalized_payroll_rows(db: Session, thang: int, nam: int) -> list[dict[str, Any]]:
+    """Các bảng lương của tháng chưa về Nháp (đã gửi duyệt / đã duyệt / đã chi trả), kèm phòng ban để biết ai xử lý."""
+    rows = db.execute(
+        text(
+            """
+            SELECT bl.ma_nv, nv.ho_ten, nv.ma_pb, bl.trang_thai
+            FROM bang_luong bl
+            JOIN nhan_vien nv ON nv.ma_nv = bl.ma_nv
+            WHERE bl.thang = :thang AND bl.nam = :nam AND bl.trang_thai <> 'NHAP'
+            ORDER BY FIELD(bl.trang_thai, 'DA_TRA', 'DA_DUYET', 'CHO_DUYET'), bl.ma_nv
+            """
+        ),
+        {"thang": thang, "nam": nam},
+    ).mappings().all()
+    return [dict(r) for r in rows]
+
+
 def set_monthly_attendance_lock(
     db: Session, thang: int, nam: int, is_locked: bool, nguoi_chot: str | None = None, ghi_chu: str = ""
 ) -> dict[str, Any]:
