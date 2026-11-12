@@ -276,7 +276,7 @@ function App() {
     if (session && isAdminRoute(route)) {
       setNotice(
         canAccessAdminPortal(session.role, session.permissions)
-          ? "Cổng Quản trị tách biệt với các cổng khác. Vui lòng đăng nhập tại /login-admin."
+          ? "Cổng Quản trị tách biệt với các cổng khác. Vui lòng đăng nhập tại Cổng Quản trị."
           : "Cổng Quản trị chỉ dành cho Quản trị viên hoặc tài khoản được cấp quyền Quản lý tài khoản."
       );
     } else if (session && isManagerRoute(route)) {

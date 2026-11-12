@@ -1381,7 +1381,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                               }
                             >
                               <UserX className="w-3.5 h-3.5 text-rose-600" />
-                              <span>{emp.scheduledTerminationDate ? "Đổi ngày thôi việc" : "Thôi việc / Xóa"}</span>
+                              <span>{emp.scheduledTerminationDate ? "Đổi ngày thôi việc" : "Thôi việc"}</span>
                             </button>
                           ) : (
                             !emp.scheduledTerminationDate && <span className="text-slate-300">—</span>
@@ -1486,7 +1486,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                 </div>
                 <div>
                   <h3 id="deactivate-dialog-title" className="font-bold text-sm text-slate-900">
-                    Xác nhận Thôi việc / Xóa nhân sự
+                    Xác nhận Thôi việc nhân sự
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     Ngừng công tác và khóa quyền truy cập của nhân sự từ ngày hiệu lực

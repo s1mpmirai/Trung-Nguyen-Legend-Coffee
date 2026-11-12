@@ -75,14 +75,14 @@ def management_login(
     if role == ADMIN_ROLE:
         raise HTTPException(
             status_code=403,
-            detail="Quản trị viên hệ thống vui lòng đăng nhập tại Cổng Quản trị (/login-admin)",
+            detail="Quản trị viên hệ thống vui lòng đăng nhập tại Cổng Quản trị",
         )
 
     if role not in BUSINESS_ROLES and not any(p in perms for p in MANAGER_PORTAL_PERMISSIONS):
         if ADMIN_PORTAL_PERMISSION in perms:
-            detail = "Tài khoản này chỉ có quyền quản trị, vui lòng đăng nhập tại Cổng Quản trị (/login-admin)"
+            detail = "Tài khoản này chỉ có quyền quản trị, vui lòng đăng nhập tại Cổng Quản trị"
         else:
-            detail = "Tài khoản Nhân viên vui lòng đăng nhập tại Cổng Nhân viên (/login)"
+            detail = "Tài khoản Nhân viên vui lòng đăng nhập tại Cổng Nhân viên"
         raise HTTPException(status_code=403, detail=detail)
 
     return user
