@@ -96,7 +96,7 @@ def get_employee_permissions_endpoint(
 @router.put(
     "/employee/{ma_nv}/role",
     response_model=EmployeePermissionsResponse,
-    summary="[Phân quyền] Cấp vai trò / Thăng chức cho nhân sự (vd: lên Trưởng nhóm)",
+    summary="[Phân quyền] Cấp vai trò cho nhân sự (ADMIN, Ban Giám đốc, Nhân sự, Kế toán, Nhân viên)",
 )
 def assign_role_endpoint(
     ma_nv: str,

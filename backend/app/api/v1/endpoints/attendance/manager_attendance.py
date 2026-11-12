@@ -108,7 +108,7 @@ def toggle_attendance_lock_endpoint(
     account: Annotated[dict, Depends(require_permission("ATTENDANCE_LOCK"))],
     db: DbSession = None,
 ):
-    """Quản lý thực hiện Chốt hoặc Mở khóa bảng công tháng (quyền ATTENDANCE_LOCK, Trưởng nhóm không có)."""
+    """Chốt hoặc Mở khóa bảng công tháng (quyền ATTENDANCE_LOCK, mặc định chỉ Phòng Nhân sự; Admin mới cấp được)."""
     if not data.get("thang") or not data.get("nam"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Thiếu tháng hoặc năm cần chốt công")
     thang = int(data["thang"])

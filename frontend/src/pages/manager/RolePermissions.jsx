@@ -604,7 +604,7 @@ export default function RolePermissions({ userSession }) {
               </div>
             ) : (
               <>
-                {/* 1. THẺ THÔNG TIN NHÂN SỰ ĐƯỢC CHỌN & THĂNG CHỨC TRƯỞNG NHÓM */}
+                {/* 1. THẺ THÔNG TIN NHÂN SỰ ĐƯỢC CHỌN & BỔ NHIỆM VAI TRÒ */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
@@ -632,7 +632,7 @@ export default function RolePermissions({ userSession }) {
                     </div>
                   </div>
 
-                  {/* Nút Bổ nhiệm vai trò (Quản lý chỉ bổ nhiệm Nhân viên / Trưởng nhóm) */}
+                  {/* Nút Bổ nhiệm vai trò (Quản lý chỉ gán vai trò Nhân viên; vai trò phòng ban và ADMIN do Admin gán) */}
                   <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200/80 shrink-0">
                     <select
                       value={promoteRole}

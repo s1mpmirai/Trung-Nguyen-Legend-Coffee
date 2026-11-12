@@ -22,7 +22,7 @@ def get_all_permissions(db: Session) -> list[dict[str, Any]]:
 
 
 def get_role_matrix(db: Session) -> dict[str, Any]:
-    """Lấy ma trận phân quyền hoàn chỉnh (so sánh Nhân viên vs Trưởng nhóm)."""
+    """Lấy ma trận phân quyền hoàn chỉnh (quyền mặc định của từng vai trò)."""
     return permission_repository.get_role_matrix(db)
 
 

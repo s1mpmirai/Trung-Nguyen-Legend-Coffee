@@ -611,7 +611,7 @@ export default function AdminPermissionsTab({ userSession }) {
               <div>
                 <h3 className="font-bold text-sm text-slate-900">Bổ nhiệm / thay đổi vai trò</h3>
                 <p className="text-[11px] text-slate-400">
-                  {actorIsAdmin ? "Quản trị viên được gán mọi vai trò" : "Bạn được gán vai trò Nhân viên hoặc Trưởng nhóm"}
+                  {actorIsAdmin ? "Quản trị viên được gán mọi vai trò" : "Bạn chỉ được gán vai trò Nhân viên; vai trò phòng ban và Quản trị do Admin gán"}
                 </p>
               </div>
             </div>

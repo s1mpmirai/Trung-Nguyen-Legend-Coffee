@@ -71,7 +71,7 @@ def _report_department(account: dict, ma_pb: Optional[str]) -> Optional[str]:
 
 
 def _check_create_scope(account: dict, data: employee_profile_create) -> None:
-    """Quản lý phòng ban chỉ thêm nhân sự vào phòng mình; Trưởng nhóm chỉ thêm cấp dưới trực tiếp của mình."""
+    """Trưởng phòng ban chỉ thêm nhân sự vào phòng mình; người chỉ quản lý cấp dưới trực tiếp chỉ thêm cấp dưới của mình."""
     scope = data_scope(account)
     if scope is None:
         return
