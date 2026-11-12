@@ -1016,7 +1016,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-500">
                   <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Từ 3 năm (Nòng cốt):{" "}
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Từ 3 năm:{" "}
                     {reportStats.tenureShare.core}%
                   </span>
                   <span className="flex items-center gap-1">
@@ -1106,7 +1106,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                 <option value="all">Tất cả Thâm niên</option>
                 <option value="under1">Dưới 1 năm</option>
                 <option value="1to3">1 - 3 năm</option>
-                <option value="3to5">3 - 5 năm (Nòng cốt)</option>
+                <option value="3to5">3 - 5 năm</option>
                 <option value="above5">Trên 5 năm</option>
               </select>
 
@@ -1286,14 +1286,7 @@ export default function EmployeeManagement({ initialTab = "list", userSession })
                     {/* Cột 5: Thâm niên & Ngày vào làm */}
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-emerald-700">{emp.tenureLabel}</span>
-                          {emp.isCore && (
-                            <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase border border-emerald-200/50">
-                              Nòng cốt
-                            </span>
-                          )}
-                        </div>
+                        <span className="font-semibold text-emerald-700">{emp.tenureLabel}</span>
                         <span className="text-slate-400 text-[10px]">Vào làm: {emp.joinDate}</span>
                       </div>
                     </td>

@@ -21,7 +21,8 @@ from app.repositories.permission_repository import get_employee_permissions
 
 # Phạm vi dữ liệu (xem data_scope):
 # - ADMIN (chỉ xem danh bạ), Ban Giám đốc, Phòng Nhân sự, Phòng Kế toán: toàn công ty.
-# - Nhân viên được cấp quyền riêng: chỉ cấp dưới trực tiếp (nhan_vien.ma_nql).
+# - Trưởng phòng ban (phong_ban.ma_truong_pb) được cấp quyền riêng: cả phòng mình + cấp dưới trực tiếp.
+# - Trưởng nhóm / nhân viên khác được cấp quyền riêng: chỉ cấp dưới trực tiếp (nhan_vien.ma_nql).
 
 # Cổng Quản trị (/login-admin): vai trò ADMIN hoặc tài khoản được cấp quyền này.
 # Giữ khớp với canAccessAdminPortal ở frontend/src/utils/navigation.js.
@@ -79,12 +80,24 @@ def get_current_account(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tài khoản đã bị khóa")
 
     perms = get_employee_permissions(db, ma_nv) or {}
-    ma_pb = db.execute(text("SELECT ma_pb FROM nhan_vien WHERE ma_nv = :ma_nv"), {"ma_nv": ma_nv}).scalar()
+    org = db.execute(
+        text(
+            """
+            SELECT nv.ma_pb, (pb.ma_truong_pb = nv.ma_nv) AS la_truong_phong
+            FROM nhan_vien nv
+            LEFT JOIN phong_ban pb ON pb.ma_pb = nv.ma_pb
+            WHERE nv.ma_nv = :ma_nv
+            """
+        ),
+        {"ma_nv": ma_nv},
+    ).mappings().first()
     return {
         "ma_nv": account.ma_nv,
         "ma_tk": account.ma_tk,
         "ma_vai_tro": account.ma_vai_tro,
-        "ma_pb": ma_pb,
+        "ma_pb": org["ma_pb"] if org else None,
+        # Là trưởng phòng ban đang thuộc (phong_ban.ma_truong_pb): phạm vi quản lý mở rộng ra cả phòng
+        "la_truong_phong": bool(org and org["la_truong_phong"]),
         "permissions": set(perms.get("effective_permissions", [])),
     }
 
@@ -159,6 +172,9 @@ def ensure_self_or_permission(account: dict[str, Any], ma_nv: str, *permission_c
 def data_scope(account: dict[str, Any], *company_wide_permissions: str) -> DataScope | None:
     """
     Phạm vi nhân sự người gọi API được quản lý; None = toàn công ty.
+    - ADMIN, vai trò nghiệp vụ (Ban Giám đốc, Nhân sự, Kế toán): toàn công ty.
+    - Trưởng phòng ban (phong_ban.ma_truong_pb): phòng mình + cấp dưới trực tiếp.
+    - Còn lại (trưởng nhóm, nhân viên được cấp quyền riêng): chỉ cấp dưới trực tiếp.
     company_wide_permissions: quyền mà bản chất là việc toàn công ty với API đang gọi
     (vd: CONTRACT_MANAGE khi xem danh sách nhân sự để ký hợp đồng).
     """
@@ -166,6 +182,10 @@ def data_scope(account: dict[str, Any], *company_wide_permissions: str) -> DataS
         return None
     if any(code in account["permissions"] for code in company_wide_permissions):
         return None
+    # Trưởng phòng ban: toàn bộ nhân sự phòng mình + cấp dưới trực tiếp (kể cả người ở phòng khác)
+    if account.get("la_truong_phong") and account.get("ma_pb"):
+        return DataScope(ma_nql=account["ma_nv"], ma_pb=account["ma_pb"])
+    # Trưởng nhóm / nhân viên được cấp quyền quản lý riêng: chỉ cấp dưới trực tiếp
     return DataScope(ma_nql=account["ma_nv"])
 
 
